@@ -3,6 +3,11 @@
   "style": "new-york",
   "rsc": true,
   "tsx": true,
+  "dependencies": [
+    "zod",
+    "@hookform/resolvers",
+    "react-hook-form"
+  ],
   "tailwind": {
     "config": "tailwind.config.ts",
     "css": "app/globals.css",

@@ -1,0 +1,10 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="clinic-pattern" patternUnits="userSpaceOnUse" width="100" height="100">
+      <path d="M0 0h100v100H0z" fill="#f9fafb"/>
+      <path d="M20 10H10v10h10V10zm0 0v10h10V10H20zm40 0H50v10h10V10zm0 0v10h10V10H60z" fill="#e6f7ff" fill-opacity=".4"/>
+      <path d="M90 10H80v10h10V10zm-70 20H10v10h10V30zm40 0H50v10h10V30zm40 0H80v10h10V30zM20 50H10v10h10V50zm40 0H50v10h10V50zm40 0H80v10h10V50zM20 70H10v10h10V70zm40 0H50v10h10V70zm40 0H80v10h10V70zM20 90H10v10h10V90zm40 0H50v10h10V90zm40 0H80v10h10V90z" fill="#0ea5e9" fill-opacity=".2"/>
+    </pattern>
+  </defs>
+  <rect width="100" height="100" fill="url(#clinic-pattern)"/>
+</svg> 

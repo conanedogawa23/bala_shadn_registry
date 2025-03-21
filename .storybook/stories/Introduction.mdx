@@ -1,0 +1,103 @@
+import { Meta, Canvas, Story } from '@storybook/blocks';
+
+<Meta title="Introduction" />
+
+# Shadcn UI Component Library
+
+Welcome to our Shadcn UI component library! This library is built on top of [shadcn/ui](https://ui.shadcn.com/), a collection of reusable components that you can copy and paste into your apps. The components are built using [Radix UI](https://www.radix-ui.com/) and styled with [Tailwind CSS](https://tailwindcss.com/).
+
+## Component Organization
+
+Our components are organized into the following categories:
+
+### UI/Inputs
+Input components that collect user data:
+- **Input** - Basic text input field
+- **Textarea** - Multi-line text input
+- **Select** - Dropdown selection component
+- **Label** - Text labels for form fields
+- **Form** - Form handling and validation components
+
+### UI/Layout
+Components that help structure your interface:
+- **Card** - Container component with various styles
+- **Separator** - Visual dividers between elements
+
+### UI/Navigation
+Components for navigating your application:
+- **Sidebar** - Vertical navigation sidebar
+- **MobileNav** - Responsive navigation for mobile devices
+
+### UI/Overlay
+Components that overlay content:
+- **Sheet** - Slide-in panel that overlays content
+- **Popover** - Pop-up content containers
+- **Tooltip** - Informative hints on hover
+- **Dialog** - Modal dialog windows
+
+### UI/Data Display
+Components for displaying data:
+- **Table** - Tabular data display
+- **Calendar** - Date selection and display
+- **Avatar** - User avatars and images
+- **Badge** - Status indicators and labels
+
+### UI/Disclosure
+Components that show/hide content:
+- **Collapsible** - Expandable content sections
+- **DropdownMenu** - Contextual dropdown menus
+- **Accordion** - Vertically stacked disclosure components
+
+## Getting Started
+
+### Installation
+
+These components are designed to be copied into your project, not installed as a dependency. This gives you full control over the components and their styling.
+
+### Usage
+
+```jsx
+import { Button } from "@/components/ui/button"
+
+export default function Home() {
+  return (
+    <Button variant="outline">Click me</Button>
+  )
+}
+```
+
+### Customization
+
+All components are built with Tailwind CSS and can be customized by modifying their respective CSS classes or through Tailwind's theme configuration.
+
+## Component Development Guidelines
+
+When creating new components:
+
+1. **Accessibility**: Ensure components meet WCAG accessibility standards
+2. **Responsiveness**: Design components to work across different screen sizes
+3. **Customization**: Allow for adequate customization through props
+4. **Documentation**: Document props, variants, and provide usage examples
+
+## Storybook Usage
+
+This Storybook instance provides:
+
+- Interactive examples of each component
+- Documentation of available props and variants
+- Code snippets for easy implementation
+- Component playground for testing different configurations
+
+Navigate through the sidebar to explore the component categories and individual components.
+
+## Contributing
+
+To add new components or modify existing ones:
+
+1. Follow the component structure and naming conventions
+2. Create component tests and stories
+3. Document your component thoroughly
+4. Submit a pull request for review
+
+Thank you for using our component library!
+
