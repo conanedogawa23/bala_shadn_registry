@@ -7,7 +7,8 @@ import Image from "next/image";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Lock, Mail } from "lucide-react";
+import { Lock, Mail, AlertCircle } from "lucide-react";
+import { usePublicRoute } from "@/lib/auth";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,11 +23,11 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 
-// Login form schema
+// Login form schema with enhanced validation
 const loginFormSchema = z.object({
-  identifier: z.string().min(1, {
-    message: "Email or username is required.",
-  }),
+  identifier: z.string()
+    .min(1, { message: "Email is required." })
+    .email({ message: "Please enter a valid email address." }),
   password: z.string().min(6, {
     message: "Password must be at least 6 characters.",
   }),
@@ -35,10 +36,21 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
+// Mock user database for demo purposes
+const MOCK_USERS = [
+  { email: "demo@example.com", password: "password123", name: "Demo User" },
+  { email: "test@example.com", password: "test1234", name: "Test User" },
+  { email: "admin@bodybliss.com", password: "admin123", name: "Admin User" },
+];
+
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [authError, setAuthError] = React.useState<string | null>(null);
+  
+  // Redirect if already authenticated
+  usePublicRoute();
 
   // Initialize form with default values
   const form = useForm<LoginFormValues>({
@@ -53,18 +65,48 @@ export default function LoginPage() {
   // Handle form submission
   async function onSubmit(values: LoginFormValues) {
     setIsLoading(true);
+    setAuthError(null);
     
     try {
-      // This would normally call an authentication API
-      console.log(values);
-      
-      // Simulate API call
+      // Simulate API call delay
       await new Promise((resolve) => setTimeout(resolve, 1000));
       
-      // Navigate to dashboard after successful login
-      router.push("/dashboard");
+      // Find user with matching email (case insensitive)
+      const user = MOCK_USERS.find(
+        u => u.email.toLowerCase() === values.identifier.toLowerCase()
+      );
+      
+      // Check if user exists and password matches
+      if (!user) {
+        setAuthError("No account found with this email address.");
+        return;
+      }
+      
+      if (user.password !== values.password) {
+        setAuthError("Invalid password. Please try again.");
+        return;
+      }
+      
+      // Login successful - set authenticated in localStorage
+      localStorage.setItem("isAuthenticated", "true");
+      localStorage.setItem("user", JSON.stringify({ 
+        email: user.email,
+        name: user.name 
+      }));
+      
+      // Set remember me preference if checked
+      if (values.rememberMe) {
+        localStorage.setItem("rememberMe", "true");
+      } else {
+        localStorage.removeItem("rememberMe");
+      }
+      
+      // Reset form and navigate to dashboard
+      form.reset();
+      router.push("/");
     } catch (error) {
       console.error("Login failed:", error);
+      setAuthError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -167,6 +209,14 @@ export default function LoginPage() {
                 Enter your details to access your Body Bliss account
               </p>
             </div>
+            
+            {/* Authentication error alert */}
+            {authError && (
+              <div className="mb-6 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 flex items-center">
+                <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                <p>{authError}</p>
+              </div>
+            )}
             
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
@@ -279,6 +329,10 @@ export default function LoginPage() {
                     </span>
                   )}
                 </Button>
+                
+                <div className="text-sm text-center text-gray-600">
+                  Demo credentials: <span className="font-medium">demo@example.com / password123</span>
+                </div>
               </form>
             </Form>
             

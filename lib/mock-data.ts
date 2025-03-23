@@ -248,11 +248,116 @@ export const currentUserData = {
   id: 1,
   name: "Alex Johnson",
   email: "alex.johnson@example.com",
-  phone: "(555) 123-4567",
-  dateOfBirth: "1985-06-15",
-  profileImage: "/avatars/alex.jpg",
-  preferredLocation: "Body Bliss - Main Street",
-  memberSince: "2022-01-10",
-  upcomingAppointments: 2,
-  lastVisit: "2023-05-28"
+  phone: "555-123-4567",
+  dob: "1985-06-15",
+  gender: "non-binary",
+  address: {
+    street: "123 Wellness Avenue",
+    city: "Wellness City",
+    state: "WS",
+    zipCode: "12345",
+    country: "United States"
+  },
+  emergencyContact: {
+    name: "Sarah Johnson",
+    relationship: "Spouse",
+    phone: "555-987-6543"
+  },
+  insurance: {
+    provider: "BlueShield Health",
+    policyNumber: "BSH-123456789",
+    groupNumber: "GRP-987654",
+    primaryHolder: true,
+    coverageStartDate: "2022-01-01",
+    coverageEndDate: "2023-12-31"
+  },
+  clinicalInformation: {
+    bloodType: "O+",
+    allergies: ["Penicillin", "Peanuts"],
+    chronicConditions: ["Mild Asthma", "Seasonal Allergies"],
+    currentMedications: [
+      {
+        name: "Albuterol",
+        dosage: "90mcg",
+        frequency: "As needed",
+        purpose: "Asthma management"
+      },
+      {
+        name: "Loratadine",
+        dosage: "10mg",
+        frequency: "Once daily",
+        purpose: "Allergy relief"
+      }
+    ],
+    surgicalHistory: [
+      {
+        procedure: "Appendectomy",
+        date: "2010-03-12",
+        hospital: "Wellness General Hospital"
+      }
+    ],
+    vaccinations: [
+      { name: "Influenza", date: "2022-10-05" },
+      { name: "COVID-19", date: "2022-04-15" },
+      { name: "Tdap", date: "2019-06-20" }
+    ]
+  },
+  wellnessProfile: {
+    height: { value: 175, unit: "cm" },
+    weight: { value: 68, unit: "kg" },
+    bmi: 22.2,
+    exerciseFrequency: "3-4 times per week",
+    dietaryPreferences: ["Vegetarian", "Low-carb"],
+    sleepAverage: 7.5,
+    stressLevel: "Moderate",
+    goals: [
+      "Improve flexibility",
+      "Reduce stress",
+      "Maintain current weight"
+    ]
+  },
+  treatmentPreferences: {
+    preferredClinics: [1, 3],
+    preferredProviders: [2, 5],
+    preferredAppointmentDays: {
+      monday: true,
+      tuesday: false,
+      wednesday: true,
+      thursday: true,
+      friday: false,
+      saturday: true,
+      sunday: false
+    },
+    preferredAppointmentTimes: ["Morning", "Evening"],
+    communicationPreferences: {
+      appointmentReminders: "Email",
+      generalCommunication: "Email",
+      promotionalOffers: false
+    }
+  },
+  accountSettings: {
+    language: "English",
+    timezone: "America/New_York",
+    receiveNewsletter: true,
+    twoFactorEnabled: true,
+    notificationSettings: {
+      appointmentReminders: true,
+      appointmentChanges: true,
+      treatmentSummaries: true,
+      billingUpdates: true,
+      promotionalContent: false
+    },
+    privacySettings: {
+      shareDataForResearch: false,
+      allowLocationTracking: true
+    }
+  },
+  membershipDetails: {
+    memberSince: "2021-08-15",
+    membershipType: "Premium",
+    membershipStatus: "Active",
+    membershipExpiration: "2024-08-15",
+    loyaltyPoints: 1250,
+    referrals: 3
+  }
 }; 

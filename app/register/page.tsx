@@ -3,8 +3,9 @@
 import * as React from "react";
 import { z } from "zod";
 import Link from "next/link";
-import { Eye, EyeOff, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { Eye, EyeOff, ChevronLeft, ChevronRight, Check, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { usePublicRoute } from "@/lib/auth";
 import {
   Card,
   CardContent,
@@ -66,6 +67,82 @@ const FormCheckbox = ({
   );
 };
 
+// Password Strength Meter component
+interface PasswordStrengthMeterProps {
+  password: string;
+}
+
+const PasswordStrengthMeter = ({ password }: PasswordStrengthMeterProps) => {
+  // Calculate password strength
+  const getStrength = (password: string): number => {
+    let strength = 0;
+    
+    if (password.length >= 8) strength += 1;
+    if (/[A-Z]/.test(password)) strength += 1;
+    if (/[a-z]/.test(password)) strength += 1;
+    if (/[0-9]/.test(password)) strength += 1;
+    if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+    
+    return strength;
+  };
+  
+  const strength = getStrength(password);
+  
+  // Get description based on strength
+  const getDescription = (): string => {
+    if (password.length === 0) return "Enter password";
+    if (strength === 0) return "Very weak";
+    if (strength === 1) return "Weak";
+    if (strength === 2) return "Fair";
+    if (strength === 3) return "Good";
+    if (strength === 4) return "Strong";
+    return "Very strong";
+  };
+  
+  // Get color based on strength
+  const getColor = (): string => {
+    if (password.length === 0) return "bg-gray-200";
+    if (strength <= 1) return "bg-red-500";
+    if (strength === 2) return "bg-orange-500";
+    if (strength === 3) return "bg-yellow-500";
+    if (strength === 4) return "bg-green-500";
+    return "bg-green-600";
+  };
+  
+  return (
+    <div className="w-full space-y-2">
+      <div className="flex justify-between items-center">
+        <div className="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden">
+          {password && (
+            <div 
+              className={`h-full transition-all duration-300 ${getColor()}`} 
+              style={{ width: `${(strength / 5) * 100}%` }}
+            ></div>
+          )}
+        </div>
+        <span className="ml-2 text-xs text-gray-500 min-w-[60px] text-right">
+          {getDescription()}
+        </span>
+      </div>
+      
+      <div className="flex gap-2 flex-wrap">
+        <div className={`text-xs ${password.length >= 8 ? "text-green-600" : "text-gray-500"}`}>
+          {password.length >= 8 ? "✓" : "•"} 8+ characters
+        </div>
+        <div className={`text-xs ${/[A-Z]/.test(password) ? "text-green-600" : "text-gray-500"}`}>
+          {/[A-Z]/.test(password) ? "✓" : "•"} Uppercase
+        </div>
+        <div className={`text-xs ${/[a-z]/.test(password) ? "text-green-600" : "text-gray-500"}`}>
+          {/[a-z]/.test(password) ? "✓" : "•"} Lowercase
+        </div>
+        <div className={`text-xs ${/[0-9]/.test(password) ? "text-green-600" : "text-gray-500"}`}>
+          {/[0-9]/.test(password) ? "✓" : "•"} Number
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Create a FormSelect component
 interface FormSelectProps {
   name: string;
@@ -117,10 +194,24 @@ const FormSelect = ({
   );
 };
 
+// Email validation checker
+const isEmailAvailable = async (email: string): Promise<boolean> => {
+  // This would be an API call to check if email is already registered
+  // For now, we'll simulate a check against a list of "taken" emails
+  const takenEmails = ["taken@example.com", "used@bodybliss.com", "registered@test.com"];
+  
+  // Simulate network latency
+  await new Promise(resolve => setTimeout(resolve, 800));
+  
+  return !takenEmails.includes(email.toLowerCase());
+};
+
 // Form schemas for each step
 const personalInfoSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  email: z.string().email({ message: "Please enter a valid email address" }),
+  email: z.string()
+    .email({ message: "Please enter a valid email address" })
+    .refine(email => email.length > 0, { message: "Email is required" }),
   phone: z.string().min(10, { message: "Please enter a valid phone number" }),
   dateOfBirth: z.string().min(1, { message: "Date of birth is required" }),
 });
@@ -256,11 +347,31 @@ const insuranceOptions = [
 
 export default function RegisterPage() {
   const router = useRouter();
+  usePublicRoute(); // Redirect if already authenticated
   const [currentStep, setCurrentStep] = React.useState(1);
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [formData, setFormData] = React.useState<Partial<RegisterFormValues>>({});
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [emailChecking, setEmailChecking] = React.useState(false);
+  const [emailAvailable, setEmailAvailable] = React.useState<boolean | null>(null);
+  const [registrationError, setRegistrationError] = React.useState<string | null>(null);
+  const [passwordInput, setPasswordInput] = React.useState("");
+
+  // Check email availability
+  const checkEmailAvailability = React.useCallback(async (email: string) => {
+    if (!email || !email.includes("@")) return;
+    
+    setEmailChecking(true);
+    try {
+      const available = await isEmailAvailable(email);
+      setEmailAvailable(available);
+    } catch (error) {
+      console.error("Error checking email:", error);
+    } finally {
+      setEmailChecking(false);
+    }
+  }, []);
 
   // Get the right form schema for each step
   const getSchemaForStep = (step: number) => {
@@ -281,7 +392,24 @@ export default function RegisterPage() {
   };
 
   // Handle form submission for each step
-  const handleStepSubmit = (values: Partial<RegisterFormValues>) => {
+  const handleStepSubmit = async (values: Partial<RegisterFormValues>) => {
+    setRegistrationError(null);
+    
+    // Special handling for step 1 - check email availability
+    if (currentStep === 1 && values.email) {
+      if (emailChecking) return; // Don't proceed if still checking
+      
+      if (emailAvailable === false) {
+        setRegistrationError("Email address is already registered. Please use a different email or login to your account.");
+        return;
+      }
+    }
+    
+    // Special handling for step 2 - store password for strength meter
+    if (currentStep === 2 && values.password) {
+      setPasswordInput(values.password as string);
+    }
+    
     // Merge the new values with the existing form data
     const updatedFormData = { ...formData, ...values };
     setFormData(updatedFormData);
@@ -298,6 +426,7 @@ export default function RegisterPage() {
   // Handle final form submission
   const handleFinalSubmit = async (values: RegisterFormValues) => {
     setIsSubmitting(true);
+    setRegistrationError(null);
     
     try {
       // Validate the complete form data against the full schema
@@ -314,19 +443,45 @@ export default function RegisterPage() {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1500));
       
+      // Simulate potential registration failure
+      if (values.email === "fail@example.com") {
+        throw new Error("Registration failed. Please try with a different email address.");
+      }
+      
+      // Set the user as authenticated (for demo purposes)
+      if (typeof window !== "undefined") {
+        localStorage.setItem("isAuthenticated", "true");
+        localStorage.setItem("user", JSON.stringify({
+          name: values.name,
+          email: values.email
+        }));
+      }
+      
       // Redirect to login page or dashboard
-      router.push('/login?registered=true');
+      router.push('/');
     } catch (error) {
       console.error("Registration error:", error);
-      alert("An error occurred during registration. Please try again.");
+      setRegistrationError(error instanceof Error ? error.message : "An error occurred during registration. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
   
+  // Check email availability when the email input changes
+  React.useEffect(() => {
+    if (formData.email) {
+      const timer = setTimeout(() => {
+        checkEmailAvailability(formData.email as string);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [formData.email, checkEmailAvailability]);
+  
   // Handle going back to the previous step
   const handlePrevStep = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
+    setRegistrationError(null);
   };
   
   // Render different form sections based on current step
@@ -393,6 +548,14 @@ export default function RegisterPage() {
       >
         {() => (
           <CardContent className="space-y-4 pt-6">
+            {/* Error message display */}
+            {registrationError && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6 text-red-800 flex items-center">
+                <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                <p>{registrationError}</p>
+              </div>
+            )}
+          
             {currentStep === 1 && (
               <>
                 <FormInput
@@ -401,13 +564,24 @@ export default function RegisterPage() {
                   placeholder="Enter your full name"
                   autoComplete="name"
                 />
-                <FormInput
-                  name="email"
-                  label="Email Address"
-                  placeholder="Enter your email address"
-                  type="email"
-                  autoComplete="email"
-                />
+                <div className="space-y-1">
+                  <FormInput
+                    name="email"
+                    label="Email Address"
+                    placeholder="Enter your email address"
+                    type="email"
+                    autoComplete="email"
+                  />
+                  {emailChecking && (
+                    <div className="text-xs text-blue-600 mt-1">Checking email availability...</div>
+                  )}
+                  {!emailChecking && emailAvailable === true && formData.email && (
+                    <div className="text-xs text-green-600 mt-1">Email is available</div>
+                  )}
+                  {!emailChecking && emailAvailable === false && formData.email && (
+                    <div className="text-xs text-red-600 mt-1">Email is already registered</div>
+                  )}
+                </div>
                 <FormInput
                   name="phone"
                   label="Phone Number"
@@ -438,13 +612,14 @@ export default function RegisterPage() {
             {currentStep === 2 && (
               <>
                 <div className="space-y-4">
-                  <div className="relative">
+                  <div className="relative space-y-1">
                     <FormInput
                       name="password"
                       label="Password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Create a secure password"
                       autoComplete="new-password"
+                      onChange={(e) => setPasswordInput(e.target.value)}
                     />
                     <button
                       type="button"
@@ -453,6 +628,7 @@ export default function RegisterPage() {
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
+                    <PasswordStrengthMeter password={passwordInput} />
                   </div>
                   
                   <div className="relative">
