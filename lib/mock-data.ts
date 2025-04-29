@@ -360,4 +360,87 @@ export const currentUserData = {
     loyaltyPoints: 1250,
     referrals: 3
   }
-}; 
+};
+
+export const activityData = [
+  {
+    id: 1,
+    type: "order",
+    title: "New order created",
+    description: "Order #SH90136 for JOHNSON, MARY",
+    timestamp: "2 hours ago",
+    icon: "ShoppingBag"
+  },
+  {
+    id: 2,
+    type: "client",
+    title: "New client registered",
+    description: "WILSON, LINDA added to the system",
+    timestamp: "5 hours ago",
+    icon: "Users"
+  },
+  {
+    id: 3,
+    type: "payment",
+    title: "Payment received",
+    description: "$120.50 payment for Order #SH90133",
+    timestamp: "Yesterday at 2:15 PM",
+    icon: "CreditCard"
+  },
+  {
+    id: 4,
+    type: "order",
+    title: "Order status updated",
+    description: "Order #SH90130 marked as completed",
+    timestamp: "Yesterday at 11:45 AM",
+    icon: "ShoppingBag"
+  },
+  {
+    id: 5,
+    type: "client",
+    title: "Client information updated",
+    description: "Contact details updated for SMITH, JOHN",
+    timestamp: "2 days ago",
+    icon: "Users"
+  },
+  {
+    id: 6,
+    type: "payment",
+    title: "Refund processed",
+    description: "$75.25 refunded for Order #SH90125",
+    timestamp: "2 days ago",
+    icon: "CreditCard"
+  },
+  {
+    id: 7,
+    type: "order",
+    title: "Order cancelled",
+    description: "Order #SH90122 has been cancelled",
+    timestamp: "3 days ago",
+    icon: "ShoppingBag"
+  },
+  {
+    id: 8,
+    type: "settings",
+    title: "System settings changed",
+    description: "Email notification preferences updated",
+    timestamp: "3 days ago",
+    icon: "Settings"
+  },
+  {
+    id: 9,
+    type: "client",
+    title: "Client appointment scheduled",
+    description: "BROWN, ROBERT scheduled for next Tuesday",
+    timestamp: "4 days ago",
+    icon: "Calendar"
+  },
+  {
+    id: 10,
+    type: "payment",
+    title: "Payment method added",
+    description: "New credit card added for TAYLOR, PATRICIA",
+    timestamp: "5 days ago",
+    icon: "CreditCard"
+  }
+]; 
