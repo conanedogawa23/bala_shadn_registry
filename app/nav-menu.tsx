@@ -18,15 +18,20 @@ import {
 import { cn } from "@/lib/utils";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { isAuthenticated, getUser, logout, User } from "@/lib/auth";
+import { ClinicSelector } from "@/components/clinic/clinic-selector";
+import { useClinic } from "@/lib/contexts/clinic-context";
+import { clinicToSlug } from "@/lib/data/clinics";
 
 export default function NavMenu() {
   const pathname = usePathname();
   const router = useRouter();
+  const { selectedClinic } = useClinic();
   const [mounted, setMounted] = useState(false);
   const [userAuthenticated, setUserAuthenticated] = useState(false);
   const [userData, setUserData] = useState<User | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Handle hydration mismatch and setup auth listener
   useEffect(() => {
@@ -70,11 +75,12 @@ export default function NavMenu() {
     const handleClickOutside = () => {
       if (userMenuOpen) setUserMenuOpen(false);
       if (notificationsOpen) setNotificationsOpen(false);
+      if (mobileMenuOpen) setMobileMenuOpen(false);
     };
     
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [userMenuOpen, notificationsOpen]);
+  }, [userMenuOpen, notificationsOpen, mobileMenuOpen]);
 
   const handleLogout = useCallback(() => {
     logout();
@@ -85,40 +91,45 @@ export default function NavMenu() {
   }, [router]);
   
   const isActive = useCallback((path: string) => {
-    if (path === "/" && pathname === "/") return true;
-    if (path !== "/" && pathname.startsWith(path)) return true;
-    return false;
+    // Exact match only
+    return pathname === path;
   }, [pathname]);
   
+  // Generate clinic-aware navigation items
+  const getClinicBasePath = () => {
+    if (!selectedClinic) return '/clinic/bodybliss-physio';
+    return `/clinic/${clinicToSlug(selectedClinic.displayName)}`;
+  };
+
   const navItems = [
     {
       name: "Dashboard",
-      href: "/",
+      href: getClinicBasePath(),
       icon: <Home className="h-5 w-5" />
     },
     {
       name: "Clients",
-      href: "/clients",
+      href: `${getClinicBasePath()}/clients`,
       icon: <Users className="h-5 w-5" />
     },
     {
       name: "Orders",
-      href: "/orders",
+      href: `${getClinicBasePath()}/orders`,
       icon: <ShoppingBag className="h-5 w-5" />
     },
     {
       name: "Payments",
-      href: "/payments",
+      href: `${getClinicBasePath()}/payments`,
       icon: <CreditCard className="h-5 w-5" />
     },
     {
       name: "Reports",
-      href: "/reports",
+      href: `${getClinicBasePath()}/reports`,
       icon: <BookOpen className="h-5 w-5" />
     },
     {
       name: "Settings",
-      href: "/settings",
+      href: `${getClinicBasePath()}/settings`,
       icon: <Settings className="h-5 w-5" />
     }
   ];
@@ -134,35 +145,59 @@ export default function NavMenu() {
   
   return (
     <nav className="bg-white border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-1 sm:px-2 lg:px-3">
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link href="/" className="font-bold text-xl" style={{ color: themeColors.primary }}>Body Bliss Visio</Link>
             </div>
             
-            <div className="hidden sm:ml-8 sm:flex sm:space-x-6">
+            {/* Clinic Selector */}
+            <div className="hidden md:ml-2 md:flex md:items-center">
+              <ClinicSelector className="w-[180px] lg:w-[200px]" />
+            </div>
+            
+            <div className="hidden lg:ml-2 lg:flex lg:space-x-2">
               {navItems.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors",
+                    "inline-flex items-center px-1.5 pt-1 border-b-2 text-sm font-medium transition-colors whitespace-nowrap",
                     isActive(item.href)
                       ? "border-blue-500 text-gray-900"
                       : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                   )}
                 >
-                  <span className="inline-flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1">
                     {item.icon}
-                    {item.name}
+                    <span className="hidden xl:inline">{item.name}</span>
                   </span>
+                </Link>
+              ))}
+            </div>
+            
+            {/* Compact nav for medium screens */}
+            <div className="hidden md:flex lg:hidden md:ml-2 md:space-x-1">
+              {navItems.slice(0, 4).map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "inline-flex items-center px-2 py-2 rounded-lg text-sm font-medium transition-colors",
+                    isActive(item.href)
+                      ? "bg-blue-100 text-blue-700"
+                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                  )}
+                  title={item.name}
+                >
+                  {item.icon}
                 </Link>
               ))}
             </div>
           </div>
           
-          <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-3">
+          <div className="hidden md:ml-3 md:flex md:items-center space-x-3 pr-1">
             {mounted && userAuthenticated ? (
               <>
                 {/* Notifications button */}
@@ -170,10 +205,10 @@ export default function NavMenu() {
                   <div className="relative">
                     <button 
                       onClick={e => { e.stopPropagation(); toggleNotifications(); }}
-                      className="p-1.5 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
+                      className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-50 focus:outline-none transition-colors"
                     >
                       <Bell className="h-5 w-5" />
-                      <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
+                      <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
                     </button>
                     
                     {/* Notifications dropdown */}
@@ -195,7 +230,7 @@ export default function NavMenu() {
                           </div>
                         </div>
                         <div className="px-4 py-2 text-center border-t border-gray-100">
-                          <Link href="/notifications" className="text-xs text-blue-600 hover:text-blue-800">
+                          <Link href={`${getClinicBasePath()}/notifications`} className="text-xs text-blue-600 hover:text-blue-800">
                             View all notifications
                           </Link>
                         </div>
@@ -208,21 +243,21 @@ export default function NavMenu() {
                 <div className="relative">
                   <button 
                     onClick={e => { e.stopPropagation(); toggleUserMenu(); }}
-                    className="flex items-center space-x-2 text-sm focus:outline-none"
+                    className="flex items-center space-x-3 text-sm focus:outline-none hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-colors"
                   >
                     <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 font-medium overflow-hidden">
                       {userData?.name ? userData.name.charAt(0).toUpperCase() : <UserCircle className="h-5 w-5" />}
                     </div>
-                    <div className="hidden md:flex md:flex-col md:items-start">
-                      <span className="text-sm font-medium text-gray-900 flex items-center">
+                    <div className="hidden lg:flex lg:flex-col lg:items-start min-w-0">
+                      <span className="text-sm font-medium text-gray-900 flex items-center truncate max-w-[120px]">
                         {userData?.name || "User"}
                         {membershipBadge}
                       </span>
-                      <span className="text-xs text-gray-500 truncate max-w-[150px]">
+                      <span className="text-xs text-gray-500 truncate max-w-[120px]">
                         {userData?.email || ""}
                       </span>
                     </div>
-                    <ChevronDown className="hidden md:block h-4 w-4 text-gray-500" />
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
                   </button>
                   
                   {/* User dropdown menu */}
@@ -233,14 +268,14 @@ export default function NavMenu() {
                         <p className="text-sm text-gray-500 truncate">{userData?.email}</p>
                       </div>
                       <Link 
-                        href="/settings/profile" 
+                        href={`${getClinicBasePath()}/settings/profile`}
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setUserMenuOpen(false)}
                       >
                         Your Profile
                       </Link>
                       <Link 
-                        href="/settings/account" 
+                        href={`${getClinicBasePath()}/settings/account`}
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setUserMenuOpen(false)}
                       >
@@ -260,14 +295,14 @@ export default function NavMenu() {
               <>
                 <Link
                   href="/login"
-                  className="inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   <LogIn className="h-4 w-4 mr-2" />
                   Login
                 </Link>
                 <Link
                   href="/register"
-                  className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
                 >
                   Register
                 </Link>
@@ -276,10 +311,15 @@ export default function NavMenu() {
           </div>
           
           {/* Mobile menu button */}
-          <div className="flex items-center sm:hidden">
+          <div className="flex items-center md:hidden space-x-2 pr-1">
+            {/* Mobile clinic selector */}
+            <div className="sm:block md:hidden">
+              <ClinicSelector className="w-[140px]" />
+            </div>
             <button
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-              aria-expanded="false"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="inline-flex items-center justify-center p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+              aria-expanded={mobileMenuOpen}
             >
               <span className="sr-only">Open main menu</span>
               {/* Icon when menu is closed */}
@@ -304,14 +344,15 @@ export default function NavMenu() {
       </div>
       
       {/* Mobile menu, show/hide based on menu state */}
-      <div className="sm:hidden hidden">
-        <div className="pt-2 pb-3 space-y-1">
+      <div className={cn("md:hidden", mobileMenuOpen ? "block" : "hidden")}>
+        <div className="pt-2 pb-3 space-y-1 border-t border-gray-200">
           {navItems.map((item) => (
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => setMobileMenuOpen(false)}
               className={cn(
-                "block pl-3 pr-4 py-2 border-l-4 text-base font-medium",
+                "block pl-3 pr-4 py-3 border-l-4 text-base font-medium transition-colors",
                 isActive(item.href)
                   ? "bg-blue-50 border-blue-500 text-blue-700"
                   : "border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700"
@@ -319,7 +360,7 @@ export default function NavMenu() {
             >
               <span className="flex items-center">
                 {item.icon}
-                <span className="ml-2">{item.name}</span>
+                <span className="ml-3">{item.name}</span>
               </span>
             </Link>
           ))}

@@ -1,0 +1,436 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { 
+  ArrowLeft, 
+  User, 
+  Package, 
+  FileText, 
+  Phone, 
+  Mail,
+  Edit,
+  Printer,
+  Download,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  DollarSign
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+interface OrderItem {
+  id: string;
+  name: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+interface OrderData {
+  id: string;
+  clientId: string;
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  orderDate: string;
+  dueDate: string;
+  completedDate?: string;
+  items: OrderItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  notes: string;
+  assignedTo: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+const themeColors = {
+  primary: '#6366f1',
+  secondary: '#8b5cf6',
+  accent: '#06b6d4',
+  success: '#10b981',
+  warning: '#f59e0b',
+  error: '#ef4444',
+};
+
+export default function ViewClientOrderPage() {
+  const router = useRouter();
+  const params = useParams();
+  const clinic = params.clinic as string;
+  const clientId = params.id as string;
+  const orderId = params.orderId as string;
+  
+  const [orderData, setOrderData] = useState<OrderData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Mock data - in real app, this would come from an API
+  useEffect(() => {
+    const fetchOrder = async () => {
+      setIsLoading(true);
+      // Simulate API call
+      setTimeout(() => {
+        const mockOrder: OrderData = {
+          id: orderId,
+          clientId: clientId,
+          clientName: "ROBINSON, DAVID",
+          clientEmail: "d.robinson@email.com",
+          clientPhone: "416-555-1234",
+          status: "processing",
+          orderDate: "2024-01-15",
+          dueDate: "2024-02-01",
+          items: [
+            {
+              id: "1",
+              name: "Physical Therapy Session",
+              description: "60-minute individual therapy session",
+              quantity: 3,
+              unitPrice: 120.00,
+              totalPrice: 360.00
+            },
+            {
+              id: "2",
+              name: "Exercise Equipment Package",
+              description: "Resistance bands and therapy balls",
+              quantity: 1,
+              unitPrice: 85.00,
+              totalPrice: 85.00
+            },
+            {
+              id: "3",
+              name: "Home Exercise Program",
+              description: "Custom exercise plan with video instructions",
+              quantity: 1,
+              unitPrice: 50.00,
+              totalPrice: 50.00
+            }
+          ],
+          subtotal: 495.00,
+          tax: 64.35,
+          total: 559.35,
+          notes: "Client prefers morning appointments. Focus on lower back rehabilitation.",
+          assignedTo: "Dr. Sarah Johnson",
+          priority: "medium"
+        };
+        setOrderData(mockOrder);
+        setIsLoading(false);
+      }, 1000);
+    };
+
+    fetchOrder();
+  }, [orderId, clientId]);
+
+  const handleBack = () => {
+    router.push(`/clinic/${clinic}/clients/${clientId}`);
+  };
+
+  const handleEditOrder = () => {
+    router.push(`/clinic/${clinic}/clients/${clientId}/orders/${orderId}/edit`);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownload = () => {
+    // In a real app, this would generate and download a PDF
+    alert('Order summary downloaded');
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'processing':
+        return 'bg-blue-100 text-blue-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return 'bg-red-100 text-red-800';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'low':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'processing':
+        return <Clock className="h-4 w-4" />;
+      case 'pending':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'cancelled':
+        return <AlertCircle className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center min-h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!orderData) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-destructive">Order Not Found</h1>
+          <p className="text-muted-foreground mt-2">
+            The order you&apos;re looking for doesn&apos;t exist or has been removed.
+          </p>
+          <Button onClick={handleBack} className="mt-4">
+            Back to Client
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-8 px-4 sm:px-6 max-w-4xl">
+      {/* Back Navigation */}
+      <div className="mb-8">
+        <Button 
+          variant="outline" 
+          onClick={handleBack}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft size={16} />
+          Back to {orderData.clientName}
+        </Button>
+      </div>
+
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: themeColors.primary }}>
+            Order #{orderData.id}
+          </h1>
+          <p className="text-gray-600 mt-1">
+            {clinic.replace('-', ' ')} • {orderData.clientName}
+          </p>
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handlePrint}
+            className="flex items-center gap-2"
+          >
+            <Printer size={16} />
+            Print
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleDownload}
+            className="flex items-center gap-2"
+          >
+            <Download size={16} />
+            Download
+          </Button>
+          <Button 
+            onClick={handleEditOrder}
+            size="sm"
+            className="flex items-center gap-2"
+            style={{ backgroundColor: themeColors.primary }}
+          >
+            <Edit size={16} />
+            Edit Order
+          </Button>
+        </div>
+      </div>
+
+      {/* Order Status & Info */}
+      <div className="grid gap-6 md:grid-cols-2 mb-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Order Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Status</span>
+              <Badge variant="secondary" className={getStatusColor(orderData.status)}>
+                {getStatusIcon(orderData.status)}
+                <span className="ml-2 capitalize">{orderData.status}</span>
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Priority</span>
+              <Badge variant="secondary" className={getPriorityColor(orderData.priority)}>
+                <span className="capitalize">{orderData.priority}</span>
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Order Date</span>
+              <span className="font-medium">{formatDate(orderData.orderDate)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Due Date</span>
+              <span className="font-medium">{formatDate(orderData.dueDate)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Assigned To</span>
+              <span className="font-medium">{orderData.assignedTo}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Client Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Name</span>
+              <span className="font-medium">{orderData.clientName}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Email</span>
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-gray-400" />
+                <span className="font-medium">{orderData.clientEmail}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Phone</span>
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-gray-400" />
+                <span className="font-medium">{orderData.clientPhone}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Client ID</span>
+              <span className="font-medium">#{orderData.clientId}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Order Items */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Order Items
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {orderData.items.map((item, index) => (
+              <div key={item.id}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-medium">{item.name}</h4>
+                    <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
+                    <div className="text-sm text-gray-600">
+                      Qty: <span className="font-medium">{item.quantity}</span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Unit: <span className="font-medium">{formatCurrency(item.unitPrice)}</span>
+                    </div>
+                    <div className="font-medium">
+                      {formatCurrency(item.totalPrice)}
+                    </div>
+                  </div>
+                </div>
+                {index < orderData.items.length - 1 && <Separator className="mt-4" />}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Order Summary */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Order Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Subtotal</span>
+              <span className="font-medium">{formatCurrency(orderData.subtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Tax</span>
+              <span className="font-medium">{formatCurrency(orderData.tax)}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between text-lg font-bold">
+              <span>Total</span>
+              <span>{formatCurrency(orderData.total)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notes */}
+      {orderData.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Order Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 whitespace-pre-wrap">{orderData.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+} 

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import NavMenu from "./nav-menu";
+import { ClinicProvider } from "@/lib/contexts/clinic-context";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,10 +20,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className={cn(inter.className, "min-h-screen bg-slate-50 flex flex-col")}>
-        <NavMenu />
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <ClinicProvider>
+          <NavMenu />
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
+        </ClinicProvider>
       </body>
     </html>
   );
