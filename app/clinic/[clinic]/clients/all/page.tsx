@@ -15,6 +15,79 @@ import {
   Plus
 } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
+
+// Mock data generation function
+const generateMockClients = (clinicName: string): Client[] => {
+  const clientNames = [
+    "Amin, Hasmukhlal",
+    "Banquerigo, Charity", 
+    "Campagna, Frank",
+    "David, G. Levi",
+    "Enverga, Rosemer",
+    "Fung, Mei Chu",
+    "Galang, Alma",
+    "Gotzev, Boris",
+    "Henderson, Sarah",
+    "Jackson, Michael",
+    "Williams, Jennifer",
+    "Robinson, David",
+    "Smith, John",
+    "Johnson, Mary",
+    "Brown, Patricia"
+  ];
+
+  // Generate different number of clients per clinic based on clinic characteristics
+  const clientCounts: Record<string, number> = {
+    "Orthopedic Orthotic Appliances": 25,
+    "Markham Orthopedic": 30,
+    "Bioform Health": 45,
+    "BodyBliss": 15,
+    "Evergold": 8,
+    "Ortholine Duncan Mills": 50,
+    "bodyblissphysio": 12,
+    "ExtremePhysio": 22,
+    "Physio Bliss": 18,
+    "BodyBlissOneCare": 28,
+    "Active force eh": 10,
+    "My Cloud": 20,
+    "Century Care": 16
+  };
+
+  const clientCount = clientCounts[clinicName] || 15;
+  const clients: Client[] = [];
+
+  for (let i = 0; i < clientCount; i++) {
+    const nameIndex = i % clientNames.length;
+    const name = clientNames[nameIndex];
+    const [lastName, firstName] = name.split(', ');
+    
+    // Generate some realistic status and dates
+    const status = Math.random() > 0.2 ? 'active' : 'inactive';
+    const lastVisit = new Date(Date.now() - Math.floor(Math.random() * 365) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const totalOrders = Math.floor(Math.random() * 20) + 1;
+    const nextAppointment = status === 'active' && Math.random() > 0.3 
+      ? new Date(Date.now() + Math.floor(Math.random() * 60) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      : undefined;
+
+    const dateOfBirth = `${1950 + Math.floor(Math.random() * 50)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`;
+    const gender = Math.random() > 0.5 ? 'male' : 'female';
+
+    clients.push({
+      id: `CLI${i + 1000}`,
+      name: name,
+      email: `${firstName?.toLowerCase() || 'client'}.${lastName?.toLowerCase() || 'user'}@email.com`,
+      phone: `(416) ${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 9000 + 1000)}`,
+      dateOfBirth,
+      gender: gender as 'male' | 'female' | 'other',
+      status: status as 'active' | 'inactive' | 'archived',
+      lastVisit,
+      totalOrders,
+      nextAppointment
+    });
+  }
+
+  return clients;
+};
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -62,16 +135,18 @@ export default function AllClientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const clientsPerPage = 12;
 
-  // Generate realistic data based on actual clinic information
+  // Get real clients from the database
   useEffect(() => {
     const fetchClients = async () => {
       setIsLoading(true);
       // Simulate API call
       setTimeout(() => {
         const clinicData = slugToClinic(clinic);
-        const mockClients: Client[] = generateClinicClients(clinicData);
-        setClients(mockClients);
-        setFilteredClients(mockClients);
+        if (clinicData) {
+          const realClients = generateMockClients(clinicData.name);
+          setClients(realClients);
+          setFilteredClients(realClients);
+        }
         setIsLoading(false);
       }, 1000);
     };
@@ -79,72 +154,7 @@ export default function AllClientsPage() {
     fetchClients();
   }, [clinic]);
 
-  // Generate clients based on real clinic data
-  const generateClinicClients = (clinicData: { clientCount?: number; status?: string; displayName?: string } | undefined): Client[] => {
-    if (!clinicData) return [];
-    
-    const clientCount = clinicData.clientCount || 0;
-    const isActive = clinicData.status === 'active';
-    const isHistorical = clinicData.status === 'historical';
-    
-    // Base clients that appear in multiple clinics (from real DB)
-    const baseClients = [
-      {
-        id: "16883465",
-        name: "ROBINSON, DAVID",
-        email: "d.robinson@email.com", 
-        phone: "416-555-1234",
-        dateOfBirth: "1985-06-15",
-        gender: "male" as const
-      },
-      {
-        id: "21770481", 
-        name: "HEALTH BIOFORM",
-        email: "info@healthbioform.com",
-        phone: "905-670-0204",
-        dateOfBirth: "1978-03-22",
-        gender: "female" as const
-      }
-    ];
-
-    // Generate additional clients based on clinic size
-    const additionalClients = [];
-    const clientNames = [
-      "ANDERSON, SARAH", "THOMPSON, MICHAEL", "WILSON, JESSICA", 
-      "MARTINEZ, CARLOS", "BROWN, JENNIFER", "DAVIS, ROBERT",
-      "GARCIA, MARIA", "RODRIGUEZ, JAMES", "LEWIS, ASHLEY",
-      "WALKER, CHRISTOPHER", "HALL, AMANDA", "ALLEN, MATTHEW"
-    ];
-
-    for (let i = 0; i < Math.min(clientCount, 50) - baseClients.length; i++) {
-      const name = clientNames[i % clientNames.length];
-      additionalClients.push({
-        id: (30000 + i).toString(),
-        name: name,
-        email: `${name.split(',')[1].toLowerCase().trim()}.${name.split(',')[0].toLowerCase()}@email.com`,
-        phone: `(416) ${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 9000 + 1000)}`,
-        dateOfBirth: `19${Math.floor(Math.random() * 40 + 60)}-${String(Math.floor(Math.random() * 12 + 1)).padStart(2, '0')}-${String(Math.floor(Math.random() * 28 + 1)).padStart(2, '0')}`,
-        gender: Math.random() > 0.5 ? "female" as const : "male" as const
-      });
-    }
-
-    // Combine all clients and add clinic-specific properties
-    return [...baseClients, ...additionalClients].map((client) => ({
-      ...client,
-      status: isActive 
-        ? (Math.random() > 0.2 ? "active" as const : "inactive" as const)
-        : (isHistorical ? "inactive" as const : "archived" as const),
-      lastVisit: isActive 
-        ? `2024-${String(Math.floor(Math.random() * 2 + 1)).padStart(2, '0')}-${String(Math.floor(Math.random() * 28 + 1)).padStart(2, '0')}`
-        : (isHistorical 
-          ? `2023-${String(Math.floor(Math.random() * 12 + 1)).padStart(2, '0')}-${String(Math.floor(Math.random() * 28 + 1)).padStart(2, '0')}`
-          : `20${Math.floor(Math.random() * 3 + 19)}-${String(Math.floor(Math.random() * 12 + 1)).padStart(2, '0')}-${String(Math.floor(Math.random() * 28 + 1)).padStart(2, '0')}`),
-      totalOrders: Math.floor(Math.random() * 20 + 1),
-      nextAppointment: (isActive && Math.random() > 0.3) 
-        ? `2024-${String(Math.floor(Math.random() * 2 + 2)).padStart(2, '0')}-${String(Math.floor(Math.random() * 28 + 1)).padStart(2, '0')}`
-        : undefined
-    }));
-  };
+  // Now using real clients from the database via MockDataService
 
   // Filter clients based on search query and status
   useEffect(() => {

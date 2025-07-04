@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { slugToClinic, clinicToSlug } from '@/lib/data/clinics';
 
 interface ClinicLayoutProps {
@@ -34,15 +33,8 @@ export async function generateMetadata({
   };
 }
 
-export default async function ClinicLayout({ children, params }: ClinicLayoutProps) {
-  const { clinic: clinicSlug } = await params;
-  const clinic = slugToClinic(clinicSlug);
-
-  // If clinic doesn't exist, redirect to 404
-  if (!clinic) {
-    notFound();
-  }
-
+export default async function ClinicLayout({ children }: ClinicLayoutProps) {
+  // Let individual pages handle clinic validation
   return (
     <div className="min-h-screen bg-background">
       {/* Clinic-specific header/breadcrumb could go here */}

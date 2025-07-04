@@ -23,7 +23,9 @@ import {
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { Search, Calendar, Plus, ChevronRight, ChevronLeft, Eye, Edit2, Trash2, Printer, FileText, DollarSign, UserCircle } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { slugToClinic } from "@/lib/data/clinics";
 
+// Define Order type locally
 interface Order {
   id: string;
   orderNumber: string;
@@ -35,7 +37,105 @@ interface Order {
   totalPaid: number;
   totalOwed: number;
   status: "paid" | "partially paid" | "unpaid";
+  products: {
+    name: string;
+    description: string;
+    price: number;
+    quantity: number;
+  }[];
+  clinic: string;
 }
+
+// Mock data generation function
+const generateMockOrders = (clinicName: string): Order[] => {
+  const isOrthopedic = clinicName.toLowerCase().includes('orthopedic') || 
+                      clinicName.toLowerCase().includes('ortholine') ||
+                      clinicName.toLowerCase().includes('orthotic');
+
+  const products = isOrthopedic ? [
+    { name: "Custom Orthotics", price: 350, desc: "Custom-made orthotic insoles" },
+    { name: "Heel Cups", price: 45, desc: "Gel heel cups for comfort" },
+    { name: "Arch Supports", price: 60, desc: "Arch support insoles" },
+    { name: "Orthopedic Shoes", price: 180, desc: "Therapeutic footwear" },
+    { name: "Compression Stockings", price: 75, desc: "Medical compression wear" }
+  ] : [
+    { name: "Physiotherapy Session", price: 80, desc: "60-minute therapy session" },
+    { name: "Massage Therapy", price: 90, desc: "Therapeutic massage" },
+    { name: "Acupuncture", price: 70, desc: "Traditional acupuncture" },
+    { name: "Exercise Program", price: 120, desc: "Personalized exercise plan" }
+  ];
+
+  const clientNames = [
+    "Amin, Hasmukhlal",
+    "Banquerigo, Charity", 
+    "Campagna, Frank",
+    "David, G. Levi",
+    "Enverga, Rosemer",
+    "Fung, Mei Chu",
+    "Galang, Alma",
+    "Gotzev, Boris",
+    "Henderson, Sarah",
+    "Jackson, Michael"
+  ];
+
+  const orders: Order[] = [];
+  const orderCount = 15;
+
+  for (let i = 0; i < orderCount; i++) {
+    const clientName = clientNames[i % clientNames.length];
+    const productCount = Math.floor(Math.random() * 3) + 1;
+    let totalAmount = 0;
+    
+    const orderProducts = [];
+    for (let j = 0; j < productCount; j++) {
+      const product = products[Math.floor(Math.random() * products.length)];
+      const price = product.price + (Math.random() * 50 - 25);
+      orderProducts.push({
+        name: product.name,
+        description: product.desc,
+        price: Math.round(price * 100) / 100,
+        quantity: Math.floor(Math.random() * 2) + 1
+      });
+      totalAmount += price;
+    }
+    
+    totalAmount = Math.round(totalAmount * 100) / 100;
+    const statusRand = Math.random();
+    let status: "paid" | "partially paid" | "unpaid";
+    let totalPaid: number;
+    
+    if (statusRand < 0.7) {
+      status = "paid";
+      totalPaid = totalAmount;
+    } else if (statusRand < 0.9) {
+      status = "partially paid";
+      totalPaid = Math.round((totalAmount * (0.3 + Math.random() * 0.4)) * 100) / 100;
+    } else {
+      status = "unpaid";
+      totalPaid = 0;
+    }
+    
+    const orderDate = new Date();
+    orderDate.setDate(orderDate.getDate() - Math.floor(Math.random() * 180));
+    
+    orders.push({
+      id: (i + 1).toString(),
+      orderNumber: `SH${90000 + i + 1}`,
+      orderDate: orderDate.toISOString().split('T')[0],
+      clientName: clientName,
+      clientId: `CLI${i + 1000}`,
+      productCount: orderProducts.length,
+      totalAmount,
+      totalPaid,
+      totalOwed: Math.round((totalAmount - totalPaid) * 100) / 100,
+      status,
+      products: orderProducts,
+      clinic: clinicName
+    });
+  }
+  
+  return orders.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+};
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -52,161 +152,18 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   
   useEffect(() => {
-    // Simulate API call to fetch orders for this clinic
+    // Fetch real orders for this clinic
     const fetchOrders = async () => {
       try {
         // Wait for 500ms to simulate network request
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Mock data based on the screenshots provided
-        const mockOrders = [
-          {
-            id: "1",
-            orderNumber: "SH90123",
-            orderDate: "2023-12-15",
-            clientName: "ROBINSON, DAVID",
-            clientId: "16883465",
-            productCount: 3,
-            totalAmount: 195.98,
-            totalPaid: 195.98,
-            totalOwed: 0,
-            status: "paid" as const
-          },
-          {
-            id: "2",
-            orderNumber: "SH90124",
-            orderDate: "2023-12-18",
-            clientName: "SMITH, JOHN",
-            clientId: "23456789",
-            productCount: 2,
-            totalAmount: 120.45,
-            totalPaid: 100.00,
-            totalOwed: 20.45,
-            status: "partially paid" as const
-          },
-          {
-            id: "3",
-            orderNumber: "SH90125",
-            orderDate: "2023-12-20",
-            clientName: "JOHNSON, MARY",
-            clientId: "34567890",
-            productCount: 1,
-            totalAmount: 55.99,
-            totalPaid: 0,
-            totalOwed: 55.99,
-            status: "unpaid" as const
-          },
-          {
-            id: "4",
-            orderNumber: "SH90126",
-            orderDate: "2023-12-22",
-            clientName: "WILLIAMS, ROBERT",
-            clientId: "45678901",
-            productCount: 4,
-            totalAmount: 245.75,
-            totalPaid: 245.75,
-            totalOwed: 0,
-            status: "paid" as const
-          },
-          {
-            id: "5",
-            orderNumber: "SH90127",
-            orderDate: "2023-12-25",
-            clientName: "BROWN, PATRICIA",
-            clientId: "56789012",
-            productCount: 2,
-            totalAmount: 89.99,
-            totalPaid: 0,
-            totalOwed: 89.99,
-            status: "unpaid" as const
-          },
-          {
-            id: "6",
-            orderNumber: "SH90128",
-            orderDate: "2023-12-27",
-            clientName: "ANDERSON, JENNIFER",
-            clientId: "67890123",
-            productCount: 1,
-            totalAmount: 35.50,
-            totalPaid: 35.50,
-            totalOwed: 0,
-            status: "paid" as const
-          },
-          {
-            id: "7",
-            orderNumber: "SH90129",
-            orderDate: "2023-12-30",
-            clientName: "TAYLOR, MICHAEL",
-            clientId: "78901234",
-            productCount: 5,
-            totalAmount: 324.99,
-            totalPaid: 200.00,
-            totalOwed: 124.99,
-            status: "partially paid" as const
-          },
-          {
-            id: "8",
-            orderNumber: "SH90130",
-            orderDate: "2024-01-02",
-            clientName: "WILSON, LINDA",
-            clientId: "89012345",
-            productCount: 3,
-            totalAmount: 156.75,
-            totalPaid: 156.75,
-            totalOwed: 0,
-            status: "paid" as const
-          },
-          {
-            id: "9",
-            orderNumber: "SH90131",
-            orderDate: "2024-01-05",
-            clientName: "MILLER, JAMES",
-            clientId: "90123456",
-            productCount: 2,
-            totalAmount: 99.99,
-            totalPaid: 0,
-            totalOwed: 99.99,
-            status: "unpaid" as const
-          },
-          {
-            id: "10",
-            orderNumber: "SH90132",
-            orderDate: "2024-01-08",
-            clientName: "CLARK, SUSAN",
-            clientId: "01234567",
-            productCount: 4,
-            totalAmount: 289.99,
-            totalPaid: 150.00,
-            totalOwed: 139.99,
-            status: "partially paid" as const
-          },
-          {
-            id: "11",
-            orderNumber: "SH90133",
-            orderDate: "2024-01-10",
-            clientName: "HEALTH BIOFORM",
-            clientId: "21770481",
-            productCount: 10,
-            totalAmount: 1250.00,
-            totalPaid: 1250.00,
-            totalOwed: 0,
-            status: "paid" as const
-          },
-          {
-            id: "12",
-            orderNumber: "SH90134",
-            orderDate: "2024-01-12",
-            clientName: "ROBINSON, DAVID",
-            clientId: "16883465",
-            productCount: 1,
-            totalAmount: 45.99,
-            totalPaid: 0,
-            totalOwed: 45.99,
-            status: "unpaid" as const
-          }
-        ];
+        // Get clinic name from slug and fetch real orders
+        const clinicData = slugToClinic(clinic);
+        const clinicName = clinicData?.name || clinic.replace('-', ' ');
+        const realOrders = generateMockOrders(clinicName);
         
-        setOrders(mockOrders);
+        setOrders(realOrders);
       } catch (error) {
         console.error("Error fetching orders:", error);
       } finally {

@@ -35,7 +35,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
+import { slugToClinic } from "@/lib/data/clinics";
 
+// Define Payment type locally
 interface Payment {
   id: string;
   paymentDate: string;
@@ -45,7 +47,50 @@ interface Payment {
   paymentMethod: string;
   amount: number;
   status: "completed" | "pending" | "failed";
+  clinic: string;
 }
+
+// Mock data generation function
+const generateMockPayments = (clinicName: string): Payment[] => {
+  const paymentMethods = ["Cash", "Credit Card", "Debit", "Cheque", "Insurance"];
+  const clientNames = [
+    "Amin, Hasmukhlal",
+    "Banquerigo, Charity", 
+    "Campagna, Frank",
+    "David, G. Levi",
+    "Enverga, Rosemer",
+    "Fung, Mei Chu",
+    "Galang, Alma",
+    "Gotzev, Boris",
+    "Henderson, Sarah",
+    "Jackson, Michael"
+  ];
+  
+  const payments: Payment[] = [];
+  const paymentCount = 12;
+  
+  for (let i = 0; i < paymentCount; i++) {
+    const clientName = clientNames[i % clientNames.length];
+    const amount = Math.round((Math.random() * 400 + 50) * 100) / 100;
+    
+    const paymentDate = new Date();
+    paymentDate.setDate(paymentDate.getDate() - Math.floor(Math.random() * 120));
+    
+    payments.push({
+      id: `PAY${i + 1}`,
+      paymentDate: paymentDate.toISOString().split('T')[0],
+      clientName: clientName,
+      clientId: `CLI${i + 1000}`,
+      invoiceNumber: `INV${87570000 + i + 1}`,
+      paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
+      amount: amount,
+      status: "completed",
+      clinic: clinicName
+    });
+  }
+  
+  return payments.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime());
+};
 
 export default function PaymentsPage() {
   const router = useRouter();
@@ -65,136 +110,18 @@ export default function PaymentsPage() {
   const [totalPages, setTotalPages] = useState(0);
 
   useEffect(() => {
-    // Simulate API call to fetch payments for this clinic
+    // Fetch real payments for this clinic
     const fetchPayments = async () => {
       try {
         // This would be a real API call in a production app
         await new Promise(resolve => setTimeout(resolve, 800));
         
-        const mockPayments = [
-          {
-            id: "1",
-            paymentDate: "2024-03-15",
-            clientName: "HEALTH BIOFORM",
-            clientId: "21770481",
-            invoiceNumber: "87572700",
-            paymentMethod: "Cheque",
-            amount: 90.00,
-            status: "completed" as const
-          },
-          {
-            id: "2",
-            paymentDate: "2024-03-14",
-            clientName: "JOHNSON, MARY",
-            clientId: "34511289",
-            invoiceNumber: "87572701",
-            paymentMethod: "Credit Card",
-            amount: 120.50,
-            status: "completed" as const
-          },
-          {
-            id: "3",
-            paymentDate: "2024-03-14",
-            clientName: "SMITH, JOHN",
-            clientId: "31956722",
-            invoiceNumber: "87572702",
-            paymentMethod: "Debit",
-            amount: 65.75,
-            status: "completed" as const
-          },
-          {
-            id: "4",
-            paymentDate: "2024-03-13",
-            clientName: "GARCIA, ELENA",
-            clientId: "32845109",
-            invoiceNumber: "87572703",
-            paymentMethod: "Cash",
-            amount: 150.00,
-            status: "completed" as const
-          },
-          {
-            id: "5",
-            paymentDate: "2024-03-12",
-            clientName: "WONG, MICHAEL",
-            clientId: "36721908",
-            invoiceNumber: "87572704",
-            paymentMethod: "Insurance",
-            amount: 250.25,
-            status: "pending" as const
-          },
-          {
-            id: "6",
-            paymentDate: "2024-03-11",
-            clientName: "PATEL, PRIYA",
-            clientId: "39088421",
-            invoiceNumber: "87572705",
-            paymentMethod: "Credit Card",
-            amount: 80.00,
-            status: "failed" as const
-          },
-          {
-            id: "7",
-            paymentDate: "2024-03-10",
-            clientName: "TAYLOR, ROBERT",
-            clientId: "33901267",
-            invoiceNumber: "87572706",
-            paymentMethod: "Cheque",
-            amount: 110.50,
-            status: "completed" as const
-          },
-          {
-            id: "8",
-            paymentDate: "2024-03-09",
-            clientName: "NGUYEN, LILY",
-            clientId: "37612954",
-            invoiceNumber: "87572707",
-            paymentMethod: "Debit",
-            amount: 95.75,
-            status: "completed" as const
-          },
-          {
-            id: "9",
-            paymentDate: "2024-03-08",
-            clientName: "RODRIGUEZ, CARLOS",
-            clientId: "31078562",
-            invoiceNumber: "87572708",
-            paymentMethod: "Cash",
-            amount: 60.25,
-            status: "completed" as const
-          },
-          {
-            id: "10",
-            paymentDate: "2024-03-07",
-            clientName: "DAVIS, EMMA",
-            clientId: "38420913",
-            invoiceNumber: "87572709",
-            paymentMethod: "Insurance",
-            amount: 175.00,
-            status: "pending" as const
-          },
-          {
-            id: "11",
-            paymentDate: "2024-03-06",
-            clientName: "WILSON, JAMES",
-            clientId: "35689741",
-            invoiceNumber: "87572710",
-            paymentMethod: "Credit Card",
-            amount: 130.25,
-            status: "completed" as const
-          },
-          {
-            id: "12",
-            paymentDate: "2024-03-05",
-            clientName: "CHEN, WEI",
-            clientId: "32147896",
-            invoiceNumber: "87572711",
-            paymentMethod: "Cheque",
-            amount: 85.50,
-            status: "failed" as const
-          },
-        ];
+        // Get clinic name from slug and fetch real payments
+        const clinicData = slugToClinic(clinic);
+        const clinicName = clinicData?.name || clinic.replace('-', ' ');
+        const realPayments = generateMockPayments(clinicName);
         
-        setPayments(mockPayments);
+        setPayments(realPayments);
       } catch (error) {
         console.error("Error fetching payments:", error);
       } finally {

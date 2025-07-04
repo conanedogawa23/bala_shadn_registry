@@ -1,0 +1,7 @@
+Changed database context to 'VISIO_10'.
+JSON_F52E2B61-18A1-11d1-B105-00805F49916B                                                                                                                                                                                                                       
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+[{"ClinicId":1,"ClinicName":"Orthopedic Orthotic Appliances","ClinicAddress":"3833 Midland Ave.","City":"Toronto","Province":"Ontario","PostalCode":"M1V 5L6","DateCreated":"2007-11-04T22:41:09","DateModified":"2007-11-04T22:41:09","CompleteName":"Orthopedi
+"ExtremePhysio"},{"ClinicId":14,"ClinicName":"Physio Bliss","ClinicAddress":"6033 Shawson Dr ","City":"Mississauga","Province":"Ontario","PostalCode":"L5T 1H8","DateCreated":"2007-11-04T22:41:43","DateModified":"2007-11-04T22:41:43","CompleteName":"Physio 
+
+(2 rows affected)
