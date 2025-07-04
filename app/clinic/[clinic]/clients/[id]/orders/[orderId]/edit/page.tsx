@@ -13,6 +13,7 @@ import {
   Package,
   DollarSign
 } from 'lucide-react';
+import { slugToClinic } from '@/lib/data/clinics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -236,7 +237,7 @@ export default function EditClientOrderPage() {
           Edit Order #{orderId}
         </h1>
         <p className="text-gray-600 mt-1">
-          {clinic.replace('-', ' ')} • {clientName}
+          {slugToClinic(clinic)?.displayName || clinic.replace('-', ' ')} • {clientName}
         </p>
       </div>
 

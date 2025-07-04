@@ -18,6 +18,7 @@ import {
   AlertCircle,
   XCircle
 } from 'lucide-react';
+import { slugToClinic } from '@/lib/data/clinics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -62,39 +63,91 @@ export default function ViewPaymentPage() {
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Mock data - in real app, this would come from an API
+  // Generate realistic data based on clinic info
   useEffect(() => {
     const fetchPayment = async () => {
       setIsLoading(true);
       // Simulate API call
       setTimeout(() => {
-        const mockPayment: PaymentData = {
-          id: paymentId,
-          clientId: "16883465",
-          clientName: "ROBINSON, DAVID",
-          clientEmail: "d.robinson@email.com",
-          clientPhone: "416-555-1234",
-          amount: 559.35,
-          paymentMethod: "credit_card",
-          status: "completed",
-          paymentDate: "2024-01-15",
-          dueDate: "2024-01-20",
-          processingFee: 16.78,
-          netAmount: 542.57,
-          transactionId: "TXN-2024-001-" + paymentId,
-          description: "Physical therapy session package",
-          notes: "Payment for 3 therapy sessions and equipment package",
-          invoiceNumber: "INV-2024-001",
-          serviceType: "Physical Therapy",
-          processedBy: "Dr. Sarah Johnson"
-        };
+        const clinicData = slugToClinic(clinic);
+        const mockPayment: PaymentData = generatePaymentData(clinicData, paymentId);
         setPaymentData(mockPayment);
         setIsLoading(false);
       }, 1000);
     };
 
     fetchPayment();
-  }, [paymentId]);
+  }, [paymentId, clinic]);
+
+  // Generate payment data based on clinic info
+  const generatePaymentData = (clinicData: { displayName?: string; status?: string; clientCount?: number } | undefined, paymentId: string): PaymentData => {
+    const isActive = clinicData?.status === 'active';
+    const clinicName = clinicData?.displayName || 'Unknown Clinic';
+    
+    // Client data based on clinic size
+    const clientPool = [
+      { id: "16883465", name: "ROBINSON, DAVID", email: "d.robinson@email.com", phone: "416-555-1234" },
+      { id: "21770481", name: "HEALTH BIOFORM", email: "info@healthbioform.com", phone: "905-670-0204" },
+      { id: "30000", name: "ANDERSON, SARAH", email: "sarah.anderson@email.com", phone: "416-555-5678" },
+      { id: "30001", name: "THOMPSON, MICHAEL", email: "michael.thompson@email.com", phone: "416-555-9012" }
+    ];
+    
+    const randomClient = clientPool[Math.floor(Math.random() * clientPool.length)];
+    
+    // Service pricing based on clinic type
+    const getServiceInfo = () => {
+      if (clinicName.includes('Physio') || clinicName.includes('Physical')) {
+        return {
+          amount: 120.00 * (Math.floor(Math.random() * 5) + 1), // 1-5 sessions
+          serviceType: "Physical Therapy",
+          description: "Physical therapy session package"
+        };
+      } else if (clinicName.includes('Orthopedic') || clinicName.includes('Orthotic')) {
+        return {
+          amount: 450.00 + (Math.random() * 200), // Custom orthotics + assessment
+          serviceType: "Orthotic Services",
+          description: "Custom orthotic device and assessment"
+        };
+      } else if (clinicName.includes('Bioform') || clinicName.includes('Bio')) {
+        return {
+          amount: 85.00 * (Math.floor(Math.random() * 3) + 1), // Equipment/supplies
+          serviceType: "Health Products",
+          description: "Health and wellness products"
+        };
+      } else {
+        return {
+          amount: 150.00 * (Math.floor(Math.random() * 3) + 1), // General services
+          serviceType: "Healthcare Services",
+          description: "Healthcare consultation and treatment"
+        };
+      }
+    };
+
+    const serviceInfo = getServiceInfo();
+    const processingFee = serviceInfo.amount * 0.03; // 3% processing fee
+    const netAmount = serviceInfo.amount - processingFee;
+
+    return {
+      id: paymentId,
+      clientId: randomClient.id,
+      clientName: randomClient.name,
+      clientEmail: randomClient.email,
+      clientPhone: randomClient.phone,
+      amount: serviceInfo.amount,
+      paymentMethod: Math.random() > 0.3 ? "credit_card" : (Math.random() > 0.5 ? "debit_card" : "cash"),
+      status: isActive ? (Math.random() > 0.8 ? "pending" : "completed") : "completed",
+      paymentDate: isActive ? "2024-01-15" : "2023-08-15",
+      dueDate: isActive ? "2024-01-20" : "2023-08-20",
+      processingFee,
+      netAmount,
+      transactionId: `TXN-${isActive ? '2024' : '2023'}-${Math.floor(Math.random() * 999) + 1}-${paymentId}`,
+      description: serviceInfo.description,
+      notes: `Payment processed at ${clinicName}. ${Math.random() > 0.5 ? 'Insurance claim submitted.' : 'Direct payment.'}`,
+      invoiceNumber: `INV-${isActive ? '2024' : '2023'}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+      serviceType: serviceInfo.serviceType,
+      processedBy: `Dr. ${Math.random() > 0.5 ? 'Sarah Johnson' : 'Michael Chen'}`
+    };
+  };
 
   const handleBack = () => {
     router.push(`/clinic/${clinic}/payments`);
@@ -238,7 +291,7 @@ export default function ViewPaymentPage() {
             Payment #{paymentData.id}
           </h1>
           <p className="text-gray-600 mt-1">
-            {clinic.replace('-', ' ')} • {paymentData.clientName}
+            {slugToClinic(clinic)?.displayName || clinic.replace('-', ' ')} • {paymentData.clientName}
           </p>
         </div>
         

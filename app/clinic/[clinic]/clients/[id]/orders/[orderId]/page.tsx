@@ -17,6 +17,7 @@ import {
   AlertCircle,
   DollarSign
 } from 'lucide-react';
+import { slugToClinic } from '@/lib/data/clinics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -69,61 +70,103 @@ export default function ViewClientOrderPage() {
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Mock data - in real app, this would come from an API
+  // Generate realistic data based on clinic and client
   useEffect(() => {
     const fetchOrder = async () => {
       setIsLoading(true);
       // Simulate API call
       setTimeout(() => {
-        const mockOrder: OrderData = {
-          id: orderId,
-          clientId: clientId,
-          clientName: "ROBINSON, DAVID",
-          clientEmail: "d.robinson@email.com",
-          clientPhone: "416-555-1234",
-          status: "processing",
-          orderDate: "2024-01-15",
-          dueDate: "2024-02-01",
-          items: [
-            {
-              id: "1",
-              name: "Physical Therapy Session",
-              description: "60-minute individual therapy session",
-              quantity: 3,
-              unitPrice: 120.00,
-              totalPrice: 360.00
-            },
-            {
-              id: "2",
-              name: "Exercise Equipment Package",
-              description: "Resistance bands and therapy balls",
-              quantity: 1,
-              unitPrice: 85.00,
-              totalPrice: 85.00
-            },
-            {
-              id: "3",
-              name: "Home Exercise Program",
-              description: "Custom exercise plan with video instructions",
-              quantity: 1,
-              unitPrice: 50.00,
-              totalPrice: 50.00
-            }
-          ],
-          subtotal: 495.00,
-          tax: 64.35,
-          total: 559.35,
-          notes: "Client prefers morning appointments. Focus on lower back rehabilitation.",
-          assignedTo: "Dr. Sarah Johnson",
-          priority: "medium"
-        };
+        const clinicData = slugToClinic(clinic);
+        const mockOrder: OrderData = generateOrderData(clinicData, orderId, clientId);
         setOrderData(mockOrder);
         setIsLoading(false);
       }, 1000);
     };
 
     fetchOrder();
-  }, [orderId, clientId]);
+  }, [orderId, clientId, clinic]);
+
+  // Generate order data based on clinic info
+  const generateOrderData = (clinicData: { displayName?: string; status?: string } | undefined, orderId: string, clientId: string): OrderData => {
+    const isActive = clinicData?.status === 'active';
+    const clinicName = clinicData?.displayName || 'Unknown Clinic';
+    
+    // Client names based on common IDs from real DB
+    const clientNames: { [key: string]: { name: string; email: string; phone: string } } = {
+      "16883465": { name: "ROBINSON, DAVID", email: "d.robinson@email.com", phone: "416-555-1234" },
+      "21770481": { name: "HEALTH BIOFORM", email: "info@healthbioform.com", phone: "905-670-0204" },
+      "30000": { name: "ANDERSON, SARAH", email: "sarah.anderson@email.com", phone: "416-555-5678" },
+      "30001": { name: "THOMPSON, MICHAEL", email: "michael.thompson@email.com", phone: "416-555-9012" }
+    };
+
+    const client = clientNames[clientId] || { 
+      name: "UNKNOWN CLIENT", 
+      email: "client@email.com", 
+      phone: "416-555-0000" 
+    };
+
+    // Different services based on clinic type
+    const getClinicServices = () => {
+      if (clinicName.includes('Physio') || clinicName.includes('Physical')) {
+        return [
+          { name: "Physical Therapy Session", description: "60-minute individual therapy session", price: 120.00 },
+          { name: "Exercise Equipment Package", description: "Resistance bands and therapy balls", price: 85.00 },
+          { name: "Home Exercise Program", description: "Custom exercise plan with video instructions", price: 50.00 },
+          { name: "Manual Therapy", description: "Hands-on treatment techniques", price: 95.00 }
+        ];
+      } else if (clinicName.includes('Orthopedic') || clinicName.includes('Orthotic')) {
+        return [
+          { name: "Custom Orthotic Assessment", description: "Comprehensive foot and gait analysis", price: 180.00 },
+          { name: "Orthotic Device", description: "Custom-made orthotic insoles", price: 450.00 },
+          { name: "Follow-up Adjustment", description: "Orthotic fitting and adjustment", price: 75.00 }
+        ];
+      } else {
+        return [
+          { name: "Consultation", description: "Initial health assessment", price: 150.00 },
+          { name: "Treatment Session", description: "Therapeutic intervention", price: 100.00 },
+          { name: "Equipment Rental", description: "Medical equipment rental", price: 60.00 }
+        ];
+      }
+    };
+
+    const availableServices = getClinicServices();
+    const selectedServices = availableServices.slice(0, Math.floor(Math.random() * 3) + 1);
+    
+    const items: OrderItem[] = selectedServices.map((service, index) => {
+      const quantity = Math.floor(Math.random() * 3) + 1;
+      const totalPrice = service.price * quantity;
+      return {
+        id: (index + 1).toString(),
+        name: service.name,
+        description: service.description,
+        quantity,
+        unitPrice: service.price,
+        totalPrice
+      };
+    });
+
+    const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+    const tax = subtotal * 0.13;
+    const total = subtotal + tax;
+
+    return {
+      id: orderId,
+      clientId: clientId,
+      clientName: client.name,
+      clientEmail: client.email,
+      clientPhone: client.phone,
+      status: isActive ? (Math.random() > 0.5 ? "processing" : "completed") : "completed",
+      orderDate: isActive ? "2024-01-15" : "2023-08-15",
+      dueDate: isActive ? "2024-02-01" : "2023-09-01",
+      items,
+      subtotal,
+      tax,
+      total,
+      notes: `${clinicName} - Client prefers ${Math.random() > 0.5 ? 'morning' : 'afternoon'} appointments. Focus on ${clinicName.includes('Physio') ? 'rehabilitation' : 'treatment'}.`,
+      assignedTo: `Dr. ${Math.random() > 0.5 ? 'Sarah Johnson' : 'Michael Chen'}`,
+      priority: Math.random() > 0.5 ? "medium" : "high"
+    };
+  };
 
   const handleBack = () => {
     router.push(`/clinic/${clinic}/clients/${clientId}`);
@@ -247,7 +290,7 @@ export default function ViewClientOrderPage() {
             Order #{orderData.id}
           </h1>
           <p className="text-gray-600 mt-1">
-            {clinic.replace('-', ' ')} • {orderData.clientName}
+            {slugToClinic(clinic)?.displayName || clinic.replace('-', ' ')} • {orderData.clientName}
           </p>
         </div>
         
