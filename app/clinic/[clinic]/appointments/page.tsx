@@ -4,12 +4,12 @@ import React from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BarChart, ArrowLeft } from 'lucide-react';
+import { Calendar, ArrowLeft } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
 import { generateLink } from '@/lib/route-utils';
 import { useRouter } from 'next/navigation';
 
-export default function ReportsPage() {
+export default function AppointmentsPage() {
   const params = useParams();
   const router = useRouter();
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
@@ -34,10 +34,10 @@ export default function ReportsPage() {
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">
-              Reports - {clinic?.displayName || clinicSlug}
+              Appointments - {clinic?.displayName || clinicSlug}
             </h1>
             <p className="text-gray-600 mt-1">
-              View analytics and generate reports
+              Manage and schedule appointments
             </p>
           </div>
         </div>
@@ -46,16 +46,16 @@ export default function ReportsPage() {
       <Card className="mb-8">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart className="h-5 w-5" />
-            Reports
+            <Calendar className="h-5 w-5" />
+            Appointments
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-12">
-            <BarChart className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-            <h2 className="text-xl font-semibold mb-2">Reports Feature Coming Soon</h2>
+            <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+            <h2 className="text-xl font-semibold mb-2">Appointments Feature Coming Soon</h2>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              This feature is currently under development. Check back soon for analytics and reporting functionality.
+              This feature is currently under development. Check back soon for appointment scheduling functionality.
             </p>
             <Button onClick={handleBack}>
               Return to Dashboard

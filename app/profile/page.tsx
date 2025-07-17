@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Edit2, ChevronRight, Settings, User, Calendar, FileText, CreditCard, Bell, LogOut } from "lucide-react";
+import { Edit2, ChevronRight, Settings, User, Calendar, CreditCard, Bell, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserInfo, ProfileFormValues } from "./user-info";
 import { AppointmentHistory, Appointment } from "./appointment-history";
@@ -323,7 +323,6 @@ export default function ProfilePage() {
   const navItems = [
     { id: "profile", label: "Profile", icon: User },
     { id: "appointments", label: "Appointments", icon: Calendar },
-    { id: "records", label: "Medical Records", icon: FileText },
     { id: "billing", label: "Billing & Insurance", icon: CreditCard },
     { id: "settings", label: "Account Settings", icon: Settings },
     { id: "preferences", label: "Preferences", icon: Bell },
@@ -462,25 +461,7 @@ export default function ProfilePage() {
                 </div>
               )}
               
-              {/* Medical Records Tab */}
-              {activeTab === "records" && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Medical Records</h2>
-                  
-                  <div className="border rounded-lg p-8 text-center">
-                    <FileText size={48} className="mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-xl font-medium mb-2">Your Medical Records</h3>
-                    <p className="text-gray-500 max-w-md mx-auto mb-6">
-                      Access your medical history, test results, and treatment plans.
-                      All your health documents are securely stored and available anytime.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                      <Button>View Health Records</Button>
-                      <Button variant="outline">Upload New Document</Button>
-                    </div>
-                  </div>
-                </div>
-              )}
+
               
               {/* Billing Tab */}
               {activeTab === "billing" && (

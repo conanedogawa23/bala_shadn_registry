@@ -4,7 +4,7 @@ import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Mail, Phone, MapPin, Calendar, Save, X, User, Heart, Briefcase, Clock } from "lucide-react";
+import { Mail, Phone, MapPin, Calendar, Save, X, User, Briefcase, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -31,8 +31,7 @@ const profileFormSchema = z.object({
   dateOfBirth: z.string().optional(),
   emergencyContact: z.string().optional(),
   occupation: z.string().optional(),
-  bloodType: z.string().optional(),
-  allergies: z.string().optional(),
+
 });
 
 export type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -64,7 +63,6 @@ export function UserInfo({ userData, isEditMode, onSave, onCancel }: UserInfoPro
     { icon: Calendar, label: "Date of Birth", value: userData.dateOfBirth ? new Date(userData.dateOfBirth).toLocaleDateString('en-US', {year: 'numeric', month: '2-digit', day: '2-digit'}) : undefined },
     { icon: Phone, label: "Emergency Contact", value: userData.emergencyContact },
     { icon: Briefcase, label: "Occupation", value: userData.occupation },
-    { icon: Heart, label: "Blood Type", value: userData.bloodType },
     { icon: Clock, label: "Member Since", value: "January 2023" },
   ];
 
@@ -159,50 +157,7 @@ export function UserInfo({ userData, isEditMode, onSave, onCancel }: UserInfoPro
             )}
           />
           
-          <FormField
-            control={form.control}
-            name="bloodType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Blood Type</FormLabel>
-                <FormControl>
-                  <select 
-                    className="w-full h-10 px-3 py-2 text-sm rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring"
-                    {...field}
-                    value={field.value || ''}
-                  >
-                    <option value="">Select blood type</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                  </select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="allergies"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Allergies</FormLabel>
-                <FormControl>
-                  <Input {...field} value={field.value || ''} />
-                </FormControl>
-                <FormDescription>
-                  List any allergies separated by commas
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+
           
           <FormField
             control={form.control}
@@ -281,22 +236,7 @@ export function UserInfo({ userData, isEditMode, onSave, onCancel }: UserInfoPro
         </>
       )}
       
-      {/* Medical information */}
-      {userData.allergies && (
-        <>
-          <Separator />
-          <div>
-            <h3 className="font-medium mb-2 flex items-center gap-2">
-              <Heart className="h-4 w-4 text-[#6666FF]" />
-              Medical Information
-            </h3>
-            <div className="mt-3">
-              <span className="text-sm text-gray-500 block mb-1">Allergies</span>
-              <p className="text-gray-700">{userData.allergies}</p>
-            </div>
-          </div>
-        </>
-      )}
+
     </div>
   );
 } 

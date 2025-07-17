@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { generateLink } from '@/lib/route-utils';
 
 interface OrderItem {
   id: string;
@@ -169,11 +170,11 @@ export default function ViewClientOrderPage() {
   };
 
   const handleBack = () => {
-    router.push(`/clinic/${clinic}/clients/${clientId}`);
+    router.push(generateLink('clinic', `clients/${clientId}`, clinic));
   };
 
   const handleEditOrder = () => {
-    router.push(`/clinic/${clinic}/clients/${clientId}/orders/${orderId}/edit`);
+    router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}/edit`, clinic));
   };
 
   const handlePrint = () => {

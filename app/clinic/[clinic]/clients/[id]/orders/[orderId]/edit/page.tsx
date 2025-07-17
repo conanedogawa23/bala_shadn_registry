@@ -27,6 +27,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { generateLink } from '@/lib/route-utils';
 
 const orderItemSchema = z.object({
   id: z.string().optional(),
@@ -188,7 +189,7 @@ export default function EditClientOrderPage() {
       console.log("Order updated:", { ...data, orderId, clientId, clinic });
       
       // Navigate back to order view
-      router.push(`/clinic/${clinic}/clients/${clientId}/orders/${orderId}`);
+      router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
     } catch (error) {
       console.error("Failed to update order:", error);
     } finally {
@@ -197,7 +198,7 @@ export default function EditClientOrderPage() {
   };
 
   const handleBack = () => {
-    router.push(`/clinic/${clinic}/clients/${clientId}/orders/${orderId}`);
+    router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
   };
 
   const formatCurrency = (amount: number) => {

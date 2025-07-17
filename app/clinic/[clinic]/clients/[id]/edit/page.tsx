@@ -18,6 +18,7 @@ import { FormSelect } from "@/components/ui/form/FormSelect";
 import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { ArrowLeft, Save, Edit3 } from "lucide-react";
+import { generateLink } from "@/lib/route-utils";
 
 // Define the client schema using zod for validation
 const clientSchema = z.object({
@@ -94,13 +95,13 @@ export default function EditClientPage() {
       setIsSubmitting(false);
       
       // Navigate back to clients page
-      router.push(`/clinic/${clinic}/clients`);
+      router.push(generateLink('clinic', 'clients', clinic));
     }, 1000);
   }, [clinic, clientId, router]);
 
   // Handle back navigation
   const handleBack = () => {
-    router.push(`/clinic/${clinic}/clients`);
+    router.push(generateLink('clinic', 'clients', clinic));
   };
 
   if (isLoading) {

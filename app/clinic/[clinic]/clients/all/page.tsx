@@ -15,79 +15,7 @@ import {
   Plus
 } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
-
-// Mock data generation function
-const generateMockClients = (clinicName: string): Client[] => {
-  const clientNames = [
-    "Amin, Hasmukhlal",
-    "Banquerigo, Charity", 
-    "Campagna, Frank",
-    "David, G. Levi",
-    "Enverga, Rosemer",
-    "Fung, Mei Chu",
-    "Galang, Alma",
-    "Gotzev, Boris",
-    "Henderson, Sarah",
-    "Jackson, Michael",
-    "Williams, Jennifer",
-    "Robinson, David",
-    "Smith, John",
-    "Johnson, Mary",
-    "Brown, Patricia"
-  ];
-
-  // Generate different number of clients per clinic based on clinic characteristics
-  const clientCounts: Record<string, number> = {
-    "Orthopedic Orthotic Appliances": 25,
-    "Markham Orthopedic": 30,
-    "Bioform Health": 45,
-    "BodyBliss": 15,
-    "Evergold": 8,
-    "Ortholine Duncan Mills": 50,
-    "bodyblissphysio": 12,
-    "ExtremePhysio": 22,
-    "Physio Bliss": 18,
-    "BodyBlissOneCare": 28,
-    "Active force eh": 10,
-    "My Cloud": 20,
-    "Century Care": 16
-  };
-
-  const clientCount = clientCounts[clinicName] || 15;
-  const clients: Client[] = [];
-
-  for (let i = 0; i < clientCount; i++) {
-    const nameIndex = i % clientNames.length;
-    const name = clientNames[nameIndex];
-    const [lastName, firstName] = name.split(', ');
-    
-    // Generate some realistic status and dates
-    const status = Math.random() > 0.2 ? 'active' : 'inactive';
-    const lastVisit = new Date(Date.now() - Math.floor(Math.random() * 365) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const totalOrders = Math.floor(Math.random() * 20) + 1;
-    const nextAppointment = status === 'active' && Math.random() > 0.3 
-      ? new Date(Date.now() + Math.floor(Math.random() * 60) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      : undefined;
-
-    const dateOfBirth = `${1950 + Math.floor(Math.random() * 50)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`;
-    const gender = Math.random() > 0.5 ? 'male' : 'female';
-
-    clients.push({
-      id: `CLI${i + 1000}`,
-      name: name,
-      email: `${firstName?.toLowerCase() || 'client'}.${lastName?.toLowerCase() || 'user'}@email.com`,
-      phone: `(416) ${Math.floor(Math.random() * 900 + 100)}-${Math.floor(Math.random() * 9000 + 1000)}`,
-      dateOfBirth,
-      gender: gender as 'male' | 'female' | 'other',
-      status: status as 'active' | 'inactive' | 'archived',
-      lastVisit,
-      totalOrders,
-      nextAppointment
-    });
-  }
-
-  return clients;
-};
+import { MockDataService } from '@/lib/data/mockDataService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -135,7 +63,7 @@ export default function AllClientsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const clientsPerPage = 12;
 
-  // Get real clients from the database
+  // Get real clients from the database using MockDataService
   useEffect(() => {
     const fetchClients = async () => {
       setIsLoading(true);
@@ -143,9 +71,11 @@ export default function AllClientsPage() {
       setTimeout(() => {
         const clinicData = slugToClinic(clinic);
         if (clinicData) {
-          const realClients = generateMockClients(clinicData.name);
-          setClients(realClients);
-          setFilteredClients(realClients);
+          // Use MockDataService to get clinic-specific clients
+          const rawClients = MockDataService.getClientsByClinic(clinicData.name);
+          const formattedClients = rawClients.map(client => MockDataService.formatClientForUI(client));
+          setClients(formattedClients);
+          setFilteredClients(formattedClients);
         }
         setIsLoading(false);
       }, 1000);
@@ -153,8 +83,6 @@ export default function AllClientsPage() {
 
     fetchClients();
   }, [clinic]);
-
-  // Now using real clients from the database via MockDataService
 
   // Filter clients based on search query and status
   useEffect(() => {

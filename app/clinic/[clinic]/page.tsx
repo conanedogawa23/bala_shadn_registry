@@ -18,6 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { slugToClinic } from '@/lib/data/clinics';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import InvalidClinicError from '@/components/error/invalid-clinic-error';
+import { generateLink } from '@/lib/route-utils';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -62,22 +64,14 @@ export default function ClinicPage() {
   const clinic = slugToClinic(clinicSlug);
 
   if (!clinic) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive">Clinic Not Found</h1>
-          <p className="text-muted-foreground mt-2">
-            The clinic you&apos;re looking for doesn&apos;t exist or has been removed.
-          </p>
-        </div>
-      </div>
-    );
+    // Use our new error component for invalid clinics
+    return <InvalidClinicError clinicSlug={clinicSlug} />;
   }
 
   const quickActions = [
     {
       title: 'Clients',
-      href: `/clinic/${clinicSlug}/clients`,
+      href: generateLink('clinic', 'clients', clinicSlug),
       icon: Users,
       description: 'Manage client records',
       count: formatNumber(clinic.clientCount ?? 0),
@@ -85,7 +79,7 @@ export default function ClinicPage() {
     },
     {
       title: 'Appointments',
-      href: `/clinic/${clinicSlug}/appointments`,
+      href: generateLink('clinic', 'appointments', clinicSlug),
       icon: Calendar,
       description: 'Schedule appointments',
       count: formatNumber(clinic.totalAppointments ?? 0),
@@ -93,7 +87,7 @@ export default function ClinicPage() {
     },
     {
       title: 'Orders',
-      href: `/clinic/${clinicSlug}/orders`,
+      href: generateLink('clinic', 'orders', clinicSlug),
       icon: TrendingUp,
       description: 'Process orders',
       count: '0', // No order data in DB analysis
@@ -101,7 +95,7 @@ export default function ClinicPage() {
     },
     {
       title: 'Reports',
-      href: `/clinic/${clinicSlug}/reports`,
+      href: generateLink('clinic', 'reports', clinicSlug),
       icon: Activity,
       description: 'View analytics',
       count: clinic.status === 'active' ? '12' : '0',

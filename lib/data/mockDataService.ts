@@ -36,16 +36,47 @@ export interface Order {
   clinic: string;
 }
 
+export interface PaymentLineItem {
+  id: string;
+  serviceCode: string;
+  serviceName: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  taxable: boolean;
+}
+
 export interface Payment {
   id: string;
   paymentDate: string;
   clientName: string;
   clientId: string;
   invoiceNumber: string;
+  orderNumber?: string;
   paymentMethod: string;
   amount: number;
-  status: "completed" | "pending" | "failed";
+  subtotal: number;
+  taxAmount: number;
+  taxRate: number;
+  discountAmount?: number;
+  netAmount: number;
+  status: "completed" | "pending" | "failed" | "refunded" | "partial";
   clinic: string;
+  clinicAddress?: string;
+  providerName?: string;
+  paymentReference?: string;
+  invoiceDate: string;
+  dueDate: string;
+  lineItems: PaymentLineItem[];
+  notes?: string;
+  paymentType: "POP" | "DPA" | "Insurance" | "COB" | "Cash" | "Credit" | "Debit";
+  insuranceInfo?: {
+    primaryInsurance?: string;
+    secondaryInsurance?: string;
+    claimNumber?: string;
+    authorizationNumber?: string;
+  };
 }
 
 export interface Clinic {
@@ -65,139 +96,14 @@ export interface ClinicStats {
   isOrthopedic: boolean;
 }
 
+// Import real data from JSON file
+import realData from './realData.json';
+
 // Real clinic data from your database
-const realClinicsData: Clinic[] = [
-  {
-    id: 1,
-    name: "Orthopedic Orthotic Appliances",
-    address: "3833 Midland Ave.",
-    city: "Toronto",
-    province: "Ontario",
-    postalCode: "M1V 5L6"
-  },
-  {
-    id: 2,
-    name: "Markham Orthopedic", 
-    address: "7155 Woodbine Avenue",
-    city: "Markham",
-    province: "Ontario",
-    postalCode: "L3R 1A3"
-  },
-  {
-    id: 3,
-    name: "Bioform Health",
-    address: "6033 Shawson Dr",
-    city: "Mississauga", 
-    province: "Ontario",
-    postalCode: "L5T 1H8"
-  },
-  {
-    id: 4,
-    name: "BodyBliss",
-    address: "1933A Leslie Street",
-    city: "Toronto",
-    province: "Ontario", 
-    postalCode: "M3B 2M3"
-  },
-  {
-    id: 5,
-    name: "Evergold",
-    address: "3833 Midland Ave.",
-    city: "Toronto",
-    province: "Ontario",
-    postalCode: "M1V 5L6"
-  },
-  {
-    id: 6,
-    name: "Ortholine Duncan Mills",
-    address: "220 Duncan Mill",
-    city: "Toronto",
-    province: "Ontario",
-    postalCode: "M3B 2M3"
-  },
-  {
-    id: 9,
-    name: "bodyblissphysio",
-    address: "1929 Leslie Street",
-    city: "Toronto",
-    province: "Ontario",
-    postalCode: "M3B 2M3"
-  },
-  {
-    id: 11,
-    name: "ExtremePhysio",
-    address: "3660 Midland Ave., Unit 102",
-    city: "Scarborough",
-    province: "Ontario",
-    postalCode: "M1V 0B8"
-  },
-  {
-    id: 14,
-    name: "Physio Bliss",
-    address: "6033 Shawson Dr",
-    city: "Mississauga",
-    province: "Ontario",
-    postalCode: "L5T 1H8"
-  },
-  {
-    id: 18,
-    name: "BodyBlissOneCare",
-    address: "1585 Markham Rd",
-    city: "Scarborough",
-    province: "Ontario",
-    postalCode: "M1M 1M1"
-  },
-  {
-    id: 19,
-    name: "Active force eh",
-    address: "4040 Finch Ave East Unit 209",
-    city: "Scarborough",
-    province: "Ontario",
-    postalCode: "M1S4V5"
-  },
-  {
-    id: 20,
-    name: "My Cloud",
-    address: "203-3459 Sheppard Ave .East",
-    city: "Toronto",
-    province: "Ontario",
-    postalCode: "M1T 3K5"
-  },
-  {
-    id: 21,
-    name: "Century Care",
-    address: "",
-    city: "",
-    province: "",
-    postalCode: ""
-  }
-];
+const realClinicsData: Clinic[] = realData.clinics;
 
 // Real client names from your database
-const realClientNames = [
-  "Amin, Hasmukhlal",
-  "Banquerigo, Charity", 
-  "Campagna, Frank",
-  "David, G. Levi",
-  "Enverga, Rosemer",
-  "Fung, Mei Chu",
-  "Galang, Alma",
-  "Gotzev, Boris",
-  "Gotzev, Valeri",
-  "Henderson, Sarah",
-  "Jackson, Michael",
-  "Williams, Jennifer",
-  "Robinson, David",
-  "Smith, John",
-  "Johnson, Mary",
-  "Brown, Patricia",
-  "Anderson, Jennifer",
-  "Taylor, Michael",
-  "Wilson, Linda",
-  "Miller, James",
-  "Clark, Susan",
-  "Health Bioform"
-];
+const realClientNames = realData.realClientNames;
 
 export class MockDataService {
   static getAllClinics(): Clinic[] {
@@ -235,21 +141,7 @@ export class MockDataService {
     if (!clinic) return [];
 
     // Generate different number of clients per clinic based on clinic characteristics
-    const clientCounts: Record<string, number> = {
-      "Orthopedic Orthotic Appliances": 25,
-      "Markham Orthopedic": 30,
-      "Bioform Health": 45,
-      "BodyBliss": 15,
-      "Evergold": 8,
-      "Ortholine Duncan Mills": 50,
-      "bodyblissphysio": 12,
-      "ExtremePhysio": 22,
-      "Physio Bliss": 18,
-      "BodyBlissOneCare": 28,
-      "Active force eh": 10,
-      "My Cloud": 20,
-      "Century Care": 16
-    };
+    const clientCounts: Record<string, number> = realData.clientCounts;
 
     const clientCount = clientCounts[clinicName] || 15;
     const clients: Client[] = [];
@@ -366,11 +258,37 @@ export class MockDataService {
     const orders = this.getOrdersByClinic(clinicName);
     const payments: Payment[] = [];
     const paymentMethods = ["Cash", "Credit Card", "Debit", "Cheque", "Insurance"];
+    const paymentTypes: ("POP" | "DPA" | "Insurance" | "COB" | "Cash" | "Credit" | "Debit")[] = ["POP", "DPA", "Insurance", "COB", "Cash", "Credit", "Debit"];
+    const clinic = this.getClinicByName(clinicName);
     
     orders.forEach((order) => {
       if (order.status === 'paid' || order.status === 'partially paid') {
         const paymentDate = new Date(order.orderDate);
         paymentDate.setDate(paymentDate.getDate() + Math.floor(Math.random() * 14));
+        
+        const invoiceDate = new Date(order.orderDate);
+        const dueDate = new Date(invoiceDate);
+        dueDate.setDate(dueDate.getDate() + 30);
+        
+        const subtotal = order.totalAmount;
+        const taxRate = 0.13; // Ontario HST
+        const taxAmount = Math.round(subtotal * taxRate * 100) / 100;
+        const discountAmount = Math.random() > 0.8 ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
+        const netAmount = Math.round((subtotal + taxAmount - discountAmount) * 100) / 100;
+        
+        // Generate line items from order products
+        const lineItems: PaymentLineItem[] = order.products.map((product, index) => ({
+          id: `LI${order.id}_${index + 1}`,
+          serviceCode: `SVC${String(index + 1).padStart(3, '0')}`,
+          serviceName: product.name,
+          description: product.description,
+          quantity: product.quantity,
+          unitPrice: product.price,
+          totalPrice: Math.round(product.price * product.quantity * 100) / 100,
+          taxable: true
+        }));
+        
+        const paymentType = paymentTypes[Math.floor(Math.random() * paymentTypes.length)];
         
         payments.push({
           id: `PAY${order.id}`,
@@ -378,10 +296,29 @@ export class MockDataService {
           clientName: order.clientName,
           clientId: order.clientId,
           invoiceNumber: `INV${87570000 + parseInt(order.id)}`,
+          orderNumber: order.orderNumber,
           paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
           amount: order.totalPaid,
+          subtotal,
+          taxAmount,
+          taxRate,
+          discountAmount,
+          netAmount,
           status: "completed",
-          clinic: clinicName
+          clinic: clinicName,
+          clinicAddress: clinic ? `${clinic.address}, ${clinic.city}, ${clinic.province} ${clinic.postalCode}` : undefined,
+          providerName: clinicName,
+          paymentReference: `REF${Math.floor(Math.random() * 1000000)}`,
+          invoiceDate: invoiceDate.toISOString().split('T')[0],
+          dueDate: dueDate.toISOString().split('T')[0],
+          lineItems,
+          paymentType,
+          insuranceInfo: paymentType === "Insurance" ? {
+            primaryInsurance: "Sun Life Financial",
+            claimNumber: `CL${Math.floor(Math.random() * 100000)}`,
+            authorizationNumber: `AUTH${Math.floor(Math.random() * 10000)}`
+          } : undefined,
+          notes: Math.random() > 0.7 ? "Payment processed successfully" : undefined
         });
       }
     });

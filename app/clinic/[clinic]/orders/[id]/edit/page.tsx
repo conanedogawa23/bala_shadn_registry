@@ -11,6 +11,7 @@ import { FormSelect } from "@/components/ui/form/FormSelect";
 import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { ArrowLeft, Save, Edit3 } from "lucide-react";
+import { generateLink } from "@/lib/route-utils";
 
 // Define the order schema using zod for validation
 const orderSchema = z.object({
@@ -72,13 +73,13 @@ export default function EditOrderPage() {
       setIsSubmitting(false);
       
       // Navigate back to orders page
-      router.push(`/clinic/${clinic}/orders`);
+      router.push(generateLink('clinic', 'orders', clinic));
     }, 1000);
   }, [clinic, orderId, router]);
 
   // Handle back navigation
   const handleBack = () => {
-    router.push(`/clinic/${clinic}/orders`);
+    router.push(generateLink('clinic', 'orders', clinic));
   };
 
   if (isLoading) {

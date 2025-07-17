@@ -24,6 +24,8 @@ import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { Search, Calendar, Plus, ChevronRight, ChevronLeft, Eye, Edit2, Trash2, Printer, FileText, DollarSign, UserCircle } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { slugToClinic } from "@/lib/data/clinics";
+import { MockDataService } from "@/lib/data/mockDataService";
+import { generateLink } from "@/lib/route-utils";
 
 // Define Order type locally
 interface Order {
@@ -46,97 +48,6 @@ interface Order {
   clinic: string;
 }
 
-// Mock data generation function
-const generateMockOrders = (clinicName: string): Order[] => {
-  const isOrthopedic = clinicName.toLowerCase().includes('orthopedic') || 
-                      clinicName.toLowerCase().includes('ortholine') ||
-                      clinicName.toLowerCase().includes('orthotic');
-
-  const products = isOrthopedic ? [
-    { name: "Custom Orthotics", price: 350, desc: "Custom-made orthotic insoles" },
-    { name: "Heel Cups", price: 45, desc: "Gel heel cups for comfort" },
-    { name: "Arch Supports", price: 60, desc: "Arch support insoles" },
-    { name: "Orthopedic Shoes", price: 180, desc: "Therapeutic footwear" },
-    { name: "Compression Stockings", price: 75, desc: "Medical compression wear" }
-  ] : [
-    { name: "Physiotherapy Session", price: 80, desc: "60-minute therapy session" },
-    { name: "Massage Therapy", price: 90, desc: "Therapeutic massage" },
-    { name: "Acupuncture", price: 70, desc: "Traditional acupuncture" },
-    { name: "Exercise Program", price: 120, desc: "Personalized exercise plan" }
-  ];
-
-  const clientNames = [
-    "Amin, Hasmukhlal",
-    "Banquerigo, Charity", 
-    "Campagna, Frank",
-    "David, G. Levi",
-    "Enverga, Rosemer",
-    "Fung, Mei Chu",
-    "Galang, Alma",
-    "Gotzev, Boris",
-    "Henderson, Sarah",
-    "Jackson, Michael"
-  ];
-
-  const orders: Order[] = [];
-  const orderCount = 15;
-
-  for (let i = 0; i < orderCount; i++) {
-    const clientName = clientNames[i % clientNames.length];
-    const productCount = Math.floor(Math.random() * 3) + 1;
-    let totalAmount = 0;
-    
-    const orderProducts = [];
-    for (let j = 0; j < productCount; j++) {
-      const product = products[Math.floor(Math.random() * products.length)];
-      const price = product.price + (Math.random() * 50 - 25);
-      orderProducts.push({
-        name: product.name,
-        description: product.desc,
-        price: Math.round(price * 100) / 100,
-        quantity: Math.floor(Math.random() * 2) + 1
-      });
-      totalAmount += price;
-    }
-    
-    totalAmount = Math.round(totalAmount * 100) / 100;
-    const statusRand = Math.random();
-    let status: "paid" | "partially paid" | "unpaid";
-    let totalPaid: number;
-    
-    if (statusRand < 0.7) {
-      status = "paid";
-      totalPaid = totalAmount;
-    } else if (statusRand < 0.9) {
-      status = "partially paid";
-      totalPaid = Math.round((totalAmount * (0.3 + Math.random() * 0.4)) * 100) / 100;
-    } else {
-      status = "unpaid";
-      totalPaid = 0;
-    }
-    
-    const orderDate = new Date();
-    orderDate.setDate(orderDate.getDate() - Math.floor(Math.random() * 180));
-    
-    orders.push({
-      id: (i + 1).toString(),
-      orderNumber: `SH${90000 + i + 1}`,
-      orderDate: orderDate.toISOString().split('T')[0],
-      clientName: clientName,
-      clientId: `CLI${i + 1000}`,
-      productCount: orderProducts.length,
-      totalAmount,
-      totalPaid,
-      totalOwed: Math.round((totalAmount - totalPaid) * 100) / 100,
-      status,
-      products: orderProducts,
-      clinic: clinicName
-    });
-  }
-  
-  return orders.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
-};
-
 export default function OrdersPage() {
   const router = useRouter();
   const params = useParams();
@@ -148,7 +59,7 @@ export default function OrdersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 10;
   
-  // Mock orders data - in a real app, this would be fetched from an API based on clinic
+  // Orders data - fetched from MockDataService based on clinic
   const [orders, setOrders] = useState<Order[]>([]);
   
   useEffect(() => {
@@ -160,10 +71,10 @@ export default function OrdersPage() {
         
         // Get clinic name from slug and fetch real orders
         const clinicData = slugToClinic(clinic);
-        const clinicName = clinicData?.name || clinic.replace('-', ' ');
-        const realOrders = generateMockOrders(clinicName);
-        
-        setOrders(realOrders);
+        if (clinicData) {
+          const realOrders = MockDataService.getOrdersByClinic(clinicData.name);
+          setOrders(realOrders);
+        }
       } catch (error) {
         console.error("Error fetching orders:", error);
       } finally {
@@ -191,11 +102,11 @@ export default function OrdersPage() {
   
   // Event handlers
   const handleViewOrder = (clientId: string, orderId: string) => {
-    router.push(`/clients/${clientId}/orders/${orderId}`);
+    router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
   };
   
   const handleEditOrder = (clientId: string, orderId: string) => {
-    router.push(`/clients/${clientId}/orders/${orderId}/edit`);
+    router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}/edit`, clinic));
   };
   
   const handleDeleteOrder = (orderId: string) => {
@@ -206,11 +117,11 @@ export default function OrdersPage() {
   };
   
   const handlePrintInvoice = (clientId: string, orderId: string) => {
-    router.push(`/clients/${clientId}/orders/${orderId}`);
+    router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
   };
   
   const handleCreateNewOrder = () => {
-    router.push(`/clinic/${clinic}/orders/new`);
+    router.push(generateLink('clinic', 'orders/new', clinic));
   };
   
   const handlePageChange = (page: number) => {

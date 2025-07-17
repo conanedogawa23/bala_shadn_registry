@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { 
   Card, 
@@ -21,12 +21,13 @@ import {
 } from "@/components/ui/table/Table";
 import { ArrowLeft, Search, Plus, User } from "lucide-react";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
+import { slugToClinic } from "@/lib/data/clinics";
+import { MockDataService } from "@/lib/data/mockDataService";
+import { generateLink } from "@/lib/route-utils";
 
 interface Client {
   id: string;
   name: string;
-  phone: string;
-  email: string;
 }
 
 export default function ClinicOrdersNewPage() {
@@ -39,42 +40,31 @@ export default function ClinicOrdersNewPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const clientsPerPage = 8;
   
-  // Mock clients data filtered by clinic - in a real app, this would be fetched from an API
-  const [clients] = useState<Client[]>([
-    {
-      id: "21770481",
-      name: "HEALTH BIOFORM",
-      phone: "905-670-0204",
-      email: "info@healthbioform.com"
-    },
-    {
-      id: "16883465",
-      name: "ROBINSON, DAVID",
-      phone: "416-555-1234",
-      email: "d.robinson@email.com"
-    },
-    {
-      id: "23456789",
-      name: "SMITH, JOHN",
-      phone: "416-555-2345",
-      email: "j.smith@email.com"
-    },
-    {
-      id: "34567890",
-      name: "JOHNSON, MARY",
-      phone: "416-555-3456",
-      email: "m.johnson@email.com"
-    }
-  ]);
+  // Clients data - fetched from MockDataService based on clinic
+  const [clients, setClients] = useState<Client[]>([]);
+  
+  useEffect(() => {
+    // Fetch real clients for this clinic
+    const fetchClients = async () => {
+      // Get clinic name from slug and fetch real clients
+      const clinicData = slugToClinic(clinic);
+      if (clinicData) {
+        const rawClients = MockDataService.getClientsByClinic(clinicData.name);
+        const formattedClients = rawClients.map(client => ({
+          id: client.id,
+          name: client.name
+        }));
+        setClients(formattedClients);
+      }
+    };
+    
+    fetchClients();
+  }, [clinic]);
   
   // Filter clients based on search query
   const filteredClients = clients.filter(client => {
     const query = searchQuery.toLowerCase();
-    return (
-      client.name.toLowerCase().includes(query) ||
-      client.phone.toLowerCase().includes(query) ||
-      client.email.toLowerCase().includes(query)
-    );
+    return client.name.toLowerCase().includes(query);
   });
   
   // Calculate pagination
@@ -90,11 +80,11 @@ export default function ClinicOrdersNewPage() {
   };
   
   const handleBack = () => {
-    router.push(`/clinic/${clinic}/orders`);
+    router.push(generateLink('clinic', 'orders', clinic));
   };
   
   const handleCreateOrderForClient = (clientId: string) => {
-    router.push(`/clients/${clientId}/orders/create`);
+    router.push(generateLink('clinic', `clients/${clientId}/orders/new`, clinic));
   };
 
   return (
@@ -136,7 +126,7 @@ export default function ClinicOrdersNewPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
                 id="search"
-                placeholder="Search by name, phone, or email..."
+                placeholder="Search by name..."
                 className="pl-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -150,8 +140,6 @@ export default function ClinicOrdersNewPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Client Name</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Email</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -160,8 +148,6 @@ export default function ClinicOrdersNewPage() {
                       currentClients.map((client) => (
                         <TableRow key={client.id} className="hover:bg-gray-50">
                           <TableCell className="font-medium">{client.name}</TableCell>
-                          <TableCell>{client.phone}</TableCell>
-                          <TableCell>{client.email}</TableCell>
                           <TableCell className="text-right">
                             <Button 
                               size="sm"
@@ -176,7 +162,7 @@ export default function ClinicOrdersNewPage() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                        <TableCell colSpan={2} className="text-center py-8 text-gray-500">
                           {searchQuery ? "No clients found matching your search" : "No clients available"}
                         </TableCell>
                       </TableRow>
@@ -210,7 +196,7 @@ export default function ClinicOrdersNewPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <Button 
               variant="outline" 
-              onClick={() => router.push('/clients')}
+              onClick={() => router.push(generateLink('clinic', 'clients/new', clinic))}
               className="flex items-center gap-2"
             >
               <User size={16} />
@@ -218,7 +204,7 @@ export default function ClinicOrdersNewPage() {
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => router.push(`/clinic/${clinic}/clients`)}
+              onClick={() => router.push(generateLink('clinic', 'clients', clinic))}
               className="flex items-center gap-2"
             >
               <User size={16} />

@@ -21,6 +21,7 @@ import { isAuthenticated, getUser, logout, User } from "@/lib/auth";
 import { ClinicSelector } from "@/components/clinic/clinic-selector";
 import { useClinic } from "@/lib/contexts/clinic-context";
 import { clinicToSlug } from "@/lib/data/clinics";
+import { generateLink, RouteType } from "@/lib/route-utils";
 
 export default function NavMenu() {
   const pathname = usePathname();
@@ -95,41 +96,41 @@ export default function NavMenu() {
     return pathname === path;
   }, [pathname]);
   
-  // Generate clinic-aware navigation items
-  const getClinicBasePath = () => {
-    if (!selectedClinic) return '/clinic/bodybliss-physio';
-    return `/clinic/${clinicToSlug(selectedClinic.displayName)}`;
+  // Generate clinic-aware navigation items using the route utility
+  const getClinicSlug = (): string => {
+    if (!selectedClinic) return 'bodybliss-physio';
+    return clinicToSlug(selectedClinic.displayName);
   };
 
   const navItems = [
     {
       name: "Dashboard",
-      href: getClinicBasePath(),
+      href: generateLink('clinic', '', getClinicSlug()),
       icon: <Home className="h-5 w-5" />
     },
     {
       name: "Clients",
-      href: `${getClinicBasePath()}/clients`,
+      href: generateLink('clinic', 'clients', getClinicSlug()),
       icon: <Users className="h-5 w-5" />
     },
     {
       name: "Orders",
-      href: `${getClinicBasePath()}/orders`,
+      href: generateLink('clinic', 'orders', getClinicSlug()),
       icon: <ShoppingBag className="h-5 w-5" />
     },
     {
       name: "Payments",
-      href: `${getClinicBasePath()}/payments`,
+      href: generateLink('clinic', 'payments', getClinicSlug()),
       icon: <CreditCard className="h-5 w-5" />
     },
     {
       name: "Reports",
-      href: `${getClinicBasePath()}/reports`,
+      href: generateLink('clinic', 'reports', getClinicSlug()),
       icon: <BookOpen className="h-5 w-5" />
     },
     {
       name: "Settings",
-      href: `${getClinicBasePath()}/settings`,
+      href: generateLink('clinic', 'settings', getClinicSlug()),
       icon: <Settings className="h-5 w-5" />
     }
   ];
@@ -230,7 +231,7 @@ export default function NavMenu() {
                           </div>
                         </div>
                         <div className="px-4 py-2 text-center border-t border-gray-100">
-                          <Link href={`${getClinicBasePath()}/notifications`} className="text-xs text-blue-600 hover:text-blue-800">
+                          <Link href={generateLink('clinic', 'notifications', getClinicSlug())} className="text-xs text-blue-600 hover:text-blue-800">
                             View all notifications
                           </Link>
                         </div>
@@ -268,14 +269,14 @@ export default function NavMenu() {
                         <p className="text-sm text-gray-500 truncate">{userData?.email}</p>
                       </div>
                       <Link 
-                        href={`${getClinicBasePath()}/settings/profile`}
+                        href={generateLink('clinic', 'settings/profile', getClinicSlug())}
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setUserMenuOpen(false)}
                       >
                         Your Profile
                       </Link>
                       <Link 
-                        href={`${getClinicBasePath()}/settings/account`}
+                        href={generateLink('clinic', 'settings/account', getClinicSlug())}
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={() => setUserMenuOpen(false)}
                       >

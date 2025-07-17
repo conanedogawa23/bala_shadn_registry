@@ -11,6 +11,7 @@ import {
   clinicToSlug,
   slugToClinic 
 } from '@/lib/data/clinics';
+import { generateLink, getClinicPath } from '@/lib/route-utils';
 
 const ClinicContext = createContext<ClinicContextType | undefined>(undefined);
 
@@ -66,11 +67,11 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
     
     if (pathSegments[1] === 'clinic') {
       // Replace clinic in existing clinic URL
-      const newPath = `/clinic/${clinicSlug}${pathSegments.slice(3).join('/')}`;
-      router.push(newPath);
+      const remainingPath = pathSegments.slice(3).join('/');
+      router.push(generateLink('clinic', remainingPath, clinicSlug));
     } else {
       // Redirect to clinic-specific homepage
-      router.push(`/clinic/${clinicSlug}`);
+      router.push(generateLink('clinic', '', clinicSlug));
     }
   };
 
