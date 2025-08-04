@@ -98,18 +98,17 @@ export const realClinicsData: Clinic[] = [
     id: 14,
     name: 'Physio Bliss',
     displayName: 'Physio Bliss',
-    address: '6033 Shawson Dr',
-    city: 'Mississauga',
+    address: '220 Duncan Mills Rd, Suite 100',
+    city: 'Toronto',
     province: 'Ontario',
-    postalCode: 'L5T 1H8',
+    postalCode: 'M3B 2M3',
     status: 'inactive',
-    lastActivity: '2019-08-15',
-    totalAppointments: 51992,
+    lastActivity: '2018-11-14',
+    totalAppointments: 2436,
     clientCount: 1433,
-    description: 'High-volume physiotherapy clinic (inactive since 2019)'
+    description: 'Physiotherapy and wellness services (inactive since 2018)'
   },
   
-  // Clinics with Client Data but No Appointments
   {
     id: 3,
     name: 'Bioform Health',
@@ -118,10 +117,11 @@ export const realClinicsData: Clinic[] = [
     city: 'Mississauga',
     province: 'Ontario',
     postalCode: 'L5T 1H8',
-    status: 'no-data',
-    totalAppointments: 0,
+    status: 'inactive',
+    lastActivity: '2018-04-19',
+    totalAppointments: 17808,
     clientCount: 7254,
-    description: 'Health services clinic (client data only, no appointment history)'
+    description: 'Biomechanical health assessment and treatment (inactive since 2018)'
   },
   
   {
@@ -132,12 +132,14 @@ export const realClinicsData: Clinic[] = [
     city: 'Toronto',
     province: 'Ontario',
     postalCode: 'M1V 5L6',
-    status: 'no-data',
-    totalAppointments: 0,
+    status: 'inactive',
+    lastActivity: '2017-12-28',
+    totalAppointments: 4242,
     clientCount: 2860,
-    description: 'Orthotic appliance services (client data only)'
+    description: 'Custom orthotic devices and appliances (inactive since 2017)'
   },
   
+  // No-Data Clinics (Setup/Development)
   {
     id: 4,
     name: 'BodyBliss',
@@ -195,6 +197,57 @@ export const realClinicsData: Clinic[] = [
   }
 ];
 
+// Comprehensive clinic name mapping for data resolution
+// Maps clinic names from clinics.ts to corresponding names in realData.json
+export const clinicNameMapping: Record<string, string> = {
+  // Direct matches (clinic name → realData.json clientCounts key)
+  'My Cloud': 'My Cloud',
+  'BodyBlissOneCare': 'BodyBlissOneCare', 
+  'Ortholine Duncan Mills': 'Ortholine Duncan Mills',
+  'Markham Orthopedic': 'Markham Orthopedic',
+  'ExtremePhysio': 'ExtremePhysio',
+  'Physio Bliss': 'Physio Bliss',
+  'Bioform Health': 'Bioform Health',
+  'Orthopedic Orthotic Appliances': 'Orthopedic Orthotic Appliances',
+  'Century Care': 'Century Care',
+  'Active force eh': 'Active force eh',
+  'Evergold': 'Evergold',
+  
+  // Special cases that need mapping
+  'bodyblissphysio': 'BodyBlissPhysio', // Use the larger dataset (4586 vs 120)
+  'BodyBliss': 'BodyBliss',
+  
+  // Display name mappings (for when displayName is used)
+  'BodyBliss Physio': 'BodyBlissPhysio',
+  'BodyBliss OneCare': 'BodyBlissOneCare',
+  'Extreme Physio': 'ExtremePhysio',
+  'Active Force': 'Active force eh'
+};
+
+// Get the realData.json clinic name for data lookups
+export const getRealDataClinicName = (clinic: Clinic): string => {
+  // Try clinic name first, then displayName, then fallback to clinic name
+  return clinicNameMapping[clinic.name] || 
+         clinicNameMapping[clinic.displayName] || 
+         clinic.name;
+};
+
+// Available clinic types for service generation
+export const getClinicType = (clinic: Clinic): 'physiotherapy' | 'orthopedic' | 'wellness' | 'general' => {
+  const name = clinic.name.toLowerCase();
+  const displayName = clinic.displayName?.toLowerCase() || '';
+  
+  if (name.includes('physio') || displayName.includes('physio')) {
+    return 'physiotherapy';
+  } else if (name.includes('orthopedic') || name.includes('orthotic') || displayName.includes('orthopedic')) {
+    return 'orthopedic';
+  } else if (name.includes('bliss') || name.includes('wellness') || displayName.includes('wellness')) {
+    return 'wellness';
+  } else {
+    return 'general';
+  }
+};
+
 // Get active clinic (currently BodyBlissPhysio)
 export const getActiveClinic = (): Clinic => {
   return realClinicsData.find(clinic => clinic.status === 'active') || realClinicsData[0];
@@ -205,14 +258,15 @@ export const getClinicsByStatus = (status: Clinic['status']): Clinic[] => {
   return realClinicsData.filter(clinic => clinic.status === status);
 };
 
-// Get clinic by name or id
+// Clinic data lookup functions
 export const getClinicByName = (name: string): Clinic | undefined => {
   return realClinicsData.find(clinic => 
-    clinic.name.toLowerCase() === name.toLowerCase() || 
-    clinic.displayName.toLowerCase() === name.toLowerCase()
+    clinic.name === name || 
+    clinic.displayName === name
   );
 };
 
+// Get clinic by ID
 export const getClinicById = (id: number): Clinic | undefined => {
   return realClinicsData.find(clinic => clinic.id === id);
 };

@@ -102,11 +102,23 @@ export default function OrdersPage() {
   
   // Event handlers
   const handleViewOrder = (clientId: string, orderId: string) => {
-    router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
+    // Check if clientId is valid before navigating
+    if (!clientId || clientId === 'undefined' || clientId === 'null') {
+      // If no valid client ID, navigate directly to the order page
+      router.push(generateLink('clinic', `orders/${orderId}`, clinic));
+    } else {
+      router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
+    }
   };
   
   const handleEditOrder = (clientId: string, orderId: string) => {
-    router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}/edit`, clinic));
+    // Check if clientId is valid before navigating
+    if (!clientId || clientId === 'undefined' || clientId === 'null') {
+      // If no valid client ID, navigate directly to the order edit page
+      router.push(generateLink('clinic', `orders/${orderId}/edit`, clinic));
+    } else {
+      router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}/edit`, clinic));
+    }
   };
   
   const handleDeleteOrder = (orderId: string) => {
@@ -117,7 +129,13 @@ export default function OrdersPage() {
   };
   
   const handlePrintInvoice = (clientId: string, orderId: string) => {
-    router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
+    // Check if clientId is valid before navigating
+    if (!clientId || clientId === 'undefined' || clientId === 'null') {
+      // If no valid client ID, navigate directly to the order page
+      router.push(generateLink('clinic', `orders/${orderId}`, clinic));
+    } else {
+      router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
+    }
   };
   
   const handleCreateNewOrder = () => {

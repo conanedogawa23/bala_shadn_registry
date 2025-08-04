@@ -97,7 +97,18 @@ export default function ViewClientOrderPage() {
       "16883465": { name: "ROBINSON, DAVID", email: "d.robinson@email.com", phone: "416-555-1234" },
       "21770481": { name: "HEALTH BIOFORM", email: "info@healthbioform.com", phone: "905-670-0204" },
       "30000": { name: "ANDERSON, SARAH", email: "sarah.anderson@email.com", phone: "416-555-5678" },
-      "30001": { name: "THOMPSON, MICHAEL", email: "michael.thompson@email.com", phone: "416-555-9012" }
+      "30001": { name: "THOMPSON, MICHAEL", email: "michael.thompson@email.com", phone: "416-555-9012" },
+      // Add more client IDs that match the actual IDs in the system
+      "91000": { name: "JOHNSON, ROBERT", email: "r.johnson@email.com", phone: "416-555-1111" },
+      "91001": { name: "WILLIAMS, JENNIFER", email: "j.williams@email.com", phone: "416-555-2222" },
+      "91002": { name: "BROWN, JAMES", email: "j.brown@email.com", phone: "416-555-3333" },
+      "91003": { name: "DAVIS, PATRICIA", email: "p.davis@email.com", phone: "416-555-4444" },
+      "91004": { name: "MILLER, JOHN", email: "j.miller@email.com", phone: "416-555-5555" },
+      "91005": { name: "WILSON, LINDA", email: "l.wilson@email.com", phone: "416-555-6666" },
+      "91006": { name: "MOORE, BARBARA", email: "b.moore@email.com", phone: "416-555-7777" },
+      "91007": { name: "TAYLOR, RICHARD", email: "r.taylor@email.com", phone: "416-555-8888" },
+      "91008": { name: "ANDERSON, SUSAN", email: "s.anderson@email.com", phone: "416-555-9999" },
+      "91009": { name: "THOMAS, CHARLES", email: "c.thomas@email.com", phone: "416-555-0000" }
     };
 
     const client = clientNames[clientId] || { 

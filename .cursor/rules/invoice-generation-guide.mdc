@@ -1,0 +1,97 @@
+---
+description: "Invoice generation and formatting requirements based on BodyBliss One Care format"
+---
+
+# Invoice Generation Guide
+
+## Overview
+Invoice generation must follow the BodyBliss One Care format shown in the provided image, with professional layout and complete payment information.
+
+## Required Invoice Structure
+
+### Header Section
+- **Clinic Logo and Branding**: Use clinic-specific branding
+- **Clinic Information**: Name, complete address, phone, fax from [lib/data/realData.json](mdc:lib/data/realData.json)
+- **Invoice Title**: "INVOICE" prominently displayed
+- **Invoice Metadata**: Invoice No., Date, Customer details, Referring MD
+
+### Service Details Table
+```tsx
+// Table must include these columns:
+const invoiceColumns = [
+  'ITEM DESCRIPTION',
+  'QTY', 
+  'PRICE',
+  'AMOUNT',
+  'SERVICE DATE'
+];
+```
+
+### Financial Summary
+- **Subtotal calculation** from line items
+- **Tax calculation** (13% HST for Ontario)
+- **Total Amount** (Subtotal + Tax)
+- **Payment Information**: Amount paid, Amount due, Payment method, Payment date
+
+### Footer Section
+- **Professional signature line**
+- **Dispense date and payment method**
+- **Clean, professional layout**
+
+## Technical Implementation
+
+### Component Structure
+```
+/components/ui/invoice/
+├── InvoiceTemplate.tsx (main template)
+├── InvoiceHeader.tsx (clinic info and branding)
+├── InvoiceLineItems.tsx (service table)
+├── InvoiceFooter.tsx (totals and signature)
+└── InvoicePrintLayout.tsx (print-specific styling)
+```
+
+### Data Requirements
+- Use `Payment` interface from [lib/data/mockDataService.ts](mdc:lib/data/mockDataService.ts)
+- Include `PaymentLineItem[]` for service details
+- Access clinic information via `slugToClinic()` function
+- Format dates using Canadian locale standards
+
+### Print Functionality
+```tsx
+const handlePrint = () => {
+  window.print();
+};
+
+// CSS for print media
+@media print {
+  .no-print { display: none; }
+  .invoice-container { 
+    max-width: none; 
+    box-shadow: none; 
+    border: none; 
+  }
+}
+```
+
+### Currency Formatting
+```tsx
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD'
+  }).format(amount);
+};
+```
+
+## Professional Styling Requirements
+- **Clean borders** around table elements
+- **Professional typography** using system fonts
+- **Proper spacing** and alignment
+- **Print-optimized** layout and styling
+- **Responsive** design for screen preview
+- **Accessible** table headers and structure
+
+## Invoice Numbering
+- Use existing `invoiceNumber` from payment data
+- Format: `INV{baseNumber}` where baseNumber comes from order ID
+- Ensure uniqueness across clinic system

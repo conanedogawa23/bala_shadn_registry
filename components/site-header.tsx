@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { UserCircle, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { generateLink } from '@/lib/route-utils';
 
 interface SiteHeaderProps {
   isLoggedIn?: boolean;
@@ -20,7 +21,7 @@ export function SiteHeader({ isLoggedIn = false, className }: SiteHeaderProps) {
     <header className={cn('border-b bg-background sticky top-0 z-50 w-full', className)}>
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div className="flex items-center">
-          <Link href="/" className="font-bold text-lg md:text-xl flex items-center">
+          <Link href={generateLink('global', '')} className="font-bold text-lg md:text-xl flex items-center">
             <div className="h-7 w-7 md:h-8 md:w-8 rounded-md mr-2 bg-gradient-to-br from-purple-600 to-blue-500 flex items-center justify-center text-white text-xs md:text-sm">
               BB
             </div>
@@ -31,25 +32,25 @@ export function SiteHeader({ isLoggedIn = false, className }: SiteHeaderProps) {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-4 lg:gap-6">
-          <Link href="/services" className="text-sm font-medium hover:text-primary transition-colors">
+          <Link href={generateLink('global', 'services')} className="text-sm font-medium hover:text-primary transition-colors">
             Services
           </Link>
-          <Link href="/clinics" className="text-sm font-medium hover:text-primary transition-colors">
+          <Link href={generateLink('global', 'clinics')} className="text-sm font-medium hover:text-primary transition-colors">
             Clinics
           </Link>
-          <Link href="/about" className="text-sm font-medium hover:text-primary transition-colors">
+          <Link href={generateLink('global', 'about')} className="text-sm font-medium hover:text-primary transition-colors">
             About Us
           </Link>
-          <Link href="/contact" className="text-sm font-medium hover:text-primary transition-colors">
+          <Link href={generateLink('global', 'contact')} className="text-sm font-medium hover:text-primary transition-colors">
             Contact
           </Link>
           
           {isLoggedIn ? (
             <div className="flex items-center gap-2 lg:gap-4 pl-2 lg:pl-4 border-l border-gray-200">
-              <Link href="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
+              <Link href={generateLink('global', 'dashboard')} className="text-sm font-medium hover:text-primary transition-colors">
                 Dashboard
               </Link>
-              <Link href="/profile">
+              <Link href={generateLink('global', 'profile')}>
                 <Button variant="ghost" size="icon" aria-label="User Profile" className="h-8 w-8">
                   <UserCircle className="h-5 w-5" />
                 </Button>
@@ -57,12 +58,12 @@ export function SiteHeader({ isLoggedIn = false, className }: SiteHeaderProps) {
             </div>
           ) : (
             <div className="flex items-center gap-2 lg:gap-4 pl-2 lg:pl-4 border-l border-gray-200">
-              <Link href="/login">
+              <Link href={generateLink('global', 'login')}>
                 <Button variant="ghost" size="sm" className="text-sm h-8">
                   Log In
                 </Button>
               </Link>
-              <Link href="/register">
+              <Link href={generateLink('global', 'register')}>
                 <Button size="sm" className="text-sm h-8">Sign Up</Button>
               </Link>
             </div>
@@ -86,28 +87,28 @@ export function SiteHeader({ isLoggedIn = false, className }: SiteHeaderProps) {
         <div className="md:hidden absolute w-full bg-background shadow-lg border-b z-40">
           <nav className="container mx-auto py-4 px-4 flex flex-col space-y-3 max-w-7xl">
             <Link 
-              href="/services" 
+              href={generateLink('global', 'services')}
               className="text-sm font-medium px-2 py-1.5 hover:bg-gray-50 rounded hover:text-primary transition-colors"
               onClick={() => setIsMenuOpen(false)}
             >
               Services
             </Link>
             <Link 
-              href="/clinics" 
+              href={generateLink('global', 'clinics')}
               className="text-sm font-medium px-2 py-1.5 hover:bg-gray-50 rounded hover:text-primary transition-colors"
               onClick={() => setIsMenuOpen(false)}
             >
               Clinics
             </Link>
             <Link 
-              href="/about" 
+              href={generateLink('global', 'about')}
               className="text-sm font-medium px-2 py-1.5 hover:bg-gray-50 rounded hover:text-primary transition-colors"
               onClick={() => setIsMenuOpen(false)}
             >
               About Us
             </Link>
             <Link 
-              href="/contact" 
+              href={generateLink('global', 'contact')}
               className="text-sm font-medium px-2 py-1.5 hover:bg-gray-50 rounded hover:text-primary transition-colors"
               onClick={() => setIsMenuOpen(false)}
             >
@@ -119,14 +120,14 @@ export function SiteHeader({ isLoggedIn = false, className }: SiteHeaderProps) {
             {isLoggedIn ? (
               <>
                 <Link 
-                  href="/dashboard" 
+                  href={generateLink('global', 'dashboard')}
                   className="text-sm font-medium px-2 py-1.5 hover:bg-gray-50 rounded hover:text-primary transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
                 <Link 
-                  href="/profile" 
+                  href={generateLink('global', 'profile')}
                   className="text-sm font-medium px-2 py-1.5 hover:bg-gray-50 rounded hover:text-primary transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
@@ -135,12 +136,12 @@ export function SiteHeader({ isLoggedIn = false, className }: SiteHeaderProps) {
               </>
             ) : (
               <div className="flex flex-col space-y-2 pt-2">
-                <Link href="/login" onClick={() => setIsMenuOpen(false)}>
+                <Link href={generateLink('global', 'login')} onClick={() => setIsMenuOpen(false)}>
                   <Button variant="outline" className="w-full">
                     Log In
                   </Button>
                 </Link>
-                <Link href="/register" onClick={() => setIsMenuOpen(false)}>
+                <Link href={generateLink('global', 'register')} onClick={() => setIsMenuOpen(false)}>
                   <Button className="w-full">Sign Up</Button>
                 </Link>
               </div>

@@ -6,488 +6,448 @@ import {
   ArrowLeft, 
   User, 
   CreditCard, 
-  DollarSign,
   FileText,
-  Phone,
-  Mail,
   Edit,
   Printer,
-  Download,
   CheckCircle,
   Clock,
   AlertCircle,
-  XCircle
+  XCircle,
+  Building
 } from 'lucide-react';
-import { slugToClinic } from '@/lib/data/clinics';
+import { generateLink } from '@/lib/route-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { paymentsData } from '@/lib/mock-data';
+
+interface PaymentService {
+  id: string;
+  name: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
 
 interface PaymentData {
   id: string;
-  clientId: string;
   clientName: string;
-  clientEmail: string;
-  clientPhone: string;
+  invoiceNumber: string;
   amount: number;
-  paymentMethod: 'credit_card' | 'debit_card' | 'cash' | 'check' | 'bank_transfer';
-  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  status: string;
   paymentDate: string;
+  paymentMethod: string;
+  paymentType: string;
+  clientId: string;
+  paymentReference?: string;
   dueDate: string;
-  processingFee: number;
+  invoiceDate: string;
+  subtotal: number;
+  taxAmount: number;
+  taxRate: number;
   netAmount: number;
-  transactionId: string;
-  description: string;
+  clinic: string;
+  clinicAddress?: string;
+  providerName?: string;
+  orderNumber?: string;
+  services?: PaymentService[];
+  insuranceInfo?: {
+    primaryInsurance?: string;
+    claimNumber?: string;
+    authorizationNumber?: string;
+  };
   notes?: string;
-  invoiceNumber?: string;
-  serviceType: string;
-  processedBy: string;
 }
-
-const themeColors = {
-  primary: '#6366f1',
-  secondary: '#8b5cf6',
-  accent: '#06b6d4',
-  success: '#10b981',
-  warning: '#f59e0b',
-  error: '#ef4444',
-};
 
 export default function ViewPaymentPage() {
   const router = useRouter();
   const params = useParams();
-  const clinic = params.clinic as string;
+  const clinicSlug = params.clinic as string;
   const paymentId = params.id as string;
   
-  const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
+  const [payment, setPayment] = useState<PaymentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Generate realistic data based on clinic info
+  // Fetch payment data
   useEffect(() => {
     const fetchPayment = async () => {
       setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        const clinicData = slugToClinic(clinic);
-        const mockPayment: PaymentData = generatePaymentData(clinicData, paymentId);
-        setPaymentData(mockPayment);
+      try {
+        // Use existing mock data
+        const foundPayment = paymentsData.find(p => p.id === paymentId);
+        if (foundPayment) {
+          setPayment(foundPayment);
+        } else {
+          setError('Payment not found');
+        }
+      } catch {
+        setError('Failed to load payment');
+      } finally {
         setIsLoading(false);
-      }, 1000);
-    };
-
-    fetchPayment();
-  }, [paymentId, clinic]);
-
-  // Generate payment data based on clinic info
-  const generatePaymentData = (clinicData: { displayName?: string; status?: string; clientCount?: number } | undefined, paymentId: string): PaymentData => {
-    const isActive = clinicData?.status === 'active';
-    const clinicName = clinicData?.displayName || 'Unknown Clinic';
-    
-    // Client data based on clinic size
-    const clientPool = [
-      { id: "16883465", name: "ROBINSON, DAVID", email: "d.robinson@email.com", phone: "416-555-1234" },
-      { id: "21770481", name: "HEALTH BIOFORM", email: "info@healthbioform.com", phone: "905-670-0204" },
-      { id: "30000", name: "ANDERSON, SARAH", email: "sarah.anderson@email.com", phone: "416-555-5678" },
-      { id: "30001", name: "THOMPSON, MICHAEL", email: "michael.thompson@email.com", phone: "416-555-9012" }
-    ];
-    
-    const randomClient = clientPool[Math.floor(Math.random() * clientPool.length)];
-    
-    // Service pricing based on clinic type
-    const getServiceInfo = () => {
-      if (clinicName.includes('Physio') || clinicName.includes('Physical')) {
-        return {
-          amount: 120.00 * (Math.floor(Math.random() * 5) + 1), // 1-5 sessions
-          serviceType: "Physical Therapy",
-          description: "Physical therapy session package"
-        };
-      } else if (clinicName.includes('Orthopedic') || clinicName.includes('Orthotic')) {
-        return {
-          amount: 450.00 + (Math.random() * 200), // Custom orthotics + assessment
-          serviceType: "Orthotic Services",
-          description: "Custom orthotic device and assessment"
-        };
-      } else if (clinicName.includes('Bioform') || clinicName.includes('Bio')) {
-        return {
-          amount: 85.00 * (Math.floor(Math.random() * 3) + 1), // Equipment/supplies
-          serviceType: "Health Products",
-          description: "Health and wellness products"
-        };
-      } else {
-        return {
-          amount: 150.00 * (Math.floor(Math.random() * 3) + 1), // General services
-          serviceType: "Healthcare Services",
-          description: "Healthcare consultation and treatment"
-        };
       }
     };
 
-    const serviceInfo = getServiceInfo();
-    const processingFee = serviceInfo.amount * 0.03; // 3% processing fee
-    const netAmount = serviceInfo.amount - processingFee;
-
-    return {
-      id: paymentId,
-      clientId: randomClient.id,
-      clientName: randomClient.name,
-      clientEmail: randomClient.email,
-      clientPhone: randomClient.phone,
-      amount: serviceInfo.amount,
-      paymentMethod: Math.random() > 0.3 ? "credit_card" : (Math.random() > 0.5 ? "debit_card" : "cash"),
-      status: isActive ? (Math.random() > 0.8 ? "pending" : "completed") : "completed",
-      paymentDate: isActive ? "2024-01-15" : "2023-08-15",
-      dueDate: isActive ? "2024-01-20" : "2023-08-20",
-      processingFee,
-      netAmount,
-      transactionId: `TXN-${isActive ? '2024' : '2023'}-${Math.floor(Math.random() * 999) + 1}-${paymentId}`,
-      description: serviceInfo.description,
-      notes: `Payment processed at ${clinicName}. ${Math.random() > 0.5 ? 'Insurance claim submitted.' : 'Direct payment.'}`,
-      invoiceNumber: `INV-${isActive ? '2024' : '2023'}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
-      serviceType: serviceInfo.serviceType,
-      processedBy: `Dr. ${Math.random() > 0.5 ? 'Sarah Johnson' : 'Michael Chen'}`
-    };
-  };
+    fetchPayment();
+  }, [paymentId]);
 
   const handleBack = () => {
-    router.push(`/clinic/${clinic}/payments`);
+    router.push(generateLink('clinic', 'payments', clinicSlug));
   };
 
-  const handleEditPayment = () => {
-    router.push(`/clinic/${clinic}/payments/${paymentId}/edit`);
+  const handleEdit = () => {
+    router.push(generateLink('clinic', `payments/${paymentId}/edit`, clinicSlug));
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleDownload = () => {
-    // In a real app, this would generate and download a PDF receipt
-    alert('Payment receipt downloaded');
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      case 'refunded':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const handlePrintInvoice = () => {
+    router.push(generateLink('clinic', `payments/invoice/${paymentId}`, clinicSlug));
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed':
-        return <CheckCircle className="h-4 w-4" />;
-      case 'pending':
-        return <Clock className="h-4 w-4" />;
-      case 'failed':
-        return <XCircle className="h-4 w-4" />;
-      case 'refunded':
-        return <AlertCircle className="h-4 w-4" />;
-      default:
-        return <Clock className="h-4 w-4" />;
+      case 'completed': return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case 'pending': return <Clock className="h-5 w-5 text-yellow-600" />;
+      case 'failed': return <XCircle className="h-5 w-5 text-red-600" />;
+      case 'refunded': return <ArrowLeft className="h-5 w-5 text-blue-600" />;
+      case 'partial': return <AlertCircle className="h-5 w-5 text-orange-600" />;
+      default: return <Clock className="h-5 w-5 text-gray-600" />;
     }
   };
 
-  const getPaymentMethodIcon = (method: string) => {
-    switch (method) {
-      case 'credit_card':
-      case 'debit_card':
-        return <CreditCard className="h-4 w-4" />;
-      case 'cash':
-        return <DollarSign className="h-4 w-4" />;
-      case 'check':
-        return <FileText className="h-4 w-4" />;
-      case 'bank_transfer':
-        return <FileText className="h-4 w-4" />;
-      default:
-        return <CreditCard className="h-4 w-4" />;
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'failed': return 'bg-red-100 text-red-800';
+      case 'refunded': return 'bg-blue-100 text-blue-800';
+      case 'partial': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const formatPaymentMethod = (method: string) => {
-    switch (method) {
-      case 'credit_card':
-        return 'Credit Card';
-      case 'debit_card':
-        return 'Debit Card';
-      case 'cash':
-        return 'Cash';
-      case 'check':
-        return 'Check';
-      case 'bank_transfer':
-        return 'Bank Transfer';
-      default:
-        return method;
-    }
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-CA', {
+      style: 'currency',
+      currency: 'CAD'
+    }).format(amount);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString('en-CA', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
-
   if (isLoading) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
-        <div className="flex items-center justify-center min-h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="outline" size="sm" onClick={handleBack}>
+            <ArrowLeft size={16} />
+            Back
+          </Button>
+          <h1 className="text-2xl sm:text-3xl font-bold">Loading Payment...</h1>
         </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p>Loading payment details...</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  if (!paymentData) {
+  if (error || !payment) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive">Payment Not Found</h1>
-          <p className="text-muted-foreground mt-2">
-            The payment you&apos;re looking for doesn&apos;t exist or has been removed.
-          </p>
-          <Button onClick={handleBack} className="mt-4">
-            Back to Payments
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="outline" size="sm" onClick={handleBack}>
+            <ArrowLeft size={16} />
+            Back
           </Button>
+          <h1 className="text-2xl sm:text-3xl font-bold">Payment Not Found</h1>
         </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center py-12">
+              <XCircle className="h-16 w-16 mx-auto mb-4 text-red-400" />
+              <h2 className="text-xl font-semibold mb-2">Payment Not Found</h2>
+              <p className="text-gray-600 mb-6">
+                {error || 'The payment you are looking for does not exist.'}
+              </p>
+              <Button onClick={handleBack}>
+                Return to Payments
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 sm:px-6 max-w-4xl">
-      {/* Back Navigation */}
-      <div className="mb-8">
-        <Button 
-          variant="outline" 
-          onClick={handleBack}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft size={16} />
-          Back to Payments
-        </Button>
-      </div>
-
-      {/* Page Header */}
+    <div className="container mx-auto py-8 px-4 sm:px-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: themeColors.primary }}>
-            Payment #{paymentData.id}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {slugToClinic(clinic)?.displayName || clinic.replace('-', ' ')} • {paymentData.clientName}
-          </p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBack}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft size={16} />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">
+              Payment Details
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {payment.invoiceNumber}
+            </p>
+          </div>
         </div>
-        
-        <div className="flex flex-wrap gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handlePrint}
-            className="flex items-center gap-2"
-          >
-            <Printer size={16} />
-            Print
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleDownload}
-            className="flex items-center gap-2"
-          >
-            <Download size={16} />
-            Download
-          </Button>
-          <Button 
-            onClick={handleEditPayment}
-            size="sm"
-            className="flex items-center gap-2"
-            style={{ backgroundColor: themeColors.primary }}
-          >
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <Button variant="outline" onClick={handleEdit} className="flex items-center gap-2">
             <Edit size={16} />
             Edit Payment
           </Button>
+          <Button onClick={handlePrintInvoice} className="flex items-center gap-2">
+            <Printer size={16} />
+            Print Invoice
+          </Button>
         </div>
       </div>
 
-      {/* Payment Status & Amount */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div 
-                className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: `${themeColors.primary}20` }}
-              >
-                <DollarSign className="h-6 w-6" style={{ color: themeColors.primary }} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Main Payment Info */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Payment Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Payment Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    {getStatusIcon(payment.status)}
+                    <Badge className={getStatusColor(payment.status)}>
+                      {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                    </Badge>
+                  </div>
+                  <p className="text-3xl font-bold text-green-600">
+                    {formatCurrency(payment.amount)}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Payment Amount
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-semibold">
+                    {payment.paymentMethod}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Payment Method
+                  </p>
+                </div>
               </div>
+
+              <Separator />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Payment Date</p>
+                  <p className="text-base">{formatDate(payment.paymentDate)}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Due Date</p>
+                  <p className="text-base">{formatDate(payment.dueDate)}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Invoice Date</p>
+                  <p className="text-base">{formatDate(payment.invoiceDate)}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Payment Type</p>
+                  <p className="text-base">{payment.paymentType}</p>
+                </div>
+              </div>
+
+              {payment.paymentReference && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Payment Reference</p>
+                  <p className="text-base font-mono">{payment.paymentReference}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Service Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Service Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b">
+                    <tr className="text-left">
+                      <th className="pb-3 text-sm font-medium text-gray-500">Service</th>
+                      <th className="pb-3 text-sm font-medium text-gray-500 text-right">Qty</th>
+                      <th className="pb-3 text-sm font-medium text-gray-500 text-right">Unit Price</th>
+                      <th className="pb-3 text-sm font-medium text-gray-500 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {payment.services?.map((service, index) => (
+                      <tr key={service.id || index}>
+                        <td className="py-3">
+                          <div>
+                            <p className="font-medium">{service.name}</p>
+                            <p className="text-sm text-gray-600">{service.description}</p>
+                          </div>
+                        </td>
+                        <td className="py-3 text-right">{service.quantity}</td>
+                        <td className="py-3 text-right">{formatCurrency(service.unitPrice)}</td>
+                        <td className="py-3 text-right font-medium">{formatCurrency(service.totalPrice)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>{formatCurrency(payment.subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tax ({(payment.taxRate * 100).toFixed(1)}%):</span>
+                  <span>{formatCurrency(payment.taxAmount)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-semibold border-t pt-2">
+                  <span>Total:</span>
+                  <span>{formatCurrency(payment.netAmount)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Client Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Client Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <div className="text-3xl font-bold">{formatCurrency(paymentData.amount)}</div>
-                <div className="text-sm text-gray-600">Total Amount</div>
+                <p className="font-medium text-lg">{payment.clientName}</p>
+                <p className="text-sm text-gray-600">Client ID: {payment.clientId}</p>
               </div>
-            </div>
-            
-            <Badge variant="secondary" className={getStatusColor(paymentData.status)}>
-              {getStatusIcon(paymentData.status)}
-              <span className="ml-2 capitalize">{paymentData.status}</span>
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
+              
+              {payment.orderNumber && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Order Number</p>
+                  <p className="text-base">{payment.orderNumber}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Payment Details */}
-      <div className="grid gap-6 md:grid-cols-2 mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Payment Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Transaction ID</span>
-              <span className="font-medium">{paymentData.transactionId}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Payment Method</span>
-              <div className="flex items-center gap-2">
-                {getPaymentMethodIcon(paymentData.paymentMethod)}
-                <span className="font-medium">{formatPaymentMethod(paymentData.paymentMethod)}</span>
+          {/* Clinic Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5" />
+                Clinic Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="font-medium">{payment.clinic}</p>
+                {payment.clinicAddress && (
+                  <p className="text-sm text-gray-600">{payment.clinicAddress}</p>
+                )}
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Payment Date</span>
-              <span className="font-medium">{formatDate(paymentData.paymentDate)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Due Date</span>
-              <span className="font-medium">{formatDate(paymentData.dueDate)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Processed By</span>
-              <span className="font-medium">{paymentData.processedBy}</span>
-            </div>
-            {paymentData.invoiceNumber && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Invoice Number</span>
-                <span className="font-medium">{paymentData.invoiceNumber}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              
+              {payment.providerName && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Provider</p>
+                  <p className="text-base">{payment.providerName}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Client Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Name</span>
-              <span className="font-medium">{paymentData.clientName}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Email</span>
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-gray-400" />
-                <span className="font-medium">{paymentData.clientEmail}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Phone</span>
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-gray-400" />
-                <span className="font-medium">{paymentData.clientPhone}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Client ID</span>
-              <span className="font-medium">#{paymentData.clientId}</span>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Insurance Information */}
+          {payment.insuranceInfo && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Insurance Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {payment.insuranceInfo.primaryInsurance && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Primary Insurance</p>
+                    <p className="text-base">{payment.insuranceInfo.primaryInsurance}</p>
+                  </div>
+                )}
+                
+                {payment.insuranceInfo.claimNumber && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Claim Number</p>
+                    <p className="text-base font-mono">{payment.insuranceInfo.claimNumber}</p>
+                  </div>
+                )}
+                
+                {payment.insuranceInfo.authorizationNumber && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Authorization</p>
+                    <p className="text-base font-mono">{payment.insuranceInfo.authorizationNumber}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Notes */}
+          {payment.notes && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm">{payment.notes}</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
-
-      {/* Service Details */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Service Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Service Type</span>
-            <span className="font-medium">{paymentData.serviceType}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Description</span>
-            <span className="font-medium">{paymentData.description}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Payment Breakdown */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Payment Breakdown
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Service Amount</span>
-              <span className="font-medium">{formatCurrency(paymentData.amount)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Processing Fee</span>
-              <span className="font-medium">-{formatCurrency(paymentData.processingFee)}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between text-lg font-bold">
-              <span>Net Amount</span>
-              <span>{formatCurrency(paymentData.netAmount)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Notes */}
-      {paymentData.notes && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Payment Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-700 whitespace-pre-wrap">{paymentData.notes}</p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 } 

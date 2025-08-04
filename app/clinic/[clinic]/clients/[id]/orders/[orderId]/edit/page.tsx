@@ -99,8 +99,26 @@ export default function EditClientOrderPage() {
       setIsLoading(true);
       // Simulate API call
       setTimeout(() => {
+        // Client names based on common IDs from real DB
+        const clientNames: { [key: string]: string } = {
+          "16883465": "ROBINSON, DAVID",
+          "21770481": "HEALTH BIOFORM",
+          "30000": "ANDERSON, SARAH",
+          "30001": "THOMPSON, MICHAEL",
+          "91000": "JOHNSON, ROBERT",
+          "91001": "WILLIAMS, JENNIFER",
+          "91002": "BROWN, JAMES",
+          "91003": "DAVIS, PATRICIA",
+          "91004": "MILLER, JOHN",
+          "91005": "WILSON, LINDA",
+          "91006": "MOORE, BARBARA",
+          "91007": "TAYLOR, RICHARD",
+          "91008": "ANDERSON, SUSAN",
+          "91009": "THOMAS, CHARLES"
+        };
+        
         const mockOrderData = {
-          clientName: "ROBINSON, DAVID",
+          clientName: clientNames[clientId] || "UNKNOWN CLIENT",
           status: "processing" as const,
           priority: "medium" as const,
           dueDate: "2024-02-01",

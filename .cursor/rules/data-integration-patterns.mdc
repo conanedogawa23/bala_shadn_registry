@@ -1,0 +1,97 @@
+---
+globs: "**/lib/**/*.ts,**/lib/**/*.tsx,**/data/**/*.ts,**/data/**/*.tsx"
+---
+
+# Data Integration Patterns
+
+## MockDataService Usage Standards
+When working with payment data, follow these established patterns from the clinic system.
+
+## Core Data Fetching Pattern
+```tsx
+import { MockDataService } from '@/lib/data/mockDataService';
+import { slugToClinic } from '@/lib/data/clinics';
+
+// Standard data fetching in payment components
+useEffect(() => {
+  const fetchPayments = async () => {
+    setIsLoading(true);
+    try {
+      const clinicData = slugToClinic(clinic);
+      if (clinicData) {
+        const payments = MockDataService.getPaymentsByClinic(clinicData.name);
+        setPayments(payments);
+      }
+    } catch (error) {
+      setError('Failed to load payments');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchPayments();
+}, [clinic]);
+```
+
+## Required TypeScript Interfaces
+Use existing interfaces from [lib/data/mockDataService.ts](mdc:lib/data/mockDataService.ts):
+- `Payment` interface for payment data
+- `PaymentLineItem` interface for service details  
+- `Clinic` interface for clinic information
+- `Client` interface for client data
+
+## Error Handling Patterns
+```tsx
+const [error, setError] = useState<string | null>(null);
+const [isLoading, setIsLoading] = useState(true);
+
+// Handle data loading errors consistently
+if (error) {
+  return <ErrorDisplay error={error} />;
+}
+
+if (isLoading) {
+  return <LoadingSpinner />;
+}
+```
+
+## Clinic Context Integration
+- Always use `slugToClinic()` to get clinic information
+- Implement proper clinic validation before data operations
+- Handle cases where clinic data is not found
+- Use clinic-specific filtering for all data operations
+
+## Payment Status Management
+```tsx
+type PaymentStatus = 'completed' | 'pending' | 'failed' | 'refunded' | 'partial';
+
+const getStatusColor = (status: PaymentStatus): string => {
+  // Consistent status color mapping across all components
+};
+```
+
+## Data Formatting Utilities
+```tsx
+// Currency formatting for Canadian locale
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD'
+  }).format(amount);
+};
+
+// Date formatting for display
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-CA');
+};
+```
+
+## Navigation Integration
+Use [lib/route-utils.ts](mdc:lib/route-utils.ts) for consistent URL generation:
+```tsx
+import { generateLink } from '@/lib/route-utils';
+
+// Payment route generation
+const paymentUrl = generateLink('clinic', `payments/${paymentId}`, clinic);
+const editUrl = generateLink('clinic', `payments/${paymentId}/edit`, clinic);
+```

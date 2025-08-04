@@ -134,3 +134,38 @@
 [data-rehype-pretty-code-title] + pre {
   @apply mt-2;
 }
+
+/* Invoice Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .invoice-container {
+    max-width: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 20px !important;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Ensure proper page breaks */
+  .invoice-container {
+    page-break-inside: avoid;
+  }
+  
+  /* Print-specific table styling */
+  table {
+    border-collapse: collapse !important;
+  }
+  
+  table td, table th {
+    border: 1px solid #333 !important;
+    padding: 8px !important;
+  }
+}

@@ -1,0 +1,67 @@
+---
+globs: "components/**/*.tsx,components/**/*.ts"
+---
+
+# UI Components Standards for Payment System
+
+## Component Design Principles
+- **Responsive First**: Always implement mobile-first responsive design
+- **Accessibility**: Include proper ARIA labels, keyboard navigation, screen reader support
+- **Consistency**: Follow existing patterns from [components/ui](mdc:components/ui)
+- **Reusability**: Create modular, composable components
+
+## Required Component Props Interface
+```tsx
+interface PaymentComponentProps {
+  className?: string;
+  isLoading?: boolean;
+  disabled?: boolean;
+  // Additional component-specific props
+}
+```
+
+## Payment-Specific Components
+
+### PaymentCard Component
+- Follow pattern from [components/ui/client/ClientCard.tsx](mdc:components/ui/client/ClientCard.tsx)
+- Include payment status badge, amount, client name, date
+- Support click actions for view/edit/delete
+- Responsive grid layout
+
+### PaymentForm Component  
+- Use [components/ui/form/FormWrapper.tsx](mdc:components/ui/form/FormWrapper.tsx) pattern
+- Include Zod validation schema
+- Support both create and edit modes
+- Handle payment method selection and validation
+
+### PaymentStatusBadge Component
+- Extend [components/ui/badge.tsx](mdc:components/ui/badge.tsx)
+- Color coding: green (completed), yellow (pending), red (failed), blue (refunded)
+- Include status icons for visual clarity
+
+## Styling Standards
+- **Colors**: Use consistent theme colors for status indicators
+- **Typography**: Follow established text sizing (`text-sm`, `text-base`, `text-lg`)
+- **Spacing**: Use Tailwind spacing scale (`p-4`, `m-4`, `space-y-4`)
+- **Shadows**: Apply consistent shadow patterns (`shadow-sm`, `shadow-md`)
+
+## Animation and Interactions
+- **Hover Effects**: Subtle transitions on interactive elements
+- **Loading States**: Use loading spinners and skeleton states
+- **Focus States**: Clear focus indicators for accessibility
+- **State Changes**: Smooth transitions between component states
+
+## Error Handling in Components
+```tsx
+const ErrorDisplay = ({ error }: { error: string }) => (
+  <div className="p-4 border border-red-200 bg-red-50 text-red-800 rounded-md">
+    {error}
+  </div>
+);
+```
+
+## Component Documentation
+- Include JSDoc comments for all public props
+- Provide usage examples in component files
+- Document accessibility considerations
+- Include Storybook stories where applicable

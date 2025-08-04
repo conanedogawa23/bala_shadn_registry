@@ -1,0 +1,44 @@
+---
+globs: "**/payments/**/*.tsx,**/payments/**/*.ts"
+---
+
+# Payment Files Standards
+
+## File Naming and Structure
+- Use descriptive component names: `PaymentCard.tsx`, `PaymentForm.tsx`, `InvoiceTemplate.tsx`
+- Follow existing route patterns from [app/clinic/[clinic]/clients](mdc:app/clinic/[clinic]/clients)
+- Maintain consistent directory structure with other clinic modules
+
+## Required Imports and Dependencies
+```tsx
+import { MockDataService } from '@/lib/data/mockDataService';
+import { generateLink } from '@/lib/route-utils';
+import { slugToClinic } from '@/lib/data/clinics';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+```
+
+## Payment Status Management
+- Use consistent status types: `'completed' | 'pending' | 'failed' | 'refunded' | 'partial'`
+- Implement status badges following [components/ui/badge.tsx](mdc:components/ui/badge.tsx) patterns
+- Color coding: green (completed), yellow (pending), red (failed), blue (refunded)
+
+## Error Handling Patterns
+```tsx
+const [isLoading, setIsLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+
+// Follow error patterns from [app/clinic/[clinic]/clients/[id]/edit/page.tsx](mdc:app/clinic/[clinic]/clients/[id]/edit/page.tsx)
+```
+
+## Responsive Design Requirements
+- Always implement mobile-first responsive design
+- Use `container mx-auto py-8 px-4 sm:px-6` for consistent page layout
+- Implement `flex-col sm:flex-row` for action bars
+- Use `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` for card layouts
+
+## Data Integration Standards
+- Always use `MockDataService.getPaymentsByClinic(clinicName)` for payment data
+- Implement proper TypeScript typing with existing `Payment` interface
+- Handle loading states and empty data scenarios
+- Use `useParams()` for clinic slug extraction consistently

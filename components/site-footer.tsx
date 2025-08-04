@@ -4,6 +4,7 @@ import { PhoneCall, Mail, MapPin, Facebook, Twitter, Instagram, Linkedin } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { generateLink } from '@/lib/route-utils';
 
 interface SiteFooterProps {
   className?: string;
@@ -18,7 +19,7 @@ export function SiteFooter({ className }: SiteFooterProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Logo & Description */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <Link href="/" className="font-bold text-xl flex items-center mb-4">
+            <Link href={generateLink('global', '')} className="font-bold text-xl flex items-center mb-4">
               <div className="h-8 w-8 rounded-md mr-2 bg-gradient-to-br from-purple-600 to-blue-500 flex items-center justify-center text-white">
                 BB
               </div>
@@ -53,32 +54,32 @@ export function SiteFooter({ className }: SiteFooterProps) {
             <h3 className="font-semibold text-white text-base md:text-lg mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm md:text-base">
               <li>
-                <Link href="/services" className="text-slate-400 hover:text-white transition-colors">
+                <Link href={generateLink('global', 'services')} className="text-slate-400 hover:text-white transition-colors">
                   Services
                 </Link>
               </li>
               <li>
-                <Link href="/clinics" className="text-slate-400 hover:text-white transition-colors">
+                <Link href={generateLink('global', 'clinics')} className="text-slate-400 hover:text-white transition-colors">
                   Clinics
                 </Link>
               </li>
               <li>
-                <Link href="/about" className="text-slate-400 hover:text-white transition-colors">
+                <Link href={generateLink('global', 'about')} className="text-slate-400 hover:text-white transition-colors">
                   About Us
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-slate-400 hover:text-white transition-colors">
+                <Link href={generateLink('global', 'contact')} className="text-slate-400 hover:text-white transition-colors">
                   Contact
                 </Link>
               </li>
               <li>
-                <Link href="/blog" className="text-slate-400 hover:text-white transition-colors">
+                <Link href={generateLink('global', 'blog')} className="text-slate-400 hover:text-white transition-colors">
                   Blog
                 </Link>
               </li>
               <li>
-                <Link href="/faq" className="text-slate-400 hover:text-white transition-colors">
+                <Link href={generateLink('global', 'faq')} className="text-slate-400 hover:text-white transition-colors">
                   FAQs
                 </Link>
               </li>
@@ -133,13 +134,13 @@ export function SiteFooter({ className }: SiteFooterProps) {
             &copy; {currentYear} Body Bliss Visio. All rights reserved.
           </p>
           <div className="flex flex-wrap justify-center md:justify-end gap-4 md:gap-6 text-xs md:text-sm">
-            <Link href="/privacy" className="text-slate-400 hover:text-white transition-colors">
+            <Link href={generateLink('global', 'privacy')} className="text-slate-400 hover:text-white transition-colors">
               Privacy Policy
             </Link>
-            <Link href="/terms" className="text-slate-400 hover:text-white transition-colors">
+            <Link href={generateLink('global', 'terms')} className="text-slate-400 hover:text-white transition-colors">
               Terms of Service
             </Link>
-            <Link href="/accessibility" className="text-slate-400 hover:text-white transition-colors">
+            <Link href={generateLink('global', 'accessibility')} className="text-slate-400 hover:text-white transition-colors">
               Accessibility
             </Link>
           </div>

@@ -1,11 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   ArrowLeft, 
-  Search, 
-  Filter, 
   User, 
   Phone, 
   Mail, 
@@ -18,15 +16,9 @@ import { slugToClinic } from '@/lib/data/clinics';
 import { MockDataService } from '@/lib/data/mockDataService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
+import { DataTable } from '@/components/ui/table/DataTable';
+import { ColumnDef } from '@tanstack/react-table';
 
 interface Client {
   id: string;
@@ -56,12 +48,7 @@ export default function AllClientsPage() {
   const clinic = params.clinic as string;
   
   const [clients, setClients] = useState<Client[]>([]);
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const clientsPerPage = 12;
 
   // Get real clients from the database using MockDataService
   useEffect(() => {
@@ -75,7 +62,6 @@ export default function AllClientsPage() {
           const rawClients = MockDataService.getClientsByClinic(clinicData.name);
           const formattedClients = rawClients.map(client => MockDataService.formatClientForUI(client));
           setClients(formattedClients);
-          setFilteredClients(formattedClients);
         }
         setIsLoading(false);
       }, 1000);
@@ -83,34 +69,6 @@ export default function AllClientsPage() {
 
     fetchClients();
   }, [clinic]);
-
-  // Filter clients based on search query and status
-  useEffect(() => {
-    let filtered = clients;
-    
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(client => 
-        client.name.toLowerCase().includes(query) ||
-        client.email.toLowerCase().includes(query) ||
-        client.phone.toLowerCase().includes(query)
-      );
-    }
-    
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(client => client.status === statusFilter);
-    }
-    
-    setFilteredClients(filtered);
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, clients]);
-
-  // Calculate pagination
-  const totalFilteredClients = filteredClients.length;
-  const totalPages = Math.ceil(totalFilteredClients / clientsPerPage);
-  const indexOfLastClient = currentPage * clientsPerPage;
-  const indexOfFirstClient = indexOfLastClient - clientsPerPage;
-  const currentClients = filteredClients.slice(indexOfFirstClient, indexOfLastClient);
 
   const handleBack = () => {
     router.push(`/clinic/${clinic}/clients`);
@@ -162,6 +120,125 @@ export default function AllClientsPage() {
     return age;
   };
 
+  // Define columns for DataTable
+  const columns: ColumnDef<Client>[] = useMemo(() => [
+    {
+      accessorKey: "name",
+      header: "Client",
+      cell: ({ row }) => {
+        const client = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div 
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
+              style={{ backgroundColor: themeColors.primary }}
+            >
+              {client.name.split(' ')[0][0]}
+            </div>
+            <div>
+              <div className="font-medium">{client.name}</div>
+              <div className="text-sm text-gray-600">
+                Age {calculateAge(client.dateOfBirth)} • {client.gender}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "email",
+      header: "Contact",
+      cell: ({ row }) => {
+        const client = row.original;
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm">
+              <Mail className="h-4 w-4 text-gray-400" />
+              {client.email}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="h-4 w-4 text-gray-400" />
+              {client.phone}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.getValue("status") as string;
+        return (
+          <Badge variant="secondary" className={getStatusColor(status)}>
+            {status}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "lastVisit",
+      header: "Last Visit",
+      cell: ({ row }) => {
+        const lastVisit = row.getValue("lastVisit") as string;
+        return (
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-gray-400" />
+            {formatDate(lastVisit)}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "nextAppointment",
+      header: "Next Appointment",
+      cell: ({ row }) => {
+        const nextAppointment = row.original.nextAppointment;
+        return nextAppointment ? (
+          <div className="flex items-center gap-2 text-sm text-green-600">
+            <Calendar className="h-4 w-4" />
+            {formatDate(nextAppointment)}
+          </div>
+        ) : (
+          <span className="text-sm text-gray-400">None scheduled</span>
+        );
+      },
+    },
+    {
+      accessorKey: "totalOrders",
+      header: "Orders",
+      cell: ({ row }) => {
+        const totalOrders = row.getValue("totalOrders") as number;
+        return <span className="text-sm font-medium">{totalOrders}</span>;
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const client = row.original;
+        return (
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleViewClient(client.id)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleEditClient(client.id)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ], []);
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
@@ -206,131 +283,35 @@ export default function AllClientsPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search clients by name, email, or phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Clients DataTable */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">
+            Client Directory
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={clients}
+            globalFilterKey="name"
+            filterPlaceholder="Search clients by name..."
+            defaultPageSize={15}
+            showFilter={true}
+            showColumnToggle={true}
+          />
         </CardContent>
       </Card>
 
-      {/* Results Summary */}
-      <div className="mb-6">
-        <p className="text-sm text-gray-600">
-          Showing {indexOfFirstClient + 1}-{Math.min(indexOfLastClient, totalFilteredClients)} of {totalFilteredClients} clients
-          {slugToClinic(clinic) && (
-            <span className="ml-2 text-muted-foreground">
-              • Database shows {slugToClinic(clinic)?.clientCount || 0} total clients in {slugToClinic(clinic)?.displayName}
-            </span>
-          )}
-        </p>
-      </div>
-
-      {/* Clients Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {currentClients.map((client) => (
-          <Card key={client.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
-                    style={{ backgroundColor: themeColors.primary }}
-                  >
-                    {client.name.split(' ')[0][0]}
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">{client.name}</CardTitle>
-                    <p className="text-sm text-gray-600">
-                      Age {calculateAge(client.dateOfBirth)} • {client.gender}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant="secondary" className={getStatusColor(client.status)}>
-                  {client.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Mail className="h-4 w-4" />
-                  {client.email}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Phone className="h-4 w-4" />
-                  {client.phone}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Calendar className="h-4 w-4" />
-                  Last visit: {formatDate(client.lastVisit)}
-                </div>
-                {client.nextAppointment && (
-                  <div className="flex items-center gap-2 text-sm text-green-600">
-                    <Calendar className="h-4 w-4" />
-                    Next: {formatDate(client.nextAppointment)}
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  {client.totalOrders} orders
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleViewClient(client.id)}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleEditClient(client.id)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
       {/* Empty State */}
-      {currentClients.length === 0 && (
+      {clients.length === 0 && !isLoading && (
         <div className="text-center py-12">
           <User className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-600 mb-2">
             No clients found
           </h3>
           <p className="text-gray-500 mb-4">
-            {searchQuery || statusFilter !== "all" 
-              ? "Try adjusting your search or filter criteria" 
-              : "Get started by adding your first client"}
+            Get started by adding your first client
           </p>
           <Button 
             onClick={handleAddClient}
@@ -338,39 +319,6 @@ export default function AllClientsPage() {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add New Client
-          </Button>
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center mt-8 gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </Button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-            <Button
-              key={page}
-              variant={currentPage === page ? "default" : "outline"}
-              size="sm"
-              className="w-8 h-8 p-0"
-              onClick={() => setCurrentPage(page)}
-            >
-              {page}
-            </Button>
-          ))}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-          >
-            Next
           </Button>
         </div>
       )}

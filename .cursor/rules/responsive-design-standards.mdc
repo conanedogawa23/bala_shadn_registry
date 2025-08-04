@@ -1,0 +1,66 @@
+---
+alwaysApply: true
+---
+
+# Responsive Design Standards
+
+## Mobile-First Design Principles
+All components and pages MUST implement responsive design following these established patterns from the clinic system.
+
+## Container and Layout Standards
+```tsx
+// Standard page container
+<div className="container mx-auto py-8 px-4 sm:px-6">
+
+// Header layout with responsive flex
+<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+
+// Responsive grid layouts  
+<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+```
+
+## Breakpoint Usage
+- **Mobile**: Default styles (no prefix)
+- **Small**: `sm:` (640px and up)
+- **Medium**: `md:` (768px and up) 
+- **Large**: `lg:` (1024px and up)
+
+## Typography Responsiveness
+```tsx
+// Page headings
+className="text-2xl sm:text-3xl font-bold"
+
+// Section headings  
+className="text-lg sm:text-xl font-semibold"
+
+// Body text remains consistent
+className="text-sm text-gray-600"
+```
+
+## Button and Action Layout
+```tsx
+// Action button groups
+<div className="flex flex-col sm:flex-row gap-3 w-full">
+  <Button variant="outline">Cancel</Button>
+  <Button type="submit">Save</Button>
+</div>
+```
+
+## Card and Component Spacing
+- **Mobile**: Single column layout with full width
+- **Tablet**: Two-column grid where appropriate
+- **Desktop**: Three-column grid for card layouts
+- **Consistent spacing**: `gap-4` for mobile, `gap-6` for larger screens
+
+## Navigation Patterns
+- **Back buttons**: Always visible and properly sized for touch
+- **Breadcrumbs**: Responsive truncation on smaller screens
+- **Action menus**: Convert to dropdowns on mobile when needed
+
+## Form Responsiveness  
+- **Single column** on mobile devices
+- **Two-column** layout on tablets and desktop
+- **Field groups** stack vertically on small screens
+- **Button placement** adjusts from inline to stacked
+
+These patterns ensure consistency with existing implementations in [app/clinic/[clinic]/clients](mdc:app/clinic/[clinic]/clients) and [app/clinic/[clinic]/orders](mdc:app/clinic/[clinic]/orders).
