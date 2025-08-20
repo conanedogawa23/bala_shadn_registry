@@ -45,7 +45,7 @@ export const Default: Story = {
 
 // Calendar with Range selection
 // Create a proper React component that can use hooks
-const RangeSelectionComponent = (args) => {
+const RangeSelectionComponent = (args: Record<string, unknown>) => {
   const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(),
     to: addDays(new Date(), 7),
@@ -83,7 +83,7 @@ export const RangeSelection: Story = {
 
 // Calendar with Multiple selection
 // Create a proper React component that can use hooks
-const MultipleSelectionComponent = (args) => {
+const MultipleSelectionComponent = (args: Record<string, unknown>) => {
   const [dates, setDates] = useState<Date[] | undefined>([
     new Date(),
     addDays(new Date(), 2),

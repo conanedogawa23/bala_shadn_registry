@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   ArrowLeft, 
@@ -74,13 +74,13 @@ export default function AllClientsPage() {
     router.push(`/clinic/${clinic}/clients`);
   };
 
-  const handleViewClient = (clientId: string) => {
+  const handleViewClient = useCallback((clientId: string) => {
     router.push(`/clinic/${clinic}/clients/${clientId}`);
-  };
+  }, [router, clinic]);
 
-  const handleEditClient = (clientId: string) => {
+  const handleEditClient = useCallback((clientId: string) => {
     router.push(`/clinic/${clinic}/clients/${clientId}/edit`);
-  };
+  }, [router, clinic]);
 
   const handleAddClient = () => {
     router.push(`/clinic/${clinic}/clients/new`);
@@ -237,7 +237,7 @@ export default function AllClientsPage() {
         );
       },
     },
-  ], []);
+  ], [handleEditClient, handleViewClient]);
 
   if (isLoading) {
     return (

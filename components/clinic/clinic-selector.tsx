@@ -16,8 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { Clinic } from '@/lib/types/clinic';
-import { clinicToSlug } from '@/lib/data/clinics';
-import { generateLink } from '@/lib/route-utils';
+// Removed unused imports
 
 const getStatusColor = (status: Clinic['status']) => {
   switch (status) {

@@ -1,383 +1,486 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 import { 
-  CreditCard, 
-  ArrowLeft, 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardContent 
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
   Plus, 
   Search, 
-  DollarSign,
-  Calendar,
-  User,
+  Filter,
   FileText,
-  Printer
-} from 'lucide-react';
-import { slugToClinic } from '@/lib/data/clinics';
-import { generateLink } from '@/lib/route-utils';
-import { getPaymentsByClinic } from '@/lib/mock-data';
+  Download,
+  ChevronRight,
+  CreditCard,
+  Eye,
+  Edit
+} from "lucide-react";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { slugToClinic } from "@/lib/data/clinics";
+import { generateLink } from "@/lib/route-utils";
+import { 
+  PaymentApiService, 
+  formatCurrency, 
+  formatDate, 
+  getPaymentStatusColor 
+} from "@/lib/api/paymentService";
+import { Payment } from "@/lib/data/mockDataService";
 
-interface PaymentData {
-  id: string;
-  clientName: string;
-  invoiceNumber: string;
-  amount: number;
-  status: string;
-  paymentDate: string;
-  paymentMethod: string;
-  paymentType: string;
-  clientId: string;
-  paymentReference?: string;
-}
+// Loading component
+const LoadingSpinner = () => (
+  <div className="flex h-64 items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+  </div>
+);
 
-type PaymentStatus = 'all' | 'completed' | 'pending' | 'failed' | 'refunded' | 'partial';
+// Error display component
+const ErrorDisplay = ({ error, onRetry }: { error: string; onRetry: () => void }) => (
+  <div className="flex flex-col items-center justify-center h-64 text-center">
+    <p className="text-red-600 mb-4">{error}</p>
+    <Button onClick={onRetry} variant="outline">
+      Try Again
+    </Button>
+  </div>
+);
 
+// Payment status badge component
+const PaymentStatusBadge = ({ status }: { status: string }) => (
+  <Badge className={getPaymentStatusColor(status)}>
+    {status.charAt(0).toUpperCase() + status.slice(1)}
+  </Badge>
+);
+
+// Payment card component for mobile view
+const PaymentCard = ({ payment, clinic }: { payment: Payment; clinic: string }) => (
+  <Card className="shadow-sm border border-gray-200">
+    <CardHeader className="pb-3">
+      <div className="flex justify-between items-start">
+        <div>
+          <CardTitle className="text-lg font-medium">
+            {payment.invoiceNumber}
+          </CardTitle>
+          <p className="text-sm text-gray-600">
+            {payment.clientName} • {formatDate(payment.paymentDate)}
+          </p>
+        </div>
+        <PaymentStatusBadge status={payment.status} />
+      </div>
+    </CardHeader>
+    <CardContent className="pt-0">
+      <div className="space-y-2">
+        <div className="flex justify-between">
+          <span className="text-sm text-gray-600">Amount:</span>
+          <span className="font-medium">{formatCurrency(payment.amount)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-sm text-gray-600">Method:</span>
+          <span className="text-sm">{payment.paymentMethod}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-sm text-gray-600">Type:</span>
+          <span className="text-sm">{payment.paymentType}</span>
+        </div>
+      </div>
+      <div className="flex gap-2 mt-4">
+        <Link href={generateLink('clinic', `payments/${payment.id}`, clinic)} className="flex-1">
+          <Button variant="outline" size="sm" className="w-full">
+            <Eye size={14} className="mr-1" />
+            View
+          </Button>
+        </Link>
+        <Link href={generateLink('clinic', `payments/${payment.id}/edit`, clinic)} className="flex-1">
+          <Button variant="outline" size="sm" className="w-full">
+            <Edit size={14} className="mr-1" />
+            Edit
+          </Button>
+        </Link>
+        <Link href={generateLink('clinic', `payments/invoice/${payment.id}`, clinic)}>
+          <Button variant="outline" size="sm">
+            <FileText size={14} />
+          </Button>
+        </Link>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+// Main payments page component
 export default function PaymentsPage() {
   const params = useParams();
-  const router = useRouter();
-  const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
-  const clinic = slugToClinic(clinicSlug);
-
-  const [payments, setPayments] = useState<PaymentData[]>([]);
-  const [filteredPayments, setFilteredPayments] = useState<PaymentData[]>([]);
+  const clinic = params.clinic as string;
+  
+  // State management
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<PaymentStatus>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalPayments, setTotalPayments] = useState(0);
+
+  const ITEMS_PER_PAGE = 10;
+
+  // Get clinic data
+  const clinicData = slugToClinic(clinic);
 
   // Fetch payments data
-  useEffect(() => {
-    const fetchPayments = async () => {
+  const fetchPayments = useCallback(async (page = 1, reset = false) => {
+    if (!clinicData) {
+      setError("Clinic not found");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
       setIsLoading(true);
-      try {
-        // Use existing mock data
-        const paymentsData = getPaymentsByClinic(clinicSlug);
-        setPayments(paymentsData);
-        setFilteredPayments(paymentsData);
-      } catch {
-        setError('Failed to load payments');
-      } finally {
-        setIsLoading(false);
+      setError(null);
+
+      const options = {
+        page,
+        limit: ITEMS_PER_PAGE,
+        status: statusFilter === "all" ? undefined : statusFilter,
+      };
+
+      const result = await PaymentApiService.getPaymentsByClinic(clinicData.name, options);
+      
+      if (reset || page === 1) {
+        setPayments(result.payments);
+      } else {
+        setPayments(prev => [...prev, ...result.payments]);
       }
-    };
+      
+      setTotalPayments(result.total);
+      setHasMore(result.hasMore);
+      setCurrentPage(page);
+    } catch (err) {
+      console.error('Error fetching payments:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load payments');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [clinicData, statusFilter]);
 
-    fetchPayments();
-  }, [clinicSlug]);
+  // Search payments
+  const searchPayments = useCallback(async () => {
+    if (!clinicData || !searchQuery.trim()) {
+      fetchPayments(1, true);
+      return;
+    }
 
-  // Filter payments based on search and status
-  useEffect(() => {
-    let filtered = payments;
+    try {
+      setIsLoading(true);
+      setError(null);
 
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(payment =>
-        payment.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payment.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        payment.paymentReference?.toLowerCase().includes(searchTerm.toLowerCase())
+      const result = await PaymentApiService.searchPayments(
+        searchQuery,
+        {
+          status: statusFilter === "all" ? undefined : statusFilter,
+          page: 1,
+          limit: ITEMS_PER_PAGE
+        }
       );
+
+      setPayments(result.payments);
+      setTotalPayments(result.total);
+      setCurrentPage(1);
+    } catch (err) {
+      console.error('Error searching payments:', err);
+      setError(err instanceof Error ? err.message : 'Search failed');
+    } finally {
+      setIsLoading(false);
     }
+  }, [clinicData, searchQuery, statusFilter, fetchPayments]);
 
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(payment => payment.status === statusFilter);
+  // Effects
+  useEffect(() => {
+    fetchPayments(1, true);
+  }, [fetchPayments]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const debounceTimer = setTimeout(() => {
+        searchPayments();
+      }, 300);
+      return () => clearTimeout(debounceTimer);
+    } else {
+      fetchPayments(1, true);
     }
+  }, [searchQuery, fetchPayments, searchPayments]);
 
-    setFilteredPayments(filtered);
-  }, [payments, searchTerm, statusFilter]);
-
-  const handleBack = () => {
-    router.push(generateLink('clinic', '', clinicSlug));
+  // Handle retry
+  const handleRetry = () => {
+    fetchPayments(currentPage, true);
   };
 
-  const handleNewPayment = () => {
-    router.push(generateLink('clinic', 'payments/new', clinicSlug));
-  };
-
-  const handleViewPayment = (paymentId: string) => {
-    router.push(generateLink('clinic', `payments/${paymentId}`, clinicSlug));
-  };
-
-  const handlePrintInvoice = (paymentId: string) => {
-    // Navigate to invoice page for printing
-    router.push(generateLink('clinic', `payments/invoice/${paymentId}`, clinicSlug));
-  };
-
-  const getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      case 'refunded': return 'bg-blue-100 text-blue-800';
-      case 'partial': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+  // Handle load more
+  const handleLoadMore = () => {
+    if (hasMore && !isLoading) {
+      fetchPayments(currentPage + 1, false);
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-CA');
-  };
-
-  const getPaymentMethodDisplay = (method: string) => {
-    const methods: Record<string, string> = {
-      'Credit Card': 'Credit',
-      'Debit': 'Debit',
-      'Cash': 'Cash',
-      'Cheque': 'Cheque',
-      'Insurance': 'Insurance'
-    };
-    return methods[method] || method;
-  };
-
-  if (error) {
+  if (!clinicData) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="outline" size="sm" onClick={handleBack}>
-            <ArrowLeft size={16} />
-            Back
-          </Button>
-          <h1 className="text-2xl sm:text-3xl font-bold">Payments</h1>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600">Clinic Not Found</h1>
+          <p className="text-gray-600 mt-2">The requested clinic could not be found.</p>
         </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center py-8">
-              <p className="text-red-600">{error}</p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6">
-      {/* Header */}
+      {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleBack}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">
-              Payments - {clinic?.displayName || clinicSlug}
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              {filteredPayments.length} payments found
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold">Payments</h1>
+          <p className="text-gray-600 mt-1">
+            Manage payments for {clinicData.displayName}
+            {totalPayments > 0 && ` • ${totalPayments} total payments`}
+          </p>
         </div>
-        <Button onClick={handleNewPayment} className="flex items-center gap-2">
-          <Plus size={16} />
-          New Payment
-        </Button>
+        <div className="flex gap-3 self-start">
+          <Link href={generateLink('clinic', 'payments/new', clinic)}>
+            <Button>
+              <Plus size={16} className="mr-2" />
+              Record Payment
+            </Button>
+          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download size={16} className="mr-2" />
+                Reports
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={async () => {
+                  try {
+                    const report = await PaymentApiService.getPaymentReports(
+                      clinicData.name, 
+                      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                      new Date().toISOString().split('T')[0]
+                    );
+                    console.log('Payment Summary Report:', report);
+                  } catch (err) {
+                    console.error('Report generation failed:', err);
+                  }
+                }}
+              >
+                Payment Summary
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={async () => {
+                  try {
+                    const report = await PaymentApiService.getPaymentReports(
+                      clinicData.name, 
+                      'co-pay-summary'
+                    );
+                    console.log('Co Pay Summary Report:', report);
+                  } catch (err) {
+                    console.error('Report generation failed:', err);
+                  }
+                }}
+              >
+                Co Pay Summary
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={async () => {
+                  try {
+                    const report = await PaymentApiService.getPaymentReports(
+                      clinicData.name, 
+                      'marketing-budget-summary'
+                    );
+                    console.log('Marketing Budget Report:', report);
+                  } catch (err) {
+                    console.error('Report generation failed:', err);
+                  }
+                }}
+              >
+                Marketing Budget Summary
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      {/* Search and Filters */}
+      {/* Filters and Search */}
       <Card className="mb-6">
-        <CardContent className="p-6">
+        <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <Input
-                  placeholder="Search by client name, invoice, or reference..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search payments by invoice number, client name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {(['all', 'completed', 'pending', 'failed', 'refunded', 'partial'] as PaymentStatus[]).map((status) => (
-                <Button
-                  key={status}
-                  variant={statusFilter === status ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStatusFilter(status)}
-                  className="capitalize"
-                >
-                  {status === 'all' ? 'All Status' : status}
-                </Button>
-              ))}
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <Filter size={16} className="mr-2" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="refunded">Refunded</SelectItem>
+                  <SelectItem value="partial">Partial</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Loading State */}
-      {isLoading && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p>Loading payments...</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Payments Grid */}
-      {!isLoading && (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPayments.map((payment) => (
-            <Card key={payment.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg font-semibold truncate">
-                      {payment.clientName}
-                    </CardTitle>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {payment.invoiceNumber}
-                    </p>
-                  </div>
-                  <Badge className={getStatusColor(payment.status)}>
-                    {payment.status}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-green-600">
-                      {formatCurrency(payment.amount)}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {getPaymentMethodDisplay(payment.paymentMethod)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Calendar size={14} />
-                    <span>Paid: {formatDate(payment.paymentDate)}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <User size={14} />
-                    <span className="truncate">ID: {payment.clientId}</span>
-                  </div>
-
-                  {payment.paymentType && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <FileText size={14} />
-                      <span>{payment.paymentType}</span>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleViewPayment(payment.id)}
-                      className="flex-1"
-                    >
-                      View Details
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrintInvoice(payment.id);
-                      }}
-                      className="px-3"
-                    >
-                      <Printer size={14} />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!isLoading && filteredPayments.length === 0 && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center py-12">
-              <CreditCard className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-              <h2 className="text-xl font-semibold mb-2">
-                {searchTerm || statusFilter !== 'all' ? 'No payments found' : 'No payments yet'}
-              </h2>
-              <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                {searchTerm || statusFilter !== 'all' 
-                  ? 'Try adjusting your search or filter criteria.'
-                  : 'Get started by creating your first payment record.'
-                }
-              </p>
-              {(!searchTerm && statusFilter === 'all') && (
-                <Button onClick={handleNewPayment}>
-                  <Plus size={16} className="mr-2" />
-                  Create Payment
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Summary Stats */}
-      {!isLoading && filteredPayments.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Payment Summary
-            </CardTitle>
-          </CardHeader>
+      {/* Content */}
+      {error ? (
+        <ErrorDisplay error={error} onRetry={handleRetry} />
+      ) : isLoading && payments.length === 0 ? (
+        <LoadingSpinner />
+      ) : payments.length === 0 ? (
+        <Card className="text-center py-12">
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-gray-600">Total Amount</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(filteredPayments.reduce((sum, p) => sum + p.amount, 0))}
-                </p>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {filteredPayments.filter(p => p.status === 'completed').length}
-                </p>
-              </div>
-              <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <p className="text-sm text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {filteredPayments.filter(p => p.status === 'pending').length}
-                </p>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">This Month</p>
-                <p className="text-2xl font-bold text-gray-600">
-                  {filteredPayments.filter(p => {
-                    const paymentDate = new Date(p.paymentDate);
-                    const now = new Date();
-                    return paymentDate.getMonth() === now.getMonth() && 
-                           paymentDate.getFullYear() === now.getFullYear();
-                  }).length}
-                </p>
-              </div>
-            </div>
+            <CreditCard size={48} className="mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium mb-2">No payments found</h3>
+            <p className="text-gray-600 mb-4">
+              {searchQuery ? "No payments match your search criteria." : "No payments have been recorded yet."}
+            </p>
+            {!searchQuery && (
+              <Link href={generateLink('clinic', 'payments/new', clinic)}>
+                <Button>
+                  <Plus size={16} className="mr-2" />
+                  Record First Payment
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
+      ) : (
+        <>
+          {/* Desktop Table */}
+          <div className="hidden lg:block">
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left p-4 font-medium">Invoice #</th>
+                      <th className="text-left p-4 font-medium">Client</th>
+                      <th className="text-left p-4 font-medium">Date</th>
+                      <th className="text-left p-4 font-medium">Amount</th>
+                      <th className="text-left p-4 font-medium">Method</th>
+                      <th className="text-left p-4 font-medium">Status</th>
+                      <th className="text-right p-4 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((payment) => (
+                      <tr key={payment.id} className="border-t hover:bg-gray-50">
+                        <td className="p-4">
+                          <Link 
+                            href={generateLink('clinic', `payments/${payment.id}`, clinic)}
+                            className="font-medium text-blue-600 hover:text-blue-800"
+                          >
+                            {payment.invoiceNumber}
+                          </Link>
+                        </td>
+                        <td className="p-4">{payment.clientName}</td>
+                        <td className="p-4">{formatDate(payment.paymentDate)}</td>
+                        <td className="p-4 font-medium">{formatCurrency(payment.amount)}</td>
+                        <td className="p-4">{payment.paymentMethod}</td>
+                        <td className="p-4">
+                          <PaymentStatusBadge status={payment.status} />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex justify-end gap-2">
+                            <Link href={generateLink('clinic', `payments/${payment.id}`, clinic)}>
+                              <Button variant="outline" size="sm">
+                                <Eye size={14} />
+                              </Button>
+                            </Link>
+                            <Link href={generateLink('clinic', `payments/${payment.id}/edit`, clinic)}>
+                              <Button variant="outline" size="sm">
+                                <Edit size={14} />
+                              </Button>
+                            </Link>
+                            <Link href={generateLink('clinic', `payments/invoice/${payment.id}`, clinic)}>
+                              <Button variant="outline" size="sm">
+                                <FileText size={14} />
+                              </Button>
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="lg:hidden space-y-4">
+            {payments.map((payment) => (
+              <PaymentCard key={payment.id} payment={payment} clinic={clinic} />
+            ))}
+          </div>
+
+          {/* Load More / Pagination */}
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <Button 
+                onClick={handleLoadMore} 
+                disabled={isLoading}
+                variant="outline"
+              >
+                {isLoading ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent mr-2" />
+                ) : (
+                  <ChevronRight size={16} className="mr-2" />
+                )}
+                Load More Payments
+              </Button>
+            </div>
+          )}
+
+          {/* Pagination Info */}
+          {totalPayments > 0 && (
+            <div className="text-center text-sm text-gray-600 mt-4">
+              Showing {payments.length} of {totalPayments} payments
+            </div>
+          )}
+        </>
       )}
     </div>
   );

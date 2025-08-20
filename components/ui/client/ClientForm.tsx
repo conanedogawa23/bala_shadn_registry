@@ -116,7 +116,7 @@ export function ClientForm({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <FormWrapper<ClientFormValues>
+      <FormWrapper
         schema={clientSchema}
         onSubmit={onSubmit}
         defaultValues={{
@@ -133,7 +133,7 @@ export function ClientForm({
           ...defaultValues,
         }}
       >
-        {(form) => (
+        {() => (
           <>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

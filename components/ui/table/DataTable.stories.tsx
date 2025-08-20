@@ -5,12 +5,10 @@ import {
   ColumnFiltersState,
   SortingState,
   VisibilityState,
-  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  useReactTable,
 } from "@tanstack/react-table";
 import { useState } from 'react';
 import { Button } from "../button";

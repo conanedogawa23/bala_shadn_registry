@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, Mail, Phone, MapPin, Star } from "lucide-react";
+import { Pencil, Trash2, Phone, MapPin, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**

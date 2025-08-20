@@ -1,330 +1,206 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Printer } from 'lucide-react';
-import { slugToClinic } from '@/lib/data/clinics';
-import { generateLink } from '@/lib/route-utils';
-import { paymentsData } from '@/lib/mock-data';
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, AlertCircle } from "lucide-react";
+import { slugToClinic } from "@/lib/data/clinics";
+import { PaymentApiService } from "@/lib/api/paymentService";
+import { Payment } from "@/lib/data/mockDataService";
+import InvoiceTemplate from "@/components/ui/invoice/InvoiceTemplate";
 
-interface PaymentService {
-  id: string;
-  name: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-}
+// Loading component
+const LoadingSpinner = () => (
+  <div className="flex h-64 items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+  </div>
+);
 
-interface PaymentData {
-  id: string;
-  clientName: string;
-  invoiceNumber: string;
-  amount: number;
-  paymentDate: string;
-  paymentMethod: string;
-  paymentType: string;
-  clientId: string;
-  paymentReference?: string;
-  dueDate: string;
-  invoiceDate: string;
-  subtotal: number;
-  taxAmount: number;
-  taxRate: number;
-  netAmount: number;
-  orderNumber?: string;
-  services?: PaymentService[];
-  notes?: string;
-}
-
-interface ClinicInfo {
-  displayName?: string;
-  name: string;
-  address: string;
-  city: string;
-  province: string;
-  postalCode: string;
-}
+// Error display component
+const ErrorDisplay = ({ error, onRetry }: { error: string; onRetry: () => void }) => (
+  <div className="container mx-auto py-8 px-4 sm:px-6">
+    <Card>
+      <CardContent className="p-8">
+        <div className="text-center">
+          <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Error Loading Invoice</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <div className="flex justify-center gap-3">
+            <Button variant="outline" onClick={() => window.history.back()}>
+              <ArrowLeft size={16} className="mr-2" />
+              Go Back
+            </Button>
+            <Button onClick={onRetry}>
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+);
 
 export default function InvoicePage() {
   const params = useParams();
-  const router = useRouter();
-  const clinicSlug = params.clinic as string;
+  const clinic = params.clinic as string;
   const paymentId = params.id as string;
-
-  const [payment, setPayment] = useState<PaymentData | null>(null);
-  const [clinic, setClinic] = useState<ClinicInfo | null>(null);
+  
+  // State management
+  const [payment, setPayment] = useState<Payment | null>(null);
+  const [clinicInfo, setClinicInfo] = useState<Record<string, unknown> | null>(null);
+  const [clientInfo, setClientInfo] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  // Get clinic data
+  const clinicData = slugToClinic(clinic);
+
+  // Fetch invoice data
+  const fetchInvoiceData = useCallback(async () => {
+    if (!clinicData || !paymentId) {
+      setError("Invalid clinic or payment ID");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
       setIsLoading(true);
+      setError(null);
+
+      // Try to get invoice data from backend first
       try {
-        console.log('Invoice: Looking for payment ID:', paymentId);
-        console.log('Invoice: Looking for clinic slug:', clinicSlug);
-        console.log('Invoice: Total payments available:', paymentsData.length);
+        const invoiceResult = await PaymentApiService.generateInvoice(paymentId);
         
-        // Use existing mock data
-        const foundPayment = paymentsData.find(p => p.id === paymentId);
-        const clinicData = slugToClinic(clinicSlug);
+        setPayment(invoiceResult.payment);
+        setClinicInfo(invoiceResult.clinic || {
+          name: clinicData.name,
+          displayName: clinicData.displayName,
+          address: clinicData.address,
+          city: clinicData.city,
+          province: clinicData.province,
+          postalCode: clinicData.postalCode
+        });
+        setClientInfo(invoiceResult.client || {
+          name: invoiceResult.payment?.clientName || 'Unknown Client',
+          address: '',
+          city: '',
+          province: '',
+          postalCode: ''
+        });
+      } catch (invoiceError) {
+        // Fallback: Get payment data directly
+        console.warn('Invoice generation failed, falling back to payment data:', invoiceError);
         
-        console.log('Invoice: Found payment:', foundPayment ? 'YES' : 'NO');
-        console.log('Invoice: Found clinic:', clinicData ? 'YES' : 'NO');
+        const paymentResult = await PaymentApiService.getPaymentById(paymentId);
         
-        if (foundPayment) {
-          setPayment(foundPayment);
-          console.log('Invoice: Payment set:', foundPayment.invoiceNumber);
-        }
-        
-        if (clinicData) {
-          setClinic({
-            displayName: clinicData.displayName,
-            name: clinicData.name,
-            address: clinicData.address,
-            city: clinicData.city,
-            province: clinicData.province,
-            postalCode: clinicData.postalCode
-          });
-          console.log('Invoice: Clinic set:', clinicData.displayName || clinicData.name);
-        }
-        
-        // Set default clinic info if not found
-        if (!clinicData) {
-          setClinic({
-            name: 'BodyBliss Physio',
-            displayName: 'BodyBliss Physio',
-            address: '1929 Leslie Street',
-            city: 'Toronto',
-            province: 'Ontario',
-            postalCode: 'M3B 2M3'
-          });
-          console.log('Invoice: Using default clinic info');
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setIsLoading(false);
+        setPayment(paymentResult);
+        setClinicInfo({
+          name: clinicData.name,
+          displayName: clinicData.displayName,
+          address: clinicData.address,
+          city: clinicData.city,
+          province: clinicData.province,
+          postalCode: clinicData.postalCode,
+          phone: '(416) 555-0123', // Default values for BodyBliss format
+          fax: '(416) 555-0124'
+        });
+        setClientInfo({
+          name: paymentResult.clientName,
+          address: '',
+          city: '',
+          province: '',
+          postalCode: ''
+        });
       }
-    };
+    } catch (err) {
+      console.error('Error loading invoice data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load invoice');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [clinicData, paymentId]);
 
-    fetchData();
-  }, [paymentId, clinicSlug]);
-
-  const handleBack = () => {
-    router.push(generateLink('clinic', `payments/${paymentId}`, clinicSlug));
+  // Handle retry
+  const handleRetry = () => {
+    fetchInvoiceData();
   };
 
-  const handlePrint = () => {
-    window.print();
+  // Handle download PDF (placeholder for future implementation)
+  const handleDownload = async () => {
+    try {
+      // For now, just trigger print
+      // In the future, this could generate a PDF blob and download it
+      window.print();
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  };
+  // Effects
+  useEffect(() => {
+    fetchInvoiceData();
+  }, [fetchInvoiceData]);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-CA', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  // Error states
+  if (!clinicData) {
+    return (
+      <ErrorDisplay 
+        error="Clinic not found" 
+        onRetry={() => window.history.back()} 
+      />
+    );
+  }
+
+  if (error) {
+    return <ErrorDisplay error={error} onRetry={handleRetry} />;
+  }
 
   if (isLoading) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Loading invoice...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     );
   }
 
   if (!payment) {
     return (
-      <div className="container mx-auto py-8 px-4 sm:px-6">
-        <div className="text-center py-12">
-          <p className="text-red-600">Payment not found (ID: {paymentId})</p>
-          <Button onClick={handleBack} className="mt-4">
-            Back to Payment
-          </Button>
-        </div>
-      </div>
+      <ErrorDisplay 
+        error="Payment not found" 
+        onRetry={handleRetry} 
+      />
     );
   }
 
-  if (!clinic) {
-    return (
-      <div className="container mx-auto py-8 px-4 sm:px-6">
-        <div className="text-center py-12">
-          <p className="text-red-600">Clinic not found (Slug: {clinicSlug})</p>
-          <Button onClick={handleBack} className="mt-4">
-            Back to Payment
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // Create default clinic info with proper types
+  const defaultClinicInfo = {
+    name: (clinicInfo as Record<string, string>)?.name || clinicData?.name || '',
+    displayName: (clinicInfo as Record<string, string>)?.displayName || clinicData?.displayName || '',
+    address: (clinicInfo as Record<string, string>)?.address || clinicData?.address || '',
+    city: (clinicInfo as Record<string, string>)?.city || clinicData?.city || '',
+    province: (clinicInfo as Record<string, string>)?.province || clinicData?.province || '',
+    postalCode: (clinicInfo as Record<string, string>)?.postalCode || clinicData?.postalCode || '',
+    phone: (clinicInfo as Record<string, string>)?.phone || '',
+    fax: (clinicInfo as Record<string, string>)?.fax || ''
+  };
+
+  const defaultClientInfo = {
+    name: (clientInfo as Record<string, string>)?.name || payment?.clientName || 'Unknown Client',
+    address: (clientInfo as Record<string, string>)?.address || '',
+    city: (clientInfo as Record<string, string>)?.city || '',
+    province: (clientInfo as Record<string, string>)?.province || '',
+    postalCode: (clientInfo as Record<string, string>)?.postalCode || '',
+    phone: (clientInfo as Record<string, string>)?.phone || '',
+    email: (clientInfo as Record<string, string>)?.email || ''
+  };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Print Header - Hidden when printing */}
-      <div className="no-print bg-gray-50 px-4 py-3 border-b">
-        <div className="container mx-auto flex justify-between items-center">
-          <Button variant="outline" onClick={handleBack} className="flex items-center gap-2">
-            <ArrowLeft size={16} />
-            Back to Payment
-          </Button>
-          <Button onClick={handlePrint} className="flex items-center gap-2">
-            <Printer size={16} />
-            Print Invoice
-          </Button>
-        </div>
-      </div>
-
-      {/* Invoice Content */}
-      <div className="invoice-container max-w-4xl mx-auto p-8">
-        {/* Header */}
-        <div className="border-b-2 border-gray-300 pb-6 mb-8">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">INVOICE</h1>
-              <div className="text-gray-600">
-                <p className="font-semibold">Invoice No: {payment.invoiceNumber}</p>
-                <p>Date: {formatDate(payment.invoiceDate)}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <h2 className="text-xl font-bold text-gray-900">{clinic.displayName || clinic.name}</h2>
-              <div className="text-gray-600 mt-2">
-                <p>{clinic.address}</p>
-                <p>{clinic.city}, {clinic.province} {clinic.postalCode}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Customer Details */}
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Bill To:</h3>
-            <div className="text-gray-700">
-              <p className="font-medium text-lg">{payment.clientName}</p>
-              <p>Client ID: {payment.clientId}</p>
-              {payment.orderNumber && <p>Order: {payment.orderNumber}</p>}
-            </div>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Payment Details:</h3>
-            <div className="text-gray-700">
-              <p>Payment Method: <span className="font-medium">{payment.paymentMethod}</span></p>
-              <p>Payment Type: <span className="font-medium">{payment.paymentType}</span></p>
-              <p>Due Date: <span className="font-medium">{formatDate(payment.dueDate)}</span></p>
-              {payment.paymentReference && (
-                <p>Reference: <span className="font-medium">{payment.paymentReference}</span></p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Service Details Table */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Service Details</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">ITEM DESCRIPTION</th>
-                  <th className="border border-gray-300 px-4 py-3 text-center font-semibold w-20">QTY</th>
-                  <th className="border border-gray-300 px-4 py-3 text-right font-semibold w-24">PRICE</th>
-                  <th className="border border-gray-300 px-4 py-3 text-right font-semibold w-24">AMOUNT</th>
-                  <th className="border border-gray-300 px-4 py-3 text-center font-semibold w-32">SERVICE DATE</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payment.services?.map((service, index) => (
-                  <tr key={service.id || index}>
-                    <td className="border border-gray-300 px-4 py-3">
-                      <div>
-                        <p className="font-medium">{service.name}</p>
-                        <p className="text-sm text-gray-600">{service.description}</p>
-                      </div>
-                    </td>
-                    <td className="border border-gray-300 px-4 py-3 text-center">{service.quantity}</td>
-                    <td className="border border-gray-300 px-4 py-3 text-right">{formatCurrency(service.unitPrice)}</td>
-                    <td className="border border-gray-300 px-4 py-3 text-right font-medium">{formatCurrency(service.totalPrice)}</td>
-                    <td className="border border-gray-300 px-4 py-3 text-center">{formatDate(payment.paymentDate)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Financial Summary */}
-        <div className="flex justify-end mb-8">
-          <div className="w-80">
-            <div className="border border-gray-300">
-              <div className="bg-gray-50 px-4 py-2 border-b border-gray-300">
-                <h3 className="font-semibold">Financial Summary</h3>
-              </div>
-              <div className="p-4 space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(payment.subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax ({(payment.taxRate * 100).toFixed(1)}% HST):</span>
-                  <span>{formatCurrency(payment.taxAmount)}</span>
-                </div>
-                <div className="border-t border-gray-300 pt-2 flex justify-between font-bold text-lg">
-                  <span>Total:</span>
-                  <span>{formatCurrency(payment.netAmount)}</span>
-                </div>
-                <div className="border-t border-gray-300 pt-2 flex justify-between">
-                  <span>Amount Paid:</span>
-                  <span className="text-green-600 font-medium">{formatCurrency(payment.amount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Amount Due:</span>
-                  <span className={`font-medium ${payment.netAmount - payment.amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {formatCurrency(payment.netAmount - payment.amount)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-gray-300 pt-6">
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h4 className="font-semibold mb-2">Authorized Signature:</h4>
-              <div className="border-b border-gray-400 h-12 mb-2"></div>
-              <p className="text-sm text-gray-600">Signature</p>
-            </div>
-            <div>
-              <div className="text-sm text-gray-700 space-y-1">
-                <p><span className="font-medium">Dispense Date:</span> {formatDate(payment.paymentDate)}</p>
-                <p><span className="font-medium">Payment Method:</span> {payment.paymentMethod}</p>
-                {payment.notes && <p><span className="font-medium">Notes:</span> {payment.notes}</p>}
-              </div>
-            </div>
-          </div>
-          
-          <div className="text-center mt-8 pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-500">
-              Thank you for choosing {clinic.displayName || clinic.name}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <InvoiceTemplate
+      payment={payment}
+      clinicInfo={defaultClinicInfo}
+      clientInfo={defaultClientInfo}
+      onDownload={handleDownload}
+    />
   );
 } 

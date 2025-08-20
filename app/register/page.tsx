@@ -619,7 +619,7 @@ export default function RegisterPage() {
                       type={showPassword ? "text" : "password"}
                       placeholder="Create a secure password"
                       autoComplete="new-password"
-                      onChange={(e) => setPasswordInput(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPasswordInput(e.target.value)}
                     />
                     <button
                       type="button"

@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { MobileNav } from './MobileNav';
-import { NavItem } from './Sidebar'; // Import NavItem from Sidebar
 import {
   Home,
   Users,

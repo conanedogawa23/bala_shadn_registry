@@ -11,7 +11,7 @@ import {
   clinicToSlug,
   slugToClinic 
 } from '@/lib/data/clinics';
-import { generateLink, getClinicPath } from '@/lib/route-utils';
+import { generateLink } from '@/lib/route-utils';
 
 const ClinicContext = createContext<ClinicContextType | undefined>(undefined);
 

@@ -157,7 +157,7 @@ export default function EditClientOrderPage() {
     };
 
     fetchOrderData();
-  }, [reset]);
+  }, [reset, clientId]);
 
   const handleAddItem = () => {
     const newItem: OrderItem = {

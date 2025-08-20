@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Input, InputProps } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   FormControl,
@@ -14,7 +14,7 @@ import {
 import { useFormContext } from "react-hook-form";
 import { forwardRef } from "react";
 
-export interface FormInputProps extends Omit<InputProps, "name"> {
+export interface FormInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name"> {
   name: string;
   label?: string;
   description?: string;
@@ -37,8 +37,7 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
                 <Textarea
                   {...field}
                   className={cn(
-                    fieldState.error && "border-destructive focus-visible:ring-destructive",
-                    props.className
+                    fieldState.error && "border-destructive focus-visible:ring-destructive"
                   )}
                 />
               ) : (
@@ -47,8 +46,7 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
                   {...props}
                   ref={ref}
                   className={cn(
-                    fieldState.error && "border-destructive focus-visible:ring-destructive",
-                    props.className
+                    fieldState.error && "border-destructive focus-visible:ring-destructive"
                   )}
                 />
               )}

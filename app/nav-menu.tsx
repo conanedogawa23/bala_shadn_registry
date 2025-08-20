@@ -21,7 +21,7 @@ import { isAuthenticated, getUser, logout, User } from "@/lib/auth";
 import { ClinicSelector } from "@/components/clinic/clinic-selector";
 import { useClinic } from "@/lib/contexts/clinic-context";
 import { clinicToSlug } from "@/lib/data/clinics";
-import { generateLink, RouteType } from "@/lib/route-utils";
+import { generateLink } from "@/lib/route-utils";
 
 export default function NavMenu() {
   const pathname = usePathname();

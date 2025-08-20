@@ -241,7 +241,7 @@ export function OrderForm({
               <CardContent className="flex flex-col items-center justify-center p-6">
                 <Package className="h-12 w-12 text-muted-foreground mb-2" />
                 <p className="text-muted-foreground text-center">
-                  No items added yet. Click "Add Item" to add products to this order.
+                  No items added yet. Click &quot;Add Item&quot; to add products to this order.
                 </p>
               </CardContent>
             </Card>

@@ -3,13 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { 
-  Menu, 
-  Home, 
-  Users, 
-  Settings, 
-  FileText, 
-  HelpCircle,
-  LucideIcon
+  Menu
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

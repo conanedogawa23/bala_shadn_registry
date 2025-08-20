@@ -105,10 +105,15 @@ export function OrderForm({
   isLoading = false,
 }: OrderFormProps) {
   // Calculate the default values with proper subtotals
-  const initialValues: Partial<OrderFormValues> = {
+  const initialValues: OrderFormValues = {
     orderDate: new Date(),
     taxRate: 0,
+    customerId: "",
     lineItems: [{ productId: "", quantity: 1, unitPrice: 0 }],
+    notes: "",
+    subtotal: 0,
+    taxAmount: 0,
+    total: 0,
     ...defaultValues,
   };
 

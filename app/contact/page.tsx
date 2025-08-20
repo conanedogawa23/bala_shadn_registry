@@ -22,7 +22,6 @@ import {
   FormLabel, 
   FormMessage 
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FormInput } from "@/components/ui/form/FormInput";
 
@@ -64,7 +63,7 @@ export default function ContactPage() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-3xl font-bold text-center">Contact Us</CardTitle>
           <CardDescription className="text-center">
-            Fill out the form below and we'll get back to you as soon as possible.
+            Fill out the form below and we&apos;ll get back to you as soon as possible.
           </CardDescription>
         </CardHeader>
         <CardContent>

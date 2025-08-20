@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { ArrowLeft, Edit2, Printer, FileText, DollarSign, User, Calendar, Clock, Tag } from "lucide-react";
+import { ArrowLeft, Edit2, Printer, FileText, DollarSign, User, Calendar } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { MockDataService } from "@/lib/data/mockDataService";
+import { MockDataService, type Client } from "@/lib/data/mockDataService";
 import { generateLink } from "@/lib/route-utils";
 
 // Define Order type locally
@@ -43,7 +43,7 @@ export default function OrderDetailPage() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [order, setOrder] = useState<Order | null>(null);
-  const [client, setClient] = useState<any | null>(null);
+  const [client, setClient] = useState<Client | null>(null);
 
   useEffect(() => {
     const fetchOrderData = async () => {
@@ -128,7 +128,7 @@ export default function OrderDetailPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-destructive">Order Not Found</h1>
           <p className="text-muted-foreground mt-2">
-            The order you're looking for doesn't exist or has been removed.
+            The order you&apos;re looking for doesn&apos;t exist or has been removed.
           </p>
           <Button onClick={handleBack} className="mt-4">
             Back to Orders

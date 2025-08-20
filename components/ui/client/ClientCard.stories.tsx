@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ClientCard } from './ClientCard';
-import { User } from 'lucide-react';
 
 const meta: Meta<typeof ClientCard> = {
   title: 'UI/Client/ClientCard',
