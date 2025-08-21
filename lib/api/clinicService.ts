@@ -25,7 +25,7 @@ export interface ClinicValidationResponse {
 import { BaseApiService } from './baseApiService';
 
 export class ClinicApiService extends BaseApiService {
-  private static readonly ENDPOINT = '/clinic-api';
+  private static readonly ENDPOINT = '/clinics';
   private static readonly CACHE_TTL = 300000; // 5 minutes
 
   /**

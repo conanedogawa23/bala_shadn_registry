@@ -6,8 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { slugToClinic } from "@/lib/data/clinics";
-import { PaymentApiService } from "@/lib/api/paymentService";
-import { Payment } from "@/lib/data/mockDataService";
+import { PaymentApiService, type Payment } from "@/lib/hooks";
 import InvoiceTemplate from "@/components/ui/invoice/InvoiceTemplate";
 
 // Loading component
@@ -68,51 +67,27 @@ export default function InvoicePage() {
       setIsLoading(true);
       setError(null);
 
-      // Try to get invoice data from backend first
-      try {
-        const invoiceResult = await PaymentApiService.generateInvoice(paymentId);
-        
-        setPayment(invoiceResult.payment);
-        setClinicInfo(invoiceResult.clinic || {
-          name: clinicData.name,
-          displayName: clinicData.displayName,
-          address: clinicData.address,
-          city: clinicData.city,
-          province: clinicData.province,
-          postalCode: clinicData.postalCode
-        });
-        setClientInfo(invoiceResult.client || {
-          name: invoiceResult.payment?.clientName || 'Unknown Client',
-          address: '',
-          city: '',
-          province: '',
-          postalCode: ''
-        });
-      } catch (invoiceError) {
-        // Fallback: Get payment data directly
-        console.warn('Invoice generation failed, falling back to payment data:', invoiceError);
-        
-        const paymentResult = await PaymentApiService.getPaymentById(paymentId);
-        
-        setPayment(paymentResult);
-        setClinicInfo({
-          name: clinicData.name,
-          displayName: clinicData.displayName,
-          address: clinicData.address,
-          city: clinicData.city,
-          province: clinicData.province,
-          postalCode: clinicData.postalCode,
-          phone: '(416) 555-0123', // Default values for BodyBliss format
-          fax: '(416) 555-0124'
-        });
-        setClientInfo({
-          name: paymentResult.clientName,
-          address: '',
-          city: '',
-          province: '',
-          postalCode: ''
-        });
-      }
+      // Get payment data from the backend
+      const paymentResult = await PaymentApiService.getPaymentById(paymentId);
+      
+      setPayment(paymentResult);
+      setClinicInfo({
+        name: clinicData.name,
+        displayName: clinicData.displayName,
+        address: clinicData.address,
+        city: clinicData.city,
+        province: clinicData.province,
+        postalCode: clinicData.postalCode,
+        phone: '(416) 555-0123', // Default values for BodyBliss format
+        fax: '(416) 555-0124'
+      });
+      setClientInfo({
+        name: paymentResult.clientName,
+        address: '',
+        city: '',
+        province: '',
+        postalCode: ''
+      });
     } catch (err) {
       console.error('Error loading invoice data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load invoice');

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,28 +9,40 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Plus, Trash2, DollarSign, User, CreditCard } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, DollarSign, User, CreditCard, AlertCircle } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
 import { generateLink } from '@/lib/route-utils';
+import { 
+  usePaymentsByClinic,
+  PaymentApiService, 
+  PaymentMethod, 
+  PaymentType,
+  type CreatePaymentRequest,
+  type PaymentAmounts
+} from '@/lib/hooks';
 
-interface PaymentLineItem {
+// Line item interface for the form
+interface FormLineItem {
   id: string;
+  serviceCode: string;
   serviceName: string;
   description: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  taxable: boolean;
 }
 
+// Form data interface
 interface PaymentFormData {
+  clientId: number | '';
   clientName: string;
-  clientId: string;
-  paymentMethod: string;
-  paymentType: string;
-  paymentDate: string;
-  dueDate: string;
+  orderNumber: string;
+  paymentMethod: PaymentMethod | '';
+  paymentType: PaymentType | '';
   notes: string;
-  lineItems: PaymentLineItem[];
+  referringNo: string;
+  lineItems: FormLineItem[];
 }
 
 export default function NewPaymentPage() {
@@ -39,155 +51,215 @@ export default function NewPaymentPage() {
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
   const clinic = slugToClinic(clinicSlug);
 
+  // Payment hooks
+  const { createPayment } = usePaymentsByClinic(clinic?.name || '', {});
+
+  // Form state
   const [formData, setFormData] = useState<PaymentFormData>({
-    clientName: '',
     clientId: '',
+    clientName: '',
+    orderNumber: '',
     paymentMethod: '',
     paymentType: '',
-    paymentDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
     notes: '',
+    referringNo: '',
     lineItems: [
       {
         id: 'item1',
+        serviceCode: 'SVC001',
         serviceName: '',
         description: '',
         quantity: 1,
         unitPrice: 0,
-        totalPrice: 0
+        totalPrice: 0,
+        taxable: true
       }
     ]
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const [clients, setClients] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock client data - in a real app this would come from an API
-  useEffect(() => {
-    const mockClients = [
-      'JOHNSON, SARAH',
-      'WILSON, MICHAEL', 
-      'CHEN, LINDA',
-      'TAYLOR, PATRICIA',
-      'BROWN, ROBERT',
-      'GARCIA, MARIA',
-      'ANDERSON, DAVID',
-      'MARTIN, JESSICA',
-      'THOMPSON, JAMES',
-      'WHITE, LISA'
-    ];
-    setClients(mockClients);
+  // Navigation handlers
+  const handleBack = useCallback(() => {
+    router.push(generateLink('clinic', 'payments', clinicSlug));
+  }, [router, clinicSlug]);
+
+  // Form handlers
+  const handleInputChange = useCallback((field: keyof PaymentFormData, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setError(null);
   }, []);
 
-  const handleBack = () => {
-    router.push(generateLink('clinic', 'payments', clinicSlug));
-  };
+  const handleLineItemChange = useCallback((index: number, field: keyof FormLineItem, value: string | number | boolean) => {
+    setFormData(prev => {
+      const updatedItems = [...prev.lineItems];
+      updatedItems[index] = {
+        ...updatedItems[index],
+        [field]: value
+      };
 
-  const handleInputChange = (field: keyof PaymentFormData, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+      // Recalculate total price when quantity or unit price changes
+      if (field === 'quantity' || field === 'unitPrice') {
+        updatedItems[index].totalPrice = Number(updatedItems[index].quantity) * Number(updatedItems[index].unitPrice);
+      }
 
-    // Auto-generate client ID when client name is selected
-    if (field === 'clientName' && value) {
-      const clientIndex = clients.indexOf(value);
-      const clientId = `CLT${String(clientIndex + 1).padStart(3, '0')}`;
-      setFormData(prev => ({
+      return {
         ...prev,
-        clientId
-      }));
-    }
-  };
+        lineItems: updatedItems
+      };
+    });
+  }, []);
 
-  const handleLineItemChange = (index: number, field: keyof PaymentLineItem, value: string | number) => {
-    const updatedItems = [...formData.lineItems];
-    updatedItems[index] = {
-      ...updatedItems[index],
-      [field]: value
-    };
-
-    // Calculate total price when quantity or unit price changes
-    if (field === 'quantity' || field === 'unitPrice') {
-      updatedItems[index].totalPrice = updatedItems[index].quantity * updatedItems[index].unitPrice;
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      lineItems: updatedItems
-    }));
-  };
-
-  const addLineItem = () => {
-    const newItem: PaymentLineItem = {
+  const addLineItem = useCallback(() => {
+    const newItem: FormLineItem = {
       id: `item${formData.lineItems.length + 1}`,
+      serviceCode: `SVC${(formData.lineItems.length + 1).toString().padStart(3, '0')}`,
       serviceName: '',
       description: '',
       quantity: 1,
       unitPrice: 0,
-      totalPrice: 0
+      totalPrice: 0,
+      taxable: true
     };
 
     setFormData(prev => ({
       ...prev,
       lineItems: [...prev.lineItems, newItem]
     }));
-  };
+  }, [formData.lineItems.length]);
 
-  const removeLineItem = (index: number) => {
+  const removeLineItem = useCallback((index: number) => {
     if (formData.lineItems.length > 1) {
       setFormData(prev => ({
         ...prev,
         lineItems: prev.lineItems.filter((_, i) => i !== index)
       }));
     }
-  };
+  }, [formData.lineItems.length]);
 
-  const calculateTotals = () => {
-    const subtotal = formData.lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
-    const taxRate = 0.13; // 13% HST for Ontario
-    const taxAmount = subtotal * taxRate;
-    const total = subtotal + taxAmount;
+  // Calculation functions
+  const calculateTotals = useCallback(() => {
+    const subtotal = formData.lineItems.reduce((sum, item) => sum + Number(item.totalPrice), 0);
+    const taxRate = 0.13; // Ontario HST
+    const taxAmount = Math.round(subtotal * taxRate * 100) / 100;
+    const total = Math.round((subtotal + taxAmount) * 100) / 100;
 
     return { subtotal, taxAmount, total, taxRate };
-  };
+  }, [formData.lineItems]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  };
-
+  // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Basic validation
-    if (!formData.clientName || !formData.paymentMethod || formData.lineItems.some(item => !item.serviceName)) {
-      alert('Please fill in all required fields');
+    setError(null);
+
+    // Validation
+    if (!clinic?.name) {
+      setError('Clinic information not found');
+      return;
+    }
+
+    if (!formData.clientId || !formData.clientName || !formData.paymentMethod || !formData.paymentType) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.lineItems.some(item => !item.serviceName || item.quantity <= 0 || item.unitPrice < 0)) {
+      setError('Please ensure all line items have valid service names, quantities, and prices');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, this would save to the database
-      console.log('Payment data:', formData);
-      
-      // Redirect to payments list
+      const { subtotal, taxAmount, total } = calculateTotals();
+
+      // Convert form line items to API format
+      const lineItems = formData.lineItems.map(item => ({
+        id: item.id,
+        serviceCode: item.serviceCode,
+        serviceName: item.serviceName,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        totalPrice: Number(item.totalPrice),
+        taxable: item.taxable
+      }));
+
+      // Create payment amounts structure
+      const amounts: PaymentAmounts = {
+        totalPaymentAmount: total,
+        totalPaid: 0, // Will be updated when actual payments are made
+        totalOwed: total,
+        
+        // Canadian Healthcare Payment Types - all zero initially
+        popAmount: 0,
+        popfpAmount: 0,
+        dpaAmount: 0,
+        dpafpAmount: 0,
+        
+        // Coordination of Benefits
+        cob1Amount: 0,
+        cob2Amount: 0,
+        cob3Amount: 0,
+        
+        // Insurance Payments
+        insurance1stAmount: 0,
+        insurance2ndAmount: 0,
+        insurance3rdAmount: 0,
+        
+        // Other Amounts
+        refundAmount: 0,
+        salesRefundAmount: 0,
+        writeoffAmount: 0,
+        noInsurFpAmount: 0,
+        badDebtAmount: 0
+      };
+
+      // Create payment request
+      const paymentData: CreatePaymentRequest = {
+        orderNumber: formData.orderNumber || undefined,
+        clientId: Number(formData.clientId),
+        clientName: formData.clientName,
+        clinicName: clinic.name,
+        paymentMethod: formData.paymentMethod as PaymentMethod,
+        paymentType: formData.paymentType as PaymentType,
+        amounts,
+        notes: formData.notes || undefined,
+        referringNo: formData.referringNo || undefined
+      };
+
+      // Submit payment
+      await createPayment(paymentData);
+
+      // Navigate back to payments list
       router.push(generateLink('clinic', 'payments', clinicSlug));
-    } catch (error) {
-      console.error('Error creating payment:', error);
-      alert('Failed to create payment. Please try again.');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create payment';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
   const { subtotal, taxAmount, total } = calculateTotals();
+
+  if (!clinic) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="mx-auto h-12 w-12 text-red-500" />
+            <h3 className="mt-2 text-lg font-medium text-gray-900">Clinic Not Found</h3>
+            <p className="mt-1 text-sm text-gray-500">The specified clinic could not be found.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6">
@@ -200,268 +272,289 @@ export default function NewPaymentPage() {
           className="flex items-center gap-2"
         >
           <ArrowLeft size={16} />
-          Back
+          Back to Payments
         </Button>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">
-            New Payment
-          </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Create a new payment record for {clinic?.displayName || clinicSlug}
-          </p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Create New Payment</h1>
+          <p className="text-sm text-gray-600 mt-1">{clinic.name}</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-3">
-        {/* Main Form */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Client Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Client Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="clientName">Client Name *</Label>
-                  <Select onValueChange={(value) => handleInputChange('clientName', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client} value={client}>
-                          {client}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="clientId">Client ID</Label>
-                  <Input
-                    id="clientId"
-                    value={formData.clientId}
-                    onChange={(e) => handleInputChange('clientId', e.target.value)}
-                    placeholder="Auto-generated"
-                    readOnly
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Error Display */}
+      {error && (
+        <div className="mb-6 p-4 border border-red-200 rounded-lg bg-red-50">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
 
-          {/* Payment Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Payment Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="paymentMethod">Payment Method *</Label>
-                  <Select onValueChange={(value) => handleInputChange('paymentMethod', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Credit Card">Credit Card</SelectItem>
-                      <SelectItem value="Debit">Debit Card</SelectItem>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Cheque">Cheque</SelectItem>
-                      <SelectItem value="Insurance">Insurance</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="paymentType">Payment Type</Label>
-                  <Select onValueChange={(value) => handleInputChange('paymentType', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="POP">Point of Purchase (POP)</SelectItem>
-                      <SelectItem value="Insurance">Insurance Claim</SelectItem>
-                      <SelectItem value="Direct">Direct Payment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="paymentDate">Payment Date</Label>
-                  <Input
-                    id="paymentDate"
-                    type="date"
-                    value={formData.paymentDate}
-                    onChange={(e) => handleInputChange('paymentDate', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="dueDate">Due Date</Label>
-                  <Input
-                    id="dueDate"
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) => handleInputChange('dueDate', e.target.value)}
-                  />
-                </div>
-              </div>
-
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Client Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User size={20} />
+              Client Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
-                  placeholder="Additional notes or comments"
-                  rows={3}
+                <Label htmlFor="clientId">Client ID *</Label>
+                <Input
+                  id="clientId"
+                  type="number"
+                  value={formData.clientId}
+                  onChange={(e) => handleInputChange('clientId', Number(e.target.value) || '')}
+                  placeholder="Enter client ID"
+                  required
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Service Items */}
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Service Items</CardTitle>
-                <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
-                  <Plus size={16} className="mr-2" />
-                  Add Item
-                </Button>
+              <div>
+                <Label htmlFor="clientName">Client Name *</Label>
+                <Input
+                  id="clientName"
+                  value={formData.clientName}
+                  onChange={(e) => handleInputChange('clientName', e.target.value)}
+                  placeholder="Enter client name"
+                  required
+                />
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {formData.lineItems.map((item, index) => (
-                <div key={item.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-medium">Item {index + 1}</h4>
-                    {formData.lineItems.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeLineItem(index)}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    )}
+            </div>
+            <div>
+              <Label htmlFor="orderNumber">Order Number (Optional)</Label>
+              <Input
+                id="orderNumber"
+                value={formData.orderNumber}
+                onChange={(e) => handleInputChange('orderNumber', e.target.value)}
+                placeholder="Enter related order number"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Payment Details */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard size={20} />
+              Payment Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="paymentMethod">Payment Method *</Label>
+                <Select value={formData.paymentMethod} onValueChange={(value) => handleInputChange('paymentMethod', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={PaymentMethod.CASH}>Cash</SelectItem>
+                    <SelectItem value={PaymentMethod.CREDIT_CARD}>Credit Card</SelectItem>
+                    <SelectItem value={PaymentMethod.DEBIT}>Debit</SelectItem>
+                    <SelectItem value={PaymentMethod.CHEQUE}>Cheque</SelectItem>
+                    <SelectItem value={PaymentMethod.INSURANCE}>Insurance</SelectItem>
+                    <SelectItem value={PaymentMethod.BANK_TRANSFER}>Bank Transfer</SelectItem>
+                    <SelectItem value={PaymentMethod.OTHER}>Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="paymentType">Payment Type *</Label>
+                <Select value={formData.paymentType} onValueChange={(value) => handleInputChange('paymentType', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={PaymentType.POP}>Patient Out of Pocket (POP)</SelectItem>
+                    <SelectItem value={PaymentType.POPFP}>POP Final Payment</SelectItem>
+                    <SelectItem value={PaymentType.DPA}>Direct Payment Authorization (DPA)</SelectItem>
+                    <SelectItem value={PaymentType.DPAFP}>DPA Final Payment</SelectItem>
+                    <SelectItem value={PaymentType.COB_1}>Coordination of Benefits - Primary</SelectItem>
+                    <SelectItem value={PaymentType.COB_2}>Coordination of Benefits - Secondary</SelectItem>
+                    <SelectItem value={PaymentType.COB_3}>Coordination of Benefits - Tertiary</SelectItem>
+                    <SelectItem value={PaymentType.INSURANCE_1ST}>1st Insurance Payment</SelectItem>
+                    <SelectItem value={PaymentType.INSURANCE_2ND}>2nd Insurance Payment</SelectItem>
+                    <SelectItem value={PaymentType.INSURANCE_3RD}>3rd Insurance Payment</SelectItem>
+                    <SelectItem value={PaymentType.NO_INSUR_FP}>No Insurance Final Payment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="referringNo">Referring Number</Label>
+                <Input
+                  id="referringNo"
+                  value={formData.referringNo}
+                  onChange={(e) => handleInputChange('referringNo', e.target.value)}
+                  placeholder="Enter referring number"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Service Line Items */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign size={20} />
+                Service Line Items
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addLineItem}
+                className="flex items-center gap-2"
+              >
+                <Plus size={16} />
+                Add Item
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {formData.lineItems.map((item, index) => (
+              <div key={item.id} className="grid gap-4 p-4 border rounded-lg">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-medium">Service Item {index + 1}</h4>
+                  {formData.lineItems.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeLineItem(index)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  )}
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <Label htmlFor={`serviceCode-${index}`}>Service Code</Label>
+                    <Input
+                      id={`serviceCode-${index}`}
+                      value={item.serviceCode}
+                      onChange={(e) => handleLineItemChange(index, 'serviceCode', e.target.value)}
+                      placeholder="SVC001"
+                    />
                   </div>
-                  
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <Label>Service Name *</Label>
-                      <Input
-                        value={item.serviceName}
-                        onChange={(e) => handleLineItemChange(index, 'serviceName', e.target.value)}
-                        placeholder="e.g., Physiotherapy Session"
-                      />
-                    </div>
-                    <div>
-                      <Label>Description</Label>
-                      <Input
-                        value={item.description}
-                        onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
-                        placeholder="Service description"
-                      />
-                    </div>
-                    <div>
-                      <Label>Quantity</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => handleLineItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                      />
-                    </div>
-                    <div>
-                      <Label>Unit Price</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(e) => handleLineItemChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                        placeholder="0.00"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor={`serviceName-${index}`}>Service Name *</Label>
+                    <Input
+                      id={`serviceName-${index}`}
+                      value={item.serviceName}
+                      onChange={(e) => handleLineItemChange(index, 'serviceName', e.target.value)}
+                      placeholder="Enter service name"
+                      required
+                    />
                   </div>
-                  
-                  <div className="text-right">
-                    <span className="text-sm text-gray-600">Total: </span>
-                    <span className="font-semibold">{formatCurrency(item.totalPrice)}</span>
+                  <div>
+                    <Label htmlFor={`quantity-${index}`}>Quantity *</Label>
+                    <Input
+                      id={`quantity-${index}`}
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => handleLineItemChange(index, 'quantity', Number(e.target.value))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`unitPrice-${index}`}>Unit Price *</Label>
+                    <Input
+                      id={`unitPrice-${index}`}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.unitPrice}
+                      onChange={(e) => handleLineItemChange(index, 'unitPrice', Number(e.target.value))}
+                      required
+                    />
                   </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Summary Sidebar */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Payment Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal:</span>
-                  <span>{formatCurrency(subtotal)}</span>
+                <div>
+                  <Label htmlFor={`description-${index}`}>Description</Label>
+                  <Textarea
+                    id={`description-${index}`}
+                    value={item.description}
+                    onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
+                    placeholder="Enter service description"
+                    rows={2}
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tax (13% HST):</span>
-                  <span>{formatCurrency(taxAmount)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-lg font-semibold">
-                  <span>Total:</span>
-                  <span className="text-green-600">{formatCurrency(total)}</span>
+                <div className="flex justify-between items-center pt-2 border-t">
+                  <span className="text-sm text-gray-600">Total Price:</span>
+                  <span className="font-medium">{PaymentApiService.formatCurrency(item.totalPrice)}</span>
                 </div>
               </div>
+            ))}
+          </CardContent>
+        </Card>
 
-              <div className="pt-4 space-y-3">
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Creating Payment...' : 'Create Payment'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleBack}
-                >
-                  Cancel
-                </Button>
+        {/* Payment Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <span>{PaymentApiService.formatCurrency(subtotal)}</span>
               </div>
-            </CardContent>
-          </Card>
+              <div className="flex justify-between">
+                <span>HST (13%):</span>
+                <span>{PaymentApiService.formatCurrency(taxAmount)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-lg font-semibold">
+                <span>Total:</span>
+                <span>{PaymentApiService.formatCurrency(total)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Clinic Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p className="font-medium">{clinic?.displayName || clinic?.name}</p>
-                <p className="text-sm text-gray-600">
-                  {clinic?.address}<br />
-                  {clinic?.city}, {clinic?.province} {clinic?.postalCode}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Notes */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Additional Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={formData.notes}
+              onChange={(e) => handleInputChange('notes', e.target.value)}
+              placeholder="Enter any additional notes or comments"
+              rows={3}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Submit Actions */}
+        <div className="flex flex-col sm:flex-row gap-4 pt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleBack}
+            disabled={isLoading}
+            className="flex-1 sm:flex-initial"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="flex-1 sm:flex-initial"
+          >
+            {isLoading ? 'Creating Payment...' : 'Create Payment'}
+          </Button>
         </div>
       </form>
     </div>

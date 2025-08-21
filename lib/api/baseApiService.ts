@@ -37,10 +37,14 @@ export abstract class BaseApiService {
   ): Promise<ApiResponse<T>> {
     const { timeout = this.DEFAULT_TIMEOUT, ...fetchOptions } = options;
     
+    // Get auth token if available (for future authentication integration)
+    const authToken = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+    
     const config: RequestInit = {
       method,
       headers: {
         'Content-Type': 'application/json',
+        ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
         ...fetchOptions.headers,
       },
       ...fetchOptions,

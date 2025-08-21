@@ -4,8 +4,8 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Printer, Download, Eye } from "lucide-react";
-import { Payment } from "@/lib/data/mockDataService";
-import { formatCurrency, formatDate } from "@/lib/api/paymentService";
+import { PaymentApiService } from "@/lib/api/paymentService";
+import { type Payment } from "@/lib/hooks";
 
 interface InvoiceTemplateProps {
   payment: Payment;
@@ -86,46 +86,61 @@ const UniversalInvoiceHeader = ({ clinicInfo, payment, clientInfo }: {
       <div className="flex justify-between items-start mb-6">
         <div className="flex-1">
           <div className="space-y-1 text-sm">
-            <p><span className="inline-block w-32">Invoice No.</span>{payment.invoiceNumber}</p>
+            <p><span className="inline-block w-32">Payment No.</span>{payment.paymentNumber}</p>
             <p><span className="inline-block w-32">Customer Name:</span>{clientInfo.name}</p>
             <p><span className="inline-block w-32">Address:</span>{clientInfo.address || 'Not provided'}</p>
           </div>
         </div>
         
         <div className="text-right text-sm space-y-1">
-          <p>Date: {formatDate(payment.invoiceDate)}</p>
-          <p>Referring MD: {payment.providerName || 'Not specified'}</p>
+          <p>Date: {PaymentApiService.formatDate(payment.paymentDate)}</p>
+          <p>Referring No: {payment.referringNo || 'Not specified'}</p>
         </div>
       </div>
     </div>
   );
 };
 
-// Universal line items table matching exact format
-const UniversalLineItemsTable = ({ payment }: { payment: Payment }) => (
+// Universal payment amounts breakdown
+const UniversalPaymentBreakdown = ({ payment }: { payment: Payment }) => (
   <div className="mb-6">
     <table className="w-full border-collapse border border-gray-900">
       <thead>
         <tr>
-          <th className="border border-gray-900 px-3 py-2 text-left font-bold bg-white">ITEM DESCRIPTION</th>
-          <th className="border border-gray-900 px-3 py-2 text-center font-bold bg-white">QTY</th>
-          <th className="border border-gray-900 px-3 py-2 text-right font-bold bg-white">PRICE</th>
+          <th className="border border-gray-900 px-3 py-2 text-left font-bold bg-white">PAYMENT TYPE</th>
           <th className="border border-gray-900 px-3 py-2 text-right font-bold bg-white">AMOUNT</th>
-          <th className="border border-gray-900 px-3 py-2 text-center font-bold bg-white">SERVICE DATE</th>
+          <th className="border border-gray-900 px-3 py-2 text-center font-bold bg-white">DATE</th>
         </tr>
       </thead>
       <tbody>
-        {payment.lineItems.map((item) => (
-          <tr key={item.id}>
-            <td className="border border-gray-900 px-3 py-2">{item.serviceName}</td>
-            <td className="border border-gray-900 px-3 py-2 text-center">{item.quantity}</td>
-            <td className="border border-gray-900 px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
-            <td className="border border-gray-900 px-3 py-2 text-right">{formatCurrency(item.totalPrice)}</td>
-            <td className="border border-gray-900 px-3 py-2 text-center">
-              {formatDate(payment.paymentDate)}
-            </td>
+        <tr>
+          <td className="border border-gray-900 px-3 py-2">{PaymentApiService.getPaymentTypeDescription(payment.paymentType)}</td>
+          <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)}</td>
+          <td className="border border-gray-900 px-3 py-2 text-center">
+            {PaymentApiService.formatDate(payment.paymentDate)}
+          </td>
+        </tr>
+        {payment.amounts.popAmount > 0 && (
+          <tr>
+            <td className="border border-gray-900 px-3 py-2">Patient Out of Pocket (POP)</td>
+            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts.popAmount)}</td>
+            <td className="border border-gray-900 px-3 py-2 text-center">-</td>
           </tr>
-        ))}
+        )}
+        {payment.amounts.dpaAmount > 0 && (
+          <tr>
+            <td className="border border-gray-900 px-3 py-2">Direct Payment Authorization (DPA)</td>
+            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts.dpaAmount)}</td>
+            <td className="border border-gray-900 px-3 py-2 text-center">-</td>
+          </tr>
+        )}
+        {payment.amounts.insurance1stAmount > 0 && (
+          <tr>
+            <td className="border border-gray-900 px-3 py-2">Insurance (Primary)</td>
+            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts.insurance1stAmount)}</td>
+            <td className="border border-gray-900 px-3 py-2 text-center">-</td>
+          </tr>
+        )}
       </tbody>
     </table>
   </div>
@@ -135,7 +150,13 @@ const UniversalLineItemsTable = ({ payment }: { payment: Payment }) => (
 const UniversalTotalSection = ({ payment }: { payment: Payment }) => (
   <div className="text-right mb-8">
     <div className="text-xl font-bold">
-      Total: {formatCurrency(payment.amount)}
+      Total: {PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)}
+    </div>
+    <div className="text-lg text-green-600">
+      Paid: {PaymentApiService.formatCurrency(payment.amounts.totalPaid)}
+    </div>
+    <div className="text-lg text-orange-600">
+      Outstanding: {PaymentApiService.formatCurrency(payment.amounts.totalOwed)}
     </div>
   </div>
 );
@@ -145,11 +166,12 @@ const UniversalPaymentDetails = ({ payment }: { payment: Payment }) => (
   <div className="space-y-4">
     {/* Payment Information */}
     <div className="space-y-2 text-sm">
-      <p>Amount: {formatCurrency(payment.amount)}</p>
-      <p>Amount Due: {formatCurrency(Math.max(0, payment.amount - payment.netAmount))}</p>
-      <p>Dispense Date: {formatDate(payment.paymentDate)}</p>
+      <p>Total Amount: {PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)}</p>
+      <p>Amount Paid: {PaymentApiService.formatCurrency(payment.amounts.totalPaid)}</p>
+      <p>Amount Due: {PaymentApiService.formatCurrency(payment.amounts.totalOwed)}</p>
+      <p>Payment Date: {PaymentApiService.formatDate(payment.paymentDate)}</p>
       <p>Payment Method: {payment.paymentMethod.toUpperCase()}</p>
-      <p>Payment Date: {formatDate(payment.paymentDate)}</p>
+      <p>Payment Type: {PaymentApiService.getPaymentTypeDescription(payment.paymentType)}</p>
     </div>
 
     {/* Signature Section */}
@@ -184,7 +206,7 @@ export default function InvoiceTemplate({
 
   // Data-driven client info with fallbacks
   const enhancedClientInfo = {
-    name: clientInfo.name || payment.clientName,
+    name: clientInfo.name || payment.clientName || 'Unknown Client',
     address: clientInfo.address || `${payment.clientId} Client Address`,
     city: clientInfo.city || '',
     province: clientInfo.province || '',
@@ -219,7 +241,7 @@ export default function InvoiceTemplate({
             payment={payment} 
             clientInfo={enhancedClientInfo} 
           />
-          <UniversalLineItemsTable payment={payment} />
+          <UniversalPaymentBreakdown payment={payment} />
           <UniversalTotalSection payment={payment} />
           <UniversalPaymentDetails payment={payment} />
         </CardContent>

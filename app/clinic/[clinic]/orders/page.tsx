@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { 
   Card, 
@@ -21,77 +21,66 @@ import {
   TableCell 
 } from "@/components/ui/table/Table";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { Search, Calendar, Plus, ChevronRight, ChevronLeft, Eye, Edit2, Trash2, Printer, FileText, DollarSign, UserCircle } from "lucide-react";
+import { Search, Calendar, Plus, ChevronRight, ChevronLeft, Eye, Edit2, Trash2, Printer, FileText, DollarSign, UserCircle, AlertCircle } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { slugToClinic } from "@/lib/data/clinics";
-import { MockDataService } from "@/lib/data/mockDataService";
 import { generateLink } from "@/lib/route-utils";
 
-// Define Order type locally
-interface Order {
-  id: string;
-  orderNumber: string;
-  orderDate: string;
-  clientName: string;
-  clientId: string;
-  productCount: number;
-  totalAmount: number;
-  totalPaid: number;
-  totalOwed: number;
-  status: "paid" | "partially paid" | "unpaid";
-  products: {
-    name: string;
-    description: string;
-    price: number;
-    quantity: number;
-  }[];
-  clinic: string;
-}
+// Import real API hooks and utilities
+import { 
+  useOrdersByClinic, 
+  useOrderMutation, 
+  OrderUtils,
+  Order,
+  OrderStatus,
+  PaymentStatus
+} from "@/lib/hooks";
 
 export default function OrdersPage() {
   const router = useRouter();
   const params = useParams();
   const clinic = params.clinic as string;
   
-  // State
+  // State for search and pagination
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 10;
   
-  // Orders data - fetched from MockDataService based on clinic
-  const [orders, setOrders] = useState<Order[]>([]);
+  // Get clinic data for API calls
+  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
   
-  useEffect(() => {
-    // Fetch real orders for this clinic
-    const fetchOrders = async () => {
-      try {
-        // Wait for 500ms to simulate network request
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Get clinic name from slug and fetch real orders
-        const clinicData = slugToClinic(clinic);
-        if (clinicData) {
-          const realOrders = MockDataService.getOrdersByClinic(clinicData.name);
-          setOrders(realOrders);
-        }
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchOrders();
-  }, [clinic]);
+  // Fetch orders using real API
+  const { 
+    orders, 
+    loading: isLoading, 
+    error, 
+    refetch 
+  } = useOrdersByClinic({
+    clinicName: clinicData?.name || "",
+    autoFetch: !!clinicData?.name
+  });
+
+  // Order mutation hook for operations
+  const { 
+    cancelOrder, 
+    loading: mutationLoading, 
+    error: mutationError 
+  } = useOrderMutation();
   
   // Filter orders based on search query
-  const filteredOrders = orders.filter(order =>
-    order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.status.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.orderDate.includes(searchQuery)
-  );
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery.trim()) return orders;
+    
+    const query = searchQuery.toLowerCase();
+    return orders.filter(order =>
+      order.orderNumber.toLowerCase().includes(query) ||
+      order.clientName.toLowerCase().includes(query) ||
+      order.status.toLowerCase().includes(query) ||
+      order.paymentStatus.toLowerCase().includes(query) ||
+      formatDate(order.orderDate).toLowerCase().includes(query) ||
+      formatDate(order.serviceDate).toLowerCase().includes(query)
+    );
+  }, [orders, searchQuery]);
   
   // Calculate pagination
   const totalFilteredOrders = filteredOrders.length;
@@ -101,41 +90,31 @@ export default function OrdersPage() {
   const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
   
   // Event handlers
-  const handleViewOrder = (clientId: string, orderId: string) => {
-    // Check if clientId is valid before navigating
-    if (!clientId || clientId === 'undefined' || clientId === 'null') {
-      // If no valid client ID, navigate directly to the order page
-      router.push(generateLink('clinic', `orders/${orderId}`, clinic));
-    } else {
-      router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
+  const handleViewOrder = (order: Order) => {
+    // Navigate to order details using order ID
+    router.push(generateLink('clinic', `orders/${order._id}`, clinic));
+  };
+  
+  const handleEditOrder = (order: Order) => {
+    // Navigate to order edit page
+    router.push(generateLink('clinic', `orders/${order._id}/edit`, clinic));
+  };
+  
+  const handleDeleteOrder = async (order: Order) => {
+    if (window.confirm(`Are you sure you want to cancel order ${order.orderNumber}?`)) {
+      try {
+        await cancelOrder(order._id, "Cancelled by user");
+        // Refetch orders to update the list
+        refetch();
+      } catch (error) {
+        console.error("Error cancelling order:", error);
+      }
     }
   };
   
-  const handleEditOrder = (clientId: string, orderId: string) => {
-    // Check if clientId is valid before navigating
-    if (!clientId || clientId === 'undefined' || clientId === 'null') {
-      // If no valid client ID, navigate directly to the order edit page
-      router.push(generateLink('clinic', `orders/${orderId}/edit`, clinic));
-    } else {
-      router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}/edit`, clinic));
-    }
-  };
-  
-  const handleDeleteOrder = (orderId: string) => {
-    if (window.confirm("Are you sure you want to delete this order?")) {
-      // In a real app, this would be an API call
-      setOrders(orders.filter(order => order.id !== orderId));
-    }
-  };
-  
-  const handlePrintInvoice = (clientId: string, orderId: string) => {
-    // Check if clientId is valid before navigating
-    if (!clientId || clientId === 'undefined' || clientId === 'null') {
-      // If no valid client ID, navigate directly to the order page
-      router.push(generateLink('clinic', `orders/${orderId}`, clinic));
-    } else {
-      router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}`, clinic));
-    }
+  const handlePrintInvoice = (order: Order) => {
+    // Navigate to order details for invoice printing
+    router.push(generateLink('clinic', `orders/${order._id}`, clinic));
   };
   
   const handleCreateNewOrder = () => {
@@ -155,34 +134,78 @@ export default function OrdersPage() {
     setCurrentPage(prev => Math.min(prev + 1, totalPages));
   };
   
-  // Function to render status badge
-  const getStatusBadge = (status: Order["status"]) => {
-    switch (status) {
-      case "paid":
-        return <Badge className="bg-green-500">Paid</Badge>;
-      case "partially paid":
-        return <Badge className="bg-yellow-500">Partially Paid</Badge>;
-      case "unpaid":
-        return <Badge className="bg-red-500">Unpaid</Badge>;
-      default:
-        return null;
-    }
+  // Function to render combined status badge (order + payment status)
+  const getStatusBadge = (order: Order) => {
+    // Primary status based on order status
+    const orderStatusColor = OrderUtils.getStatusColor(order.status);
+    const paymentStatusColor = OrderUtils.getPaymentStatusColor(order.paymentStatus);
+    
+    return (
+      <div className="flex flex-col gap-1">
+        <Badge className={`${orderStatusColor} text-xs`}>
+          {order.status === OrderStatus.SCHEDULED && "Scheduled"}
+          {order.status === OrderStatus.IN_PROGRESS && "In Progress"}
+          {order.status === OrderStatus.COMPLETED && "Completed"}
+          {order.status === OrderStatus.CANCELLED && "Cancelled"}
+          {order.status === OrderStatus.NO_SHOW && "No Show"}
+        </Badge>
+        <Badge className={`${paymentStatusColor} text-xs`}>
+          {order.paymentStatus === PaymentStatus.PENDING && "Payment Pending"}
+          {order.paymentStatus === PaymentStatus.PARTIAL && "Partially Paid"}
+          {order.paymentStatus === PaymentStatus.PAID && "Paid"}
+          {order.paymentStatus === PaymentStatus.OVERDUE && "Overdue"}
+          {order.paymentStatus === PaymentStatus.REFUNDED && "Refunded"}
+        </Badge>
+      </div>
+    );
   };
+
+  // Handle clinic not found
+  if (!clinicData) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Clinic Not Found</h2>
+            <p className="text-gray-600">The requested clinic could not be found.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Orders</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <Button onClick={() => refetch()}>Try Again</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: themeColors.primary }}>
-            Orders - {clinic.replace('-', ' ')}
+            Orders - {clinicData.name}
           </h1>
           <p className="text-gray-600 mt-1">
-            View and manage all orders for {clinic.replace('-', ' ')} clinic
+            View and manage all orders for {clinicData.name}
           </p>
         </div>
         <Button 
           onClick={handleCreateNewOrder}
           className="flex items-center gap-2 self-start"
+          disabled={mutationLoading}
         >
           <Plus size={16} />
           Create New Order
@@ -203,7 +226,7 @@ export default function OrdersPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
             <Input
               id="orderSearch"
-              placeholder="Search by order number, client name, date, or status..."
+              placeholder="Search by order number, client name, status, or date..."
               className="pl-8"
               value={searchQuery}
               onChange={(e) => {
@@ -219,6 +242,18 @@ export default function OrdersPage() {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Mutation Error Display */}
+      {mutationError && (
+        <Card className="shadow-sm border border-red-200 mb-4">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-2 text-red-600">
+              <AlertCircle size={16} />
+              <span className="text-sm">{mutationError}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       {/* Orders Table */}
       <Card className="shadow-sm border border-gray-200">
@@ -242,7 +277,7 @@ export default function OrdersPage() {
                       <TableHead className="font-medium">
                         <div className="flex items-center gap-1">
                           <Calendar size={14} />
-                          Date
+                          Service Date
                         </div>
                       </TableHead>
                       <TableHead className="font-medium">
@@ -251,6 +286,7 @@ export default function OrdersPage() {
                           Client
                         </div>
                       </TableHead>
+                      <TableHead className="font-medium">Services</TableHead>
                       <TableHead className="font-medium text-right">
                         <div className="flex items-center gap-1 justify-end">
                           <DollarSign size={14} />
@@ -264,43 +300,62 @@ export default function OrdersPage() {
                   <TableBody>
                     {currentOrders.length > 0 ? (
                       currentOrders.map((order) => (
-                        <TableRow key={order.id}>
+                        <TableRow key={order._id}>
                           <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                          <TableCell>{formatDate(order.orderDate)}</TableCell>
+                          <TableCell>{formatDate(order.serviceDate)}</TableCell>
                           <TableCell>{order.clientName}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
-                          <TableCell>{getStatusBadge(order.status)}</TableCell>
+                          <TableCell>
+                            <div className="max-w-48">
+                              {order.items.length === 1 ? (
+                                <span className="text-sm">{order.items[0].productName}</span>
+                              ) : (
+                                <span className="text-sm text-gray-600">
+                                  {order.items.length} services
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {OrderUtils.formatCurrency(order.totalAmount)}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(order)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
                               <Button 
                                 variant="outline" 
                                 size="icon" 
                                 className="h-8 w-8"
-                                onClick={() => handleViewOrder(order.clientId, order.id)}
+                                onClick={() => handleViewOrder(order)}
                               >
                                 <Eye size={14} />
                               </Button>
+                              {(order.status === OrderStatus.SCHEDULED || order.status === OrderStatus.IN_PROGRESS) && (
+                                <Button 
+                                  variant="outline" 
+                                  size="icon" 
+                                  className="h-8 w-8"
+                                  onClick={() => handleEditOrder(order)}
+                                  disabled={mutationLoading}
+                                >
+                                  <Edit2 size={14} />
+                                </Button>
+                              )}
+                              {order.status !== OrderStatus.CANCELLED && (
+                                <Button 
+                                  variant="outline" 
+                                  size="icon" 
+                                  className="h-8 w-8"
+                                  onClick={() => handleDeleteOrder(order)}
+                                  disabled={mutationLoading}
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              )}
                               <Button 
                                 variant="outline" 
                                 size="icon" 
                                 className="h-8 w-8"
-                                onClick={() => handleEditOrder(order.clientId, order.id)}
-                              >
-                                <Edit2 size={14} />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="icon" 
-                                className="h-8 w-8"
-                                onClick={() => handleDeleteOrder(order.id)}
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="icon" 
-                                className="h-8 w-8"
-                                onClick={() => handlePrintInvoice(order.clientId, order.id)}
+                                onClick={() => handlePrintInvoice(order)}
                               >
                                 <Printer size={14} />
                               </Button>
@@ -311,10 +366,10 @@ export default function OrdersPage() {
                     ) : (
                       <TableRow>
                         <TableCell 
-                          colSpan={6} 
+                          colSpan={7} 
                           className="text-center py-8 text-gray-500"
                         >
-                          {searchQuery ? "No orders match your search criteria" : "No orders found"}
+                          {searchQuery ? "No orders match your search criteria" : "No orders found for this clinic"}
                         </TableCell>
                       </TableRow>
                     )}
@@ -324,7 +379,7 @@ export default function OrdersPage() {
               
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-6">
+                <div className="flex items-center justify-between p-6">
                   <div className="text-sm text-gray-500">
                     Showing {indexOfFirstOrder + 1} to {Math.min(indexOfLastOrder, totalFilteredOrders)} of {totalFilteredOrders} orders
                   </div>

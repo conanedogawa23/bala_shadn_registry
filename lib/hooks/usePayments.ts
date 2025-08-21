@@ -1,87 +1,180 @@
 import { useState, useEffect, useCallback } from 'react';
-import { PaymentApiService } from '../api/paymentService';
-import type { Payment } from '../data/mockDataService';
+import { 
+  PaymentApiService, 
+  Payment, 
+  PaymentFilters, 
+  PaymentStatus,
+  CreatePaymentRequest,
+  UpdatePaymentRequest,
+  AddPaymentAmountRequest,
+  ProcessRefundRequest,
+  PaymentStatsResponse,
+  RevenueDataResponse
+} from '../api/paymentService';
 
-type PaymentStatus = 'completed' | 'pending' | 'failed' | 'refunded' | 'partial';
-
-interface UsePaymentsOptions {
-  clinicName: string;
-  page?: number;
-  limit?: number;
-  status?: PaymentStatus;
-  startDate?: Date;
-  endDate?: Date;
-  search?: string;
-  autoFetch?: boolean;
-}
-
-interface UsePaymentsReturn {
+// Hook return types
+interface UsePaymentsResult {
   payments: Payment[];
   loading: boolean;
   error: string | null;
   pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
   } | null;
+  refetch: () => Promise<void>;
+  createPayment: (data: CreatePaymentRequest) => Promise<Payment>;
+  updatePayment: (id: string, data: UpdatePaymentRequest) => Promise<Payment>;
+  deletePayment: (id: string) => Promise<void>;
+  addPaymentAmount: (id: string, data: AddPaymentAmountRequest) => Promise<Payment>;
+  processRefund: (id: string, data: ProcessRefundRequest) => Promise<Payment>;
+  clearError: () => void;
+}
+
+interface UsePaymentResult {
+  payment: Payment | null;
+  loading: boolean;
+  error: string | null;
   refetch: () => Promise<void>;
   clearError: () => void;
 }
 
-export function usePayments({
-  clinicName,
-  page = 1,
-  limit = 20,
-  status,
-  startDate,
-  endDate,
-  search,
-  autoFetch = true
-}: UsePaymentsOptions): UsePaymentsReturn {
+interface UsePaymentStatsResult {
+  stats: PaymentStatsResponse['data'] | null;
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+  clearError: () => void;
+}
+
+interface UseRevenueDataResult {
+  revenueData: RevenueDataResponse['data'] | null;
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+  clearError: () => void;
+}
+
+/**
+ * Hook for managing multiple payments with filtering and pagination
+ */
+export function usePayments(filters: PaymentFilters = {}): UsePaymentsResult {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<UsePaymentsReturn['pagination']>(null);
+  const [pagination, setPagination] = useState<UsePaymentsResult['pagination']>(null);
 
   const fetchPayments = useCallback(async () => {
-    if (!clinicName) return;
-
-    setLoading(true);
-    setError(null);
-
     try {
-      const response = await PaymentApiService.getPaymentsByClinic(clinicName, {
-        page,
-        limit,
-        status,
-        startDate,
-        endDate,
-        search
-      });
-
-      setPayments(response.payments);
+      setLoading(true);
+      setError(null);
+      
+      const response = await PaymentApiService.getAllPayments(filters);
+      
+      setPayments(response.data);
       setPagination(response.pagination);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch payments');
-      setPayments([]);
-      setPagination(null);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch payments';
+      setError(errorMessage);
+      console.error('Error fetching payments:', err);
     } finally {
       setLoading(false);
     }
-  }, [clinicName, page, limit, status, startDate, endDate, search]);
+  }, [filters]);
+
+  const createPayment = useCallback(async (data: CreatePaymentRequest): Promise<Payment> => {
+    try {
+      setError(null);
+      const response = await PaymentApiService.createPayment(data);
+      
+      // Refresh the payments list
+      await fetchPayments();
+      
+      return response.data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create payment';
+      setError(errorMessage);
+      throw err;
+    }
+  }, [fetchPayments]);
+
+  const updatePayment = useCallback(async (id: string, data: UpdatePaymentRequest): Promise<Payment> => {
+    try {
+      setError(null);
+      const response = await PaymentApiService.updatePayment(id, data);
+      
+      // Update the payment in the local state
+      setPayments(prev => prev.map(payment => 
+        payment._id === id ? response.data : payment
+      ));
+      
+      return response.data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update payment';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  const deletePayment = useCallback(async (id: string): Promise<void> => {
+    try {
+      setError(null);
+      await PaymentApiService.deletePayment(id);
+      
+      // Remove the payment from local state
+      setPayments(prev => prev.filter(payment => payment._id !== id));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete payment';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  const addPaymentAmount = useCallback(async (id: string, data: AddPaymentAmountRequest): Promise<Payment> => {
+    try {
+      setError(null);
+      const response = await PaymentApiService.addPaymentAmount(id, data);
+      
+      // Update the payment in the local state
+      setPayments(prev => prev.map(payment => 
+        payment._id === id ? response.data : payment
+      ));
+      
+      return response.data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add payment amount';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  const processRefund = useCallback(async (id: string, data: ProcessRefundRequest): Promise<Payment> => {
+    try {
+      setError(null);
+      const response = await PaymentApiService.processRefund(id, data);
+      
+      // Update the payment in the local state
+      setPayments(prev => prev.map(payment => 
+        payment._id === id ? response.data : payment
+      ));
+      
+      return response.data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to process refund';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
 
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
   useEffect(() => {
-    if (autoFetch) {
-      fetchPayments();
-    }
-  }, [fetchPayments, autoFetch]);
+    fetchPayments();
+  }, [fetchPayments]);
 
   return {
     payments,
@@ -89,48 +182,271 @@ export function usePayments({
     error,
     pagination,
     refetch: fetchPayments,
+    createPayment,
+    updatePayment,
+    deletePayment,
+    addPaymentAmount,
+    processRefund,
     clearError
   };
 }
 
-interface UsePaymentStatsOptions {
-  clinicName?: string;
-  autoFetch?: boolean;
+/**
+ * Hook for managing payments by clinic
+ */
+export function usePaymentsByClinic(
+  clinicName: string, 
+  filters: { page?: number; limit?: number; status?: PaymentStatus; outstanding?: boolean } = {}
+): UsePaymentsResult {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<UsePaymentsResult['pagination']>(null);
+
+  const fetchPayments = useCallback(async () => {
+    if (!clinicName) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await PaymentApiService.getPaymentsByClinic(clinicName, filters);
+      
+      setPayments(response.data);
+      setPagination(response.pagination);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch clinic payments';
+      setError(errorMessage);
+      console.error('Error fetching clinic payments:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [clinicName, filters]);
+
+  const createPayment = useCallback(async (data: CreatePaymentRequest): Promise<Payment> => {
+    try {
+      setError(null);
+      const response = await PaymentApiService.createPayment(data);
+      
+      // Refresh the payments list
+      await fetchPayments();
+      
+      return response.data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create payment';
+      setError(errorMessage);
+      throw err;
+    }
+  }, [fetchPayments]);
+
+  const updatePayment = useCallback(async (id: string, data: UpdatePaymentRequest): Promise<Payment> => {
+    try {
+      setError(null);
+      const response = await PaymentApiService.updatePayment(id, data);
+      
+      setPayments(prev => prev.map(payment => 
+        payment._id === id ? response.data : payment
+      ));
+      
+      return response.data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update payment';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  const deletePayment = useCallback(async (id: string): Promise<void> => {
+    try {
+      setError(null);
+      await PaymentApiService.deletePayment(id);
+      
+      setPayments(prev => prev.filter(payment => payment._id !== id));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete payment';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  const addPaymentAmount = useCallback(async (id: string, data: AddPaymentAmountRequest): Promise<Payment> => {
+    try {
+      setError(null);
+      const response = await PaymentApiService.addPaymentAmount(id, data);
+      
+      setPayments(prev => prev.map(payment => 
+        payment._id === id ? response.data : payment
+      ));
+      
+      return response.data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add payment amount';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  const processRefund = useCallback(async (id: string, data: ProcessRefundRequest): Promise<Payment> => {
+    try {
+      setError(null);
+      const response = await PaymentApiService.processRefund(id, data);
+      
+      setPayments(prev => prev.map(payment => 
+        payment._id === id ? response.data : payment
+      ));
+      
+      return response.data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to process refund';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
+
+  return {
+    payments,
+    loading,
+    error,
+    pagination,
+    refetch: fetchPayments,
+    createPayment,
+    updatePayment,
+    deletePayment,
+    addPaymentAmount,
+    processRefund,
+    clearError
+  };
 }
 
-interface UsePaymentStatsReturn {
-  stats: {
-    totalPayments: number;
-    totalAmount: number;
-    totalPaid: number;
-    totalDue: number;
-    averagePayment: number;
-    statusDistribution: Record<PaymentStatus, number>;
-  } | null;
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
-  clearError: () => void;
+/**
+ * Hook for managing a single payment
+ */
+export function usePayment(paymentId: string | null): UsePaymentResult {
+  const [payment, setPayment] = useState<Payment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPayment = useCallback(async () => {
+    if (!paymentId) {
+      setPayment(null);
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await PaymentApiService.getPaymentById(paymentId);
+      setPayment(response.data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch payment';
+      setError(errorMessage);
+      console.error('Error fetching payment:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [paymentId]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    fetchPayment();
+  }, [fetchPayment]);
+
+  return {
+    payment,
+    loading,
+    error,
+    refetch: fetchPayment,
+    clearError
+  };
 }
 
-export function usePaymentStats({
-  clinicName,
-  autoFetch = true
-}: UsePaymentStatsOptions): UsePaymentStatsReturn {
-  const [stats, setStats] = useState<UsePaymentStatsReturn['stats']>(null);
-  const [loading, setLoading] = useState(false);
+/**
+ * Hook for managing payments by client
+ */
+export function usePaymentsByClient(clientId: number | null): UsePaymentsResult {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPayments = useCallback(async () => {
+    if (!clientId) {
+      setPayments([]);
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await PaymentApiService.getPaymentsByClient(clientId);
+      setPayments(response.data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch client payments';
+      setError(errorMessage);
+      console.error('Error fetching client payments:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [clientId]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
+
+  return {
+    payments,
+    loading,
+    error,
+    pagination: null,
+    refetch: fetchPayments,
+    createPayment: async () => { throw new Error('Not implemented for client payments'); },
+    updatePayment: async () => { throw new Error('Not implemented for client payments'); },
+    deletePayment: async () => { throw new Error('Not implemented for client payments'); },
+    addPaymentAmount: async () => { throw new Error('Not implemented for client payments'); },
+    processRefund: async () => { throw new Error('Not implemented for client payments'); },
+    clearError
+  };
+}
+
+/**
+ * Hook for payment statistics
+ */
+export function usePaymentStats(clinicName: string): UsePaymentStatsResult {
+  const [stats, setStats] = useState<PaymentStatsResponse['data'] | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchStats = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
+    if (!clinicName) return;
+    
     try {
-      const statsData = await PaymentApiService.getPaymentStats(clinicName);
-      setStats(statsData);
+      setLoading(true);
+      setError(null);
+      
+      const response = await PaymentApiService.getPaymentStats(clinicName);
+      setStats(response.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch payment statistics');
-      setStats(null);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch payment statistics';
+      setError(errorMessage);
+      console.error('Error fetching payment stats:', err);
     } finally {
       setLoading(false);
     }
@@ -141,10 +457,8 @@ export function usePaymentStats({
   }, []);
 
   useEffect(() => {
-    if (autoFetch) {
-      fetchStats();
-    }
-  }, [fetchStats, autoFetch]);
+    fetchStats();
+  }, [fetchStats]);
 
   return {
     stats,
@@ -155,69 +469,104 @@ export function usePaymentStats({
   };
 }
 
-interface UseInvoiceDataOptions {
-  paymentId?: string;
-  autoFetch?: boolean;
-}
-
-interface UseInvoiceDataReturn {
-  invoiceData: {
-    invoice: {
-      invoiceNumber: string;
-      invoiceDate: string;
-      dueDate?: string;
-    };
-    payment: Payment;
-    client: any;
-    clinic: any;
-    insurance: any;
-    lineItems: any[];
-    financials: any;
-  } | null;
-  loading: boolean;
-  error: string | null;
-  generateInvoice: (paymentId: string) => Promise<void>;
-  clearError: () => void;
-}
-
-export function useInvoiceData({
-  paymentId,
-  autoFetch = true
-}: UseInvoiceDataOptions): UseInvoiceDataReturn {
-  const [invoiceData, setInvoiceData] = useState<UseInvoiceDataReturn['invoiceData']>(null);
-  const [loading, setLoading] = useState(false);
+/**
+ * Hook for outstanding payments
+ */
+export function useOutstandingPayments(
+  clinicName: string,
+  filters: { page?: number; limit?: number } = {}
+): UsePaymentsResult {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<UsePaymentsResult['pagination']>(null);
 
-  const generateInvoice = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
-
+  const fetchPayments = useCallback(async () => {
+    if (!clinicName) return;
+    
     try {
-      const data = await PaymentApiService.generateInvoiceData(id);
-      setInvoiceData(data);
+      setLoading(true);
+      setError(null);
+      
+      const response = await PaymentApiService.getOutstandingPayments(clinicName, filters);
+      
+      setPayments(response.data);
+      setPagination(response.pagination);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate invoice data');
-      setInvoiceData(null);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch outstanding payments';
+      setError(errorMessage);
+      console.error('Error fetching outstanding payments:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clinicName, filters]);
 
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
   useEffect(() => {
-    if (autoFetch && paymentId) {
-      generateInvoice(paymentId);
-    }
-  }, [autoFetch, paymentId, generateInvoice]);
+    fetchPayments();
+  }, [fetchPayments]);
 
   return {
-    invoiceData,
+    payments,
     loading,
     error,
-    generateInvoice,
+    pagination,
+    refetch: fetchPayments,
+    createPayment: async () => { throw new Error('Not implemented for outstanding payments'); },
+    updatePayment: async () => { throw new Error('Not implemented for outstanding payments'); },
+    deletePayment: async () => { throw new Error('Not implemented for outstanding payments'); },
+    addPaymentAmount: async () => { throw new Error('Not implemented for outstanding payments'); },
+    processRefund: async () => { throw new Error('Not implemented for outstanding payments'); },
+    clearError
+  };
+}
+
+/**
+ * Hook for revenue data
+ */
+export function useRevenueData(
+  clinicName: string,
+  startDate?: string,
+  endDate?: string
+): UseRevenueDataResult {
+  const [revenueData, setRevenueData] = useState<RevenueDataResponse['data'] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRevenueData = useCallback(async () => {
+    if (!clinicName) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await PaymentApiService.getRevenueData(clinicName, startDate, endDate);
+      setRevenueData(response.data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch revenue data';
+      setError(errorMessage);
+      console.error('Error fetching revenue data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [clinicName, startDate, endDate]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    fetchRevenueData();
+  }, [fetchRevenueData]);
+
+  return {
+    revenueData,
+    loading,
+    error,
+    refetch: fetchRevenueData,
     clearError
   };
 }

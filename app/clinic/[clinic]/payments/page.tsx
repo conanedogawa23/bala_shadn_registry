@@ -40,11 +40,9 @@ import { slugToClinic } from "@/lib/data/clinics";
 import { generateLink } from "@/lib/route-utils";
 import { 
   PaymentApiService, 
-  formatCurrency, 
-  formatDate, 
-  getPaymentStatusColor 
+  Payment,
+  PaymentStatus
 } from "@/lib/api/paymentService";
-import { Payment } from "@/lib/data/mockDataService";
 
 // Loading component
 const LoadingSpinner = () => (
@@ -64,11 +62,32 @@ const ErrorDisplay = ({ error, onRetry }: { error: string; onRetry: () => void }
 );
 
 // Payment status badge component
-const PaymentStatusBadge = ({ status }: { status: string }) => (
-  <Badge className={getPaymentStatusColor(status)}>
-    {status.charAt(0).toUpperCase() + status.slice(1)}
-  </Badge>
-);
+const PaymentStatusBadge = ({ status }: { status: PaymentStatus }) => {
+  const getStatusColorClass = (status: PaymentStatus): string => {
+    switch (status) {
+      case PaymentStatus.COMPLETED:
+        return 'bg-green-100 text-green-800';
+      case PaymentStatus.PENDING:
+        return 'bg-yellow-100 text-yellow-800';
+      case PaymentStatus.PARTIAL:
+        return 'bg-blue-100 text-blue-800';
+      case PaymentStatus.FAILED:
+        return 'bg-red-100 text-red-800';
+      case PaymentStatus.REFUNDED:
+        return 'bg-purple-100 text-purple-800';
+      case PaymentStatus.WRITEOFF:
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  return (
+    <Badge className={getStatusColorClass(status)}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </Badge>
+  );
+};
 
 // Payment card component for mobile view
 const PaymentCard = ({ payment, clinic }: { payment: Payment; clinic: string }) => (
@@ -77,10 +96,10 @@ const PaymentCard = ({ payment, clinic }: { payment: Payment; clinic: string }) 
       <div className="flex justify-between items-start">
         <div>
           <CardTitle className="text-lg font-medium">
-            {payment.invoiceNumber}
+            {payment.paymentId}
           </CardTitle>
           <p className="text-sm text-gray-600">
-            {payment.clientName} • {formatDate(payment.paymentDate)}
+            {payment.clientName} • {PaymentApiService.formatDate(payment.paymentDate)}
           </p>
         </div>
         <PaymentStatusBadge status={payment.status} />
@@ -90,31 +109,35 @@ const PaymentCard = ({ payment, clinic }: { payment: Payment; clinic: string }) 
       <div className="space-y-2">
         <div className="flex justify-between">
           <span className="text-sm text-gray-600">Amount:</span>
-          <span className="font-medium">{formatCurrency(payment.amount)}</span>
+          <span className="font-medium">{PaymentApiService.formatCurrency(payment.total)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-sm text-gray-600">Paid:</span>
+          <span className="font-medium text-green-600">{PaymentApiService.formatCurrency(payment.amountPaid)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-sm text-gray-600">Method:</span>
           <span className="text-sm">{payment.paymentMethod}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-sm text-gray-600">Type:</span>
-          <span className="text-sm">{payment.paymentType}</span>
+          <span className="text-sm text-gray-600">Invoice:</span>
+          <span className="text-sm">{payment.invoiceNumber}</span>
         </div>
       </div>
       <div className="flex gap-2 mt-4">
-        <Link href={generateLink('clinic', `payments/${payment.id}`, clinic)} className="flex-1">
+        <Link href={generateLink('clinic', `payments/${payment.paymentId}`, clinic)} className="flex-1">
           <Button variant="outline" size="sm" className="w-full">
             <Eye size={14} className="mr-1" />
             View
           </Button>
         </Link>
-        <Link href={generateLink('clinic', `payments/${payment.id}/edit`, clinic)} className="flex-1">
+        <Link href={generateLink('clinic', `payments/${payment.paymentId}/edit`, clinic)} className="flex-1">
           <Button variant="outline" size="sm" className="w-full">
             <Edit size={14} className="mr-1" />
             Edit
           </Button>
         </Link>
-        <Link href={generateLink('clinic', `payments/invoice/${payment.id}`, clinic)}>
+        <Link href={generateLink('clinic', `payments/invoice/${payment.paymentId}`, clinic)}>
           <Button variant="outline" size="sm">
             <FileText size={14} />
           </Button>
@@ -156,22 +179,22 @@ export default function PaymentsPage() {
       setIsLoading(true);
       setError(null);
 
-      const options = {
+      const filters = {
         page,
         limit: ITEMS_PER_PAGE,
-        status: statusFilter === "all" ? undefined : statusFilter,
+        status: statusFilter === "all" ? undefined : statusFilter as PaymentStatus,
       };
 
-      const result = await PaymentApiService.getPaymentsByClinic(clinicData.name, options);
+      const result = await PaymentApiService.getPaymentsByClinic(clinicData.name, filters);
       
       if (reset || page === 1) {
-        setPayments(result.payments);
+        setPayments(result.data);
       } else {
-        setPayments(prev => [...prev, ...result.payments]);
+        setPayments(prev => [...prev, ...result.data]);
       }
       
-      setTotalPayments(result.total);
-      setHasMore(result.hasMore);
+      setTotalPayments(result.pagination.totalItems);
+      setHasMore(result.pagination.hasNextPage);
       setCurrentPage(page);
     } catch (err) {
       console.error('Error fetching payments:', err);
@@ -181,36 +204,11 @@ export default function PaymentsPage() {
     }
   }, [clinicData, statusFilter]);
 
-  // Search payments
+  // Search payments - simplified to just re-fetch with current filters
   const searchPayments = useCallback(async () => {
-    if (!clinicData || !searchQuery.trim()) {
-      fetchPayments(1, true);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const result = await PaymentApiService.searchPayments(
-        searchQuery,
-        {
-          status: statusFilter === "all" ? undefined : statusFilter,
-          page: 1,
-          limit: ITEMS_PER_PAGE
-        }
-      );
-
-      setPayments(result.payments);
-      setTotalPayments(result.total);
-      setCurrentPage(1);
-    } catch (err) {
-      console.error('Error searching payments:', err);
-      setError(err instanceof Error ? err.message : 'Search failed');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clinicData, searchQuery, statusFilter, fetchPayments]);
+    // For now, just refetch all payments - search can be implemented later
+    fetchPayments(1, true);
+  }, [fetchPayments]);
 
   // Effects
   useEffect(() => {
@@ -406,35 +404,35 @@ export default function PaymentsPage() {
                   </thead>
                   <tbody>
                     {payments.map((payment) => (
-                      <tr key={payment.id} className="border-t hover:bg-gray-50">
+                      <tr key={payment._id} className="border-t hover:bg-gray-50">
                         <td className="p-4">
                           <Link 
-                            href={generateLink('clinic', `payments/${payment.id}`, clinic)}
+                            href={generateLink('clinic', `payments/${payment.paymentId}`, clinic)}
                             className="font-medium text-blue-600 hover:text-blue-800"
                           >
                             {payment.invoiceNumber}
                           </Link>
                         </td>
                         <td className="p-4">{payment.clientName}</td>
-                        <td className="p-4">{formatDate(payment.paymentDate)}</td>
-                        <td className="p-4 font-medium">{formatCurrency(payment.amount)}</td>
+                        <td className="p-4">{PaymentApiService.formatDate(payment.paymentDate)}</td>
+                        <td className="p-4 font-medium">{PaymentApiService.formatCurrency(payment.total)}</td>
                         <td className="p-4">{payment.paymentMethod}</td>
                         <td className="p-4">
                           <PaymentStatusBadge status={payment.status} />
                         </td>
                         <td className="p-4">
                           <div className="flex justify-end gap-2">
-                            <Link href={generateLink('clinic', `payments/${payment.id}`, clinic)}>
+                            <Link href={generateLink('clinic', `payments/${payment.paymentId}`, clinic)}>
                               <Button variant="outline" size="sm">
                                 <Eye size={14} />
                               </Button>
                             </Link>
-                            <Link href={generateLink('clinic', `payments/${payment.id}/edit`, clinic)}>
+                            <Link href={generateLink('clinic', `payments/${payment.paymentId}/edit`, clinic)}>
                               <Button variant="outline" size="sm">
                                 <Edit size={14} />
                               </Button>
                             </Link>
-                            <Link href={generateLink('clinic', `payments/invoice/${payment.id}`, clinic)}>
+                            <Link href={generateLink('clinic', `payments/invoice/${payment.paymentId}`, clinic)}>
                               <Button variant="outline" size="sm">
                                 <FileText size={14} />
                               </Button>
@@ -452,7 +450,7 @@ export default function PaymentsPage() {
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-4">
             {payments.map((payment) => (
-              <PaymentCard key={payment.id} payment={payment} clinic={clinic} />
+              <PaymentCard key={payment._id} payment={payment} clinic={clinic} />
             ))}
           </div>
 

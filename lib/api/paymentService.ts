@@ -1,199 +1,282 @@
 import { BaseApiService } from './baseApiService';
-import type { Payment, PaymentLineItem } from '../data/mockDataService';
 
-type PaymentStatus = 'completed' | 'pending' | 'failed' | 'refunded' | 'partial';
-type PaymentMethod = 'cash' | 'credit_card' | 'debit_card' | 'cheque' | 'bank_transfer' | 'insurance_primary' | 'insurance_secondary';
-
-interface PaymentQueryOptions {
-  page?: number;
-  limit?: number;
-  status?: PaymentStatus;
-  startDate?: Date;
-  endDate?: Date;
-  search?: string;
+// Payment Enums (matching backend)
+export enum PaymentStatus {
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  PARTIAL = 'partial',
+  FAILED = 'failed',
+  REFUNDED = 'refunded',
+  WRITEOFF = 'writeoff'
 }
 
-interface CreatePaymentRequest {
+export enum PaymentType {
+  POP = 'POP',                    // Patient Out of Pocket
+  POPFP = 'POPFP',               // Patient Out of Pocket - Final Payment
+  DPA = 'DPA',                   // Direct Payment Authorization
+  DPAFP = 'DPAFP',               // DPA Final Payment
+  COB_1 = 'COB_1',               // Coordination of Benefits - Primary
+  COB_2 = 'COB_2',               // Coordination of Benefits - Secondary
+  COB_3 = 'COB_3',               // Coordination of Benefits - Tertiary
+  INSURANCE_1ST = 'INSURANCE_1ST', // 1st Insurance Payment
+  INSURANCE_2ND = 'INSURANCE_2ND', // 2nd Insurance Payment
+  INSURANCE_3RD = 'INSURANCE_3RD', // 3rd Insurance Payment
+  SALES_REFUND = 'SALES_REFUND',   // Sales Refund
+  WRITEOFF = 'WRITEOFF',           // Write-off Amount
+  NO_INSUR_FP = 'NO_INSUR_FP'     // No Insurance Final Payment
+}
+
+export enum PaymentMethod {
+  CASH = 'Cash',
+  CREDIT_CARD = 'Credit Card',
+  DEBIT = 'Debit',
+  CHEQUE = 'Cheque',
+  INSURANCE = 'Insurance',
+  BANK_TRANSFER = 'Bank Transfer',
+  OTHER = 'Other'
+}
+
+// Payment Amount Breakdown Interface
+export interface PaymentAmounts {
+  totalPaymentAmount: number;
+  totalPaid: number;
+  totalOwed: number;
+  
+  // Canadian Healthcare Payment Types
+  popAmount: number;
+  popfpAmount: number;
+  dpaAmount: number;
+  dpafpAmount: number;
+  
+  // Coordination of Benefits
+  cob1Amount: number;
+  cob2Amount: number;
+  cob3Amount: number;
+  
+  // Insurance Payments
+  insurance1stAmount: number;
+  insurance2ndAmount: number;
+  insurance3rdAmount: number;
+  
+  // Other Amounts
+  refundAmount: number;
+  salesRefundAmount: number;
+  writeoffAmount: number;
+  noInsurFpAmount: number;
+  badDebtAmount: number;
+}
+
+// Payment Interface - Updated to match MongoDB data structure
+export interface Payment {
+  _id: string;
+  paymentId: string;
+  invoiceNumber: string;
   clientId: string;
-  clientKey?: number;
+  clientName?: string;
   clinicName: string;
-  appointmentIds: string[];
-  lineItems: Array<{
-    serviceCode: string;
-    serviceName: string;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    taxable: boolean;
-  }>;
+  
+  // Payment Details
+  paymentDate: string;
+  paymentMethod: string;
+  status: string;
+  
+  // Amount Information
   subtotal: number;
   taxRate: number;
   taxAmount: number;
   total: number;
-  paymentMethod: PaymentMethod;
-  paymentDate: Date;
-  invoiceDate?: Date;
-  dueDate?: Date;
-  referringMD?: string;
-  dispensedBy?: string;
-  dispensedDate?: Date;
-  notes?: string;
+  amountPaid: number;
+  amountDue: number;
+  
+  // Invoice Details
+  invoiceDate?: string;
+  dueDate?: string;
+  
+  // Line Items
+  lineItems?: Array<{
+    itemId: string;
+    description: string;
+    serviceDate: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+    category: string;
+  }>;
+  
+  // Appointment References
+  appointmentIds?: string[];
+  
+  // Insurance Information
   insurance?: {
     primary?: {
       companyName: string;
       policyNumber: string;
-      groupNumber?: string;
-      claimNumber?: string;
-      authorizationNumber?: string;
-      amountCovered: number;
-      amountPaid: number;
+      claimAmount: number;
+      coPayAmount: number;
+      status: string;
     };
-    secondary?: {
-      companyName: string;
-      policyNumber: string;
-      groupNumber?: string;
-      claimNumber?: string;
-      authorizationNumber?: string;
-      amountCovered: number;
-      amountPaid: number;
-    };
+  };
+  
+  // References and Notes
+  notes?: string;
+  
+  // Audit Fields
+  createdAt: string;
+  updatedAt: string;
+  
+  // Legacy fields for backward compatibility
+  paymentNumber?: string; // Alias for paymentId
+  amounts?: PaymentAmounts; // Legacy nested amounts structure
+  paymentType?: PaymentType; // Legacy payment type enum
+}
+
+// API Response Interfaces
+export interface PaymentListResponse {
+  success: boolean;
+  data: Payment[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
   };
 }
 
-interface UpdatePaymentRequest extends Partial<CreatePaymentRequest> {
-  amountPaid?: number;
+export interface PaymentResponse {
+  success: boolean;
+  data: Payment;
+  message?: string;
+}
+
+export interface PaymentStatsResponse {
+  success: boolean;
+  data: {
+    statusStats: Array<{
+      _id: PaymentStatus;
+      count: number;
+      totalAmount: number;
+      totalPaid: number;
+      totalOwed: number;
+    }>;
+    methodStats: Array<{
+      _id: {
+        method: PaymentMethod;
+        type: PaymentType;
+      };
+      count: number;
+      totalAmount: number;
+    }>;
+    totalRevenue: number;
+    outstandingPayments: number;
+  };
+}
+
+export interface RevenueDataResponse {
+  success: boolean;
+  data: {
+    totalRevenue: number;
+    startDate?: string;
+    endDate?: string;
+    clinicName: string;
+  };
+}
+
+// Payment Filter Options
+export interface PaymentFilters {
+  page?: number;
+  limit?: number;
+  status?: PaymentStatus;
+  paymentMethod?: PaymentMethod;
+  paymentType?: PaymentType;
+  clinicName?: string;
+  clientId?: number;
+  startDate?: string;
+  endDate?: string;
+  outstanding?: boolean;
+}
+
+// Create Payment Request
+export interface CreatePaymentRequest {
+  orderNumber?: string;
+  clientId: number;
+  clientName?: string;
+  clinicName: string;
+  paymentMethod: PaymentMethod;
+  paymentType: PaymentType;
+  amounts: PaymentAmounts;
+  orderId?: string;
+  notes?: string;
+  referringNo?: string;
+}
+
+// Update Payment Request
+export interface UpdatePaymentRequest {
+  orderNumber?: string;
+  clientName?: string;
+  paymentMethod?: PaymentMethod;
+  paymentType?: PaymentType;
+  amounts?: PaymentAmounts;
+  notes?: string;
+  referringNo?: string;
   status?: PaymentStatus;
 }
 
-interface PaginatedPaymentResponse {
-  payments: Payment[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
+// Add Payment Amount Request
+export interface AddPaymentAmountRequest {
+  paymentType: PaymentType;
+  amount: number;
 }
 
-interface InvoiceDataResponse {
-  invoice: {
-    invoiceNumber: string;
-    invoiceDate: string;
-    dueDate?: string;
-  };
-  payment: Payment;
-  client: {
-    name: string;
-    address: any;
-    birthday: any;
-    cellphone?: any;
-    homePhone?: any;
-    email?: string;
-    company?: string;
-    referringMD?: string;
-    gender: string;
-  };
-  clinic: any;
-  insurance: {
-    primary?: any;
-    secondary?: any;
-  };
-  lineItems: PaymentLineItem[];
-  financials: {
-    subtotal: number;
-    taxRate: number;
-    taxAmount: number;
-    total: number;
-    amountPaid: number;
-    amountDue: number;
-  };
-}
-
-interface PaymentStatsResponse {
-  totalPayments: number;
-  totalAmount: number;
-  totalPaid: number;
-  totalDue: number;
-  averagePayment: number;
-  statusDistribution: Record<PaymentStatus, number>;
-  methodDistribution: Record<PaymentMethod, number>;
-}
-
-interface PaymentSummaryResponse {
-  period: {
-    startDate: string;
-    endDate: string;
-  };
-  totals: {
-    payments: number;
-    revenue: number;
-    outstanding: number;
-    refunds: number;
-  };
-  breakdown: {
-    byStatus: Record<PaymentStatus, { count: number; amount: number }>;
-    byMethod: Record<PaymentMethod, { count: number; amount: number }>;
-    byDay: Array<{ date: string; amount: number; count: number }>;
-  };
+// Process Refund Request
+export interface ProcessRefundRequest {
+  amount: number;
+  refundType?: PaymentType;
 }
 
 export class PaymentApiService extends BaseApiService {
-  private static readonly ENDPOINT = '/payments';
-  private static readonly CACHE_TTL = 300000; // 5 minutes
+  private static baseUrl = '/payments';
 
   /**
-   * Get payments by clinic with frontend-compatible format
+   * Get all payments with filtering and pagination
    */
-  static async getPaymentsByClinic(
-    clinicName: string,
-    options: PaymentQueryOptions = {}
-  ): Promise<PaginatedPaymentResponse> {
-    const cacheKey = `payments_${clinicName}_${JSON.stringify(options)}`;
-    const cached = this.getCached<PaginatedPaymentResponse>(cacheKey);
-    if (cached) return cached;
-
+  static async getAllPayments(filters: PaymentFilters = {}): Promise<PaymentListResponse> {
     try {
-      const query = this.buildQuery({
-        page: options.page || 1,
-        limit: options.limit || 20,
-        status: options.status,
-        startDate: options.startDate?.toISOString(),
-        endDate: options.endDate?.toISOString(),
-        search: options.search
-      });
-
-      const queryString = query ? `?${query}` : '';
-      const endpoint = `${this.ENDPOINT}/clinic/${encodeURIComponent(clinicName)}/frontend-compatible${queryString}`;
+      const params = new URLSearchParams();
       
-      const response = await this.request<PaginatedPaymentResponse>(endpoint);
+      if (filters.page) params.append('page', filters.page.toString());
+      if (filters.limit) params.append('limit', filters.limit.toString());
+      if (filters.status) params.append('status', filters.status);
+      if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod);
+      if (filters.paymentType) params.append('paymentType', filters.paymentType);
+      if (filters.clinicName) params.append('clinicName', filters.clinicName);
+      if (filters.clientId) params.append('clientId', filters.clientId.toString());
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filters.outstanding !== undefined) params.append('outstanding', filters.outstanding.toString());
+
+      const url = params.toString() ? `${this.baseUrl}?${params}` : this.baseUrl;
+      const response = await this.request<PaymentListResponse>(url);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
         return response.data;
       }
       
-      throw new Error('Invalid response format');
+      throw new Error('Failed to fetch payments');
     } catch (error) {
-      throw this.handleError(error, 'getPaymentsByClinic');
+      throw this.handleError(error, 'getAllPayments');
     }
   }
 
   /**
-   * Get payment by ID with frontend-compatible format
+   * Get payment by ID
    */
-  static async getPaymentById(paymentId: string): Promise<Payment> {
-    const cacheKey = `payment_${paymentId}`;
-    const cached = this.getCached<Payment>(cacheKey);
-    if (cached) return cached;
-
+  static async getPaymentById(id: string): Promise<PaymentResponse> {
     try {
-      const endpoint = `${this.ENDPOINT}/${encodeURIComponent(paymentId)}/frontend-compatible`;
-      const response = await this.request<Payment>(endpoint);
+      const response = await this.request<PaymentResponse>(`${this.baseUrl}/${id}`);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
         return response.data;
       }
       
@@ -204,268 +287,85 @@ export class PaymentApiService extends BaseApiService {
   }
 
   /**
-   * Create new payment
+   * Get payments by clinic name
    */
-  static async createPayment(paymentData: CreatePaymentRequest): Promise<Payment> {
+  static async getPaymentsByClinic(
+    clinicName: string, 
+    filters: { page?: number; limit?: number; status?: PaymentStatus; outstanding?: boolean } = {}
+  ): Promise<PaymentListResponse> {
     try {
-      const response = await this.request<Payment>(
-        this.ENDPOINT,
-        'POST',
-        {
-          ...paymentData,
-          paymentDate: paymentData.paymentDate.toISOString(),
-          invoiceDate: paymentData.invoiceDate?.toISOString(),
-          dueDate: paymentData.dueDate?.toISOString(),
-          dispensedDate: paymentData.dispensedDate?.toISOString()
-        }
-      );
+      const params = new URLSearchParams();
       
-      if (response.success && response.data) {
-        // Clear related cache entries
-        this.clearCache('payments_');
-        return response.data;
+      if (filters.page) params.append('page', filters.page.toString());
+      if (filters.limit) params.append('limit', filters.limit.toString());
+      if (filters.status) params.append('status', filters.status);
+      if (filters.outstanding !== undefined) params.append('outstanding', filters.outstanding.toString());
+
+      const url = params.toString() 
+        ? `${this.baseUrl}/clinic/${encodeURIComponent(clinicName)}?${params}`
+        : `${this.baseUrl}/clinic/${encodeURIComponent(clinicName)}`;
+      
+      const response = await this.request<Payment[]>(url);
+      
+      if (response.success && response.data !== undefined && response.pagination) {
+        // Backend returns: { success: true, data: Payment[], pagination: {...} }
+        // BaseApiService maps: currentPage->page, totalPages->pages, totalItems->total
+        return {
+          success: true,
+          data: response.data,
+          pagination: {
+            currentPage: response.pagination.page,
+            totalPages: response.pagination.pages,
+            totalItems: response.pagination.total,
+            itemsPerPage: filters.limit || 10,
+            hasNextPage: response.pagination.hasNext,
+            hasPrevPage: response.pagination.hasPrev
+          }
+        };
       }
       
-      throw new Error('Failed to create payment');
+      throw new Error('Failed to fetch clinic payments');
     } catch (error) {
-      throw this.handleError(error, 'createPayment');
+      throw this.handleError(error, 'getPaymentsByClinic');
     }
   }
 
   /**
-   * Update existing payment
+   * Get payments by client ID
    */
-  static async updatePayment(paymentId: string, updates: UpdatePaymentRequest): Promise<Payment> {
+  static async getPaymentsByClient(clientId: number): Promise<PaymentListResponse> {
     try {
-      const processedUpdates = {
-        ...updates,
-        paymentDate: updates.paymentDate?.toISOString(),
-        invoiceDate: updates.invoiceDate?.toISOString(),
-        dueDate: updates.dueDate?.toISOString(),
-        dispensedDate: updates.dispensedDate?.toISOString()
-      };
-
-      const response = await this.request<Payment>(
-        `${this.ENDPOINT}/${encodeURIComponent(paymentId)}`,
-        'PUT',
-        processedUpdates
-      );
+      const response = await this.request<Payment[]>(`${this.baseUrl}/client/${clientId}`);
       
-      if (response.success && response.data) {
-        // Clear related cache entries
-        this.clearCache('payments_');
-        this.clearCache(`payment_${paymentId}`);
-        return response.data;
+      if (response.success && response.data !== undefined && response.pagination) {
+        return {
+          success: true,
+          data: response.data,
+          pagination: {
+            currentPage: response.pagination.page,
+            totalPages: response.pagination.pages,
+            totalItems: response.pagination.total,
+            itemsPerPage: 10,
+            hasNextPage: response.pagination.hasNext,
+            hasPrevPage: response.pagination.hasPrev
+          }
+        };
       }
       
-      throw new Error('Failed to update payment');
-    } catch (error) {
-      throw this.handleError(error, 'updatePayment');
-    }
-  }
-
-  /**
-   * Process payment refund
-   */
-  static async processRefund(paymentId: string, refundData: {
-    refundAmount: number;
-    reason: string;
-    refundMethod?: PaymentMethod;
-  }): Promise<Payment> {
-    try {
-      const response = await this.request<Payment>(
-        `${this.ENDPOINT}/${encodeURIComponent(paymentId)}/refund`,
-        'POST',
-        refundData
-      );
-      
-      if (response.success && response.data) {
-        // Clear related cache entries
-        this.clearCache('payments_');
-        this.clearCache(`payment_${paymentId}`);
-        return response.data;
-      }
-      
-      throw new Error('Failed to process refund');
-    } catch (error) {
-      throw this.handleError(error, 'processRefund');
-    }
-  }
-
-  /**
-   * Get payments by client
-   */
-  static async getPaymentsByClient(clientId: string): Promise<Payment[]> {
-    const cacheKey = `payments_client_${clientId}`;
-    const cached = this.getCached<Payment[]>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const endpoint = `${this.ENDPOINT}/client/${encodeURIComponent(clientId)}`;
-      const response = await this.request<Payment[]>(endpoint);
-      
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
-      }
-      
-      return [];
+      throw new Error('Failed to fetch client payments');
     } catch (error) {
       throw this.handleError(error, 'getPaymentsByClient');
     }
   }
 
   /**
-   * Generate invoice data for payment
+   * Get payment statistics for clinic
    */
-  static async generateInvoiceData(paymentId: string): Promise<InvoiceDataResponse> {
-    const cacheKey = `invoice_${paymentId}`;
-    const cached = this.getCached<InvoiceDataResponse>(cacheKey);
-    if (cached) return cached;
-
+  static async getPaymentStats(clinicName: string): Promise<PaymentStatsResponse> {
     try {
-      const endpoint = `${this.ENDPOINT}/${encodeURIComponent(paymentId)}/invoice`;
-      const response = await this.request<InvoiceDataResponse>(endpoint);
+      const response = await this.request<PaymentStatsResponse>(`${this.baseUrl}/stats/${encodeURIComponent(clinicName)}`);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
-      }
-      
-      throw new Error('Failed to generate invoice data');
-    } catch (error) {
-      throw this.handleError(error, 'generateInvoiceData');
-    }
-  }
-
-  /**
-   * Get payments ready for invoicing
-   */
-  static async getPaymentsReadyForInvoice(clinicName?: string): Promise<Payment[]> {
-    const cacheKey = `payments_ready_invoice_${clinicName || 'all'}`;
-    const cached = this.getCached<Payment[]>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const query = clinicName ? this.buildQuery({ clinicName }) : '';
-      const queryString = query ? `?${query}` : '';
-      const endpoint = `${this.ENDPOINT}/ready-for-invoice${queryString}`;
-      
-      const response = await this.request<Payment[]>(endpoint);
-      
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
-      }
-      
-      return [];
-    } catch (error) {
-      throw this.handleError(error, 'getPaymentsReadyForInvoice');
-    }
-  }
-
-  /**
-   * Get payment summary report by date range
-   */
-  static async getPaymentSummaryByDateRange(
-    startDate: Date,
-    endDate: Date,
-    clinicName?: string
-  ): Promise<PaymentSummaryResponse> {
-    const cacheKey = `payment_summary_${startDate.toISOString()}_${endDate.toISOString()}_${clinicName || 'all'}`;
-    const cached = this.getCached<PaymentSummaryResponse>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const query = this.buildQuery({
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        clinicName
-      });
-
-      const endpoint = `${this.ENDPOINT}/reports/summary?${query}`;
-      const response = await this.request<PaymentSummaryResponse>(endpoint);
-      
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
-      }
-      
-      throw new Error('Failed to fetch payment summary');
-    } catch (error) {
-      throw this.handleError(error, 'getPaymentSummaryByDateRange');
-    }
-  }
-
-  /**
-   * Get Co-Pay summary report (renamed from Sales Refund per CSV)
-   */
-  static async getCoPaySummary(clinicName?: string): Promise<any> {
-    const cacheKey = `copay_summary_${clinicName || 'all'}`;
-    const cached = this.getCached<any>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const query = clinicName ? this.buildQuery({ clinicName }) : '';
-      const queryString = query ? `?${query}` : '';
-      const endpoint = `${this.ENDPOINT}/reports/co-pay-summary${queryString}`;
-      
-      const response = await this.request<any>(endpoint);
-      
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
-      }
-      
-      throw new Error('Failed to fetch co-pay summary');
-    } catch (error) {
-      throw this.handleError(error, 'getCoPaySummary');
-    }
-  }
-
-  /**
-   * Get Marketing Budget summary (renamed from Shoe Allowance per CSV)
-   */
-  static async getMarketingBudgetSummary(clinicName?: string): Promise<any> {
-    const cacheKey = `marketing_budget_${clinicName || 'all'}`;
-    const cached = this.getCached<any>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const query = clinicName ? this.buildQuery({ clinicName }) : '';
-      const queryString = query ? `?${query}` : '';
-      const endpoint = `${this.ENDPOINT}/reports/marketing-budget-summary${queryString}`;
-      
-      const response = await this.request<any>(endpoint);
-      
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
-      }
-      
-      throw new Error('Failed to fetch marketing budget summary');
-    } catch (error) {
-      throw this.handleError(error, 'getMarketingBudgetSummary');
-    }
-  }
-
-  /**
-   * Get payment statistics
-   */
-  static async getPaymentStats(clinicName?: string): Promise<PaymentStatsResponse> {
-    const cacheKey = `payment_stats_${clinicName || 'all'}`;
-    const cached = this.getCached<PaymentStatsResponse>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const query = clinicName ? this.buildQuery({ clinicName }) : '';
-      const queryString = query ? `?${query}` : '';
-      const endpoint = `${this.ENDPOINT}/stats${queryString}`;
-      
-      const response = await this.request<PaymentStatsResponse>(endpoint);
-      
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
         return response.data;
       }
       
@@ -476,88 +376,303 @@ export class PaymentApiService extends BaseApiService {
   }
 
   /**
-   * Search payments by various criteria
+   * Get outstanding payments for clinic
    */
-  static async searchPayments(searchTerm: string, options: {
-    clinicName?: string;
-    status?: PaymentStatus;
-    method?: PaymentMethod;
-    limit?: number;
-  } = {}): Promise<Payment[]> {
-    if (!searchTerm.trim()) {
-      return [];
-    }
+  static async getOutstandingPayments(
+    clinicName: string,
+    filters: { page?: number; limit?: number } = {}
+  ): Promise<PaymentListResponse> {
+    const params = new URLSearchParams();
+    
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.limit) params.append('limit', filters.limit.toString());
 
-    const cacheKey = `payment_search_${searchTerm}_${JSON.stringify(options)}`;
-    const cached = this.getCached<Payment[]>(cacheKey);
-    if (cached) return cached;
-
+    const url = params.toString() 
+      ? `${this.baseUrl}/outstanding/${encodeURIComponent(clinicName)}?${params}`
+      : `${this.baseUrl}/outstanding/${encodeURIComponent(clinicName)}`;
+    
     try {
-      const query = this.buildQuery({
-        q: searchTerm.trim(),
-        clinicName: options.clinicName,
-        status: options.status,
-        method: options.method,
-        limit: options.limit || 20
-      });
+      const response = await this.request<Payment[]>(url);
+      
+      if (response.success && response.data !== undefined && response.pagination) {
+        return {
+          success: true,
+          data: response.data,
+          pagination: {
+            currentPage: response.pagination.page,
+            totalPages: response.pagination.pages,
+            totalItems: response.pagination.total,
+            itemsPerPage: filters.limit || 10,
+            hasNextPage: response.pagination.hasNext,
+            hasPrevPage: response.pagination.hasPrev
+          }
+        };
+      }
+      
+      throw new Error('Failed to fetch outstanding payments');
+    } catch (error) {
+      throw this.handleError(error, 'getOutstandingPayments');
+    }
+  }
 
-      const endpoint = `${this.ENDPOINT}/search?${query}`;
-      const response = await this.request<Payment[]>(endpoint);
+  /**
+   * Get revenue data for clinic with date range
+   */
+  static async getRevenueData(
+    clinicName: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<RevenueDataResponse> {
+    const params = new URLSearchParams();
+    
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const url = params.toString() 
+      ? `${this.baseUrl}/revenue/${encodeURIComponent(clinicName)}?${params}`
+      : `${this.baseUrl}/revenue/${encodeURIComponent(clinicName)}`;
+    
+    try {
+      const response = await this.request<RevenueDataResponse>(url);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, 60000); // 1 minute cache for searches
         return response.data;
       }
       
-      return [];
+      throw new Error('Failed to fetch revenue data');
     } catch (error) {
-      throw this.handleError(error, 'searchPayments');
+      throw this.handleError(error, 'getRevenueData');
     }
   }
 
   /**
-   * Bulk operations on payments
+   * Create new payment
    */
-  static async bulkOperations(operation: string, paymentIds: string[], data?: any): Promise<any> {
+  static async createPayment(paymentData: CreatePaymentRequest): Promise<PaymentResponse> {
     try {
-      const response = await this.request(
-        `${this.ENDPOINT}/bulk`,
-        'POST',
-        {
-          operation,
-          paymentIds,
-          data
-        }
-      );
+      const response = await this.request<PaymentResponse>(this.baseUrl, 'POST', paymentData);
       
-      if (response.success) {
-        // Clear related cache entries
-        this.clearCache('payments_');
+      if (response.success && response.data) {
         return response.data;
       }
       
-      throw new Error('Failed to perform bulk operation');
+      throw new Error('Failed to create payment');
     } catch (error) {
-      throw this.handleError(error, 'bulkOperations');
+      throw this.handleError(error, 'createPayment');
     }
   }
 
   /**
-   * Utility: Clear all payment-related cache
+   * Update payment
+   */
+  static async updatePayment(id: string, paymentData: UpdatePaymentRequest): Promise<PaymentResponse> {
+    const response = await this.request<PaymentResponse>(`${this.baseUrl}/${id}`, 'PUT', paymentData);
+    if (response.success && response.data) {
+      return response.data;
+    }
+    throw new Error('Failed to update payment');
+  }
+
+  /**
+   * Delete payment (soft delete)
+   */
+  static async deletePayment(id: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.request<{ success: boolean; message: string }>(`${this.baseUrl}/${id}`, 'DELETE');
+    if (response.success && response.data) {
+      return response.data;
+    }
+    throw new Error('Failed to delete payment');
+  }
+
+  /**
+   * Add payment amount to existing payment
+   */
+  static async addPaymentAmount(id: string, amountData: AddPaymentAmountRequest): Promise<PaymentResponse> {
+    const response = await this.request<PaymentResponse>(`${this.baseUrl}/${id}/add-amount`, 'POST', amountData);
+    if (response.success && response.data) {
+      return response.data;
+    }
+    throw new Error('Failed to add payment amount');
+  }
+
+  /**
+   * Process payment refund
+   */
+  static async processRefund(id: string, refundData: ProcessRefundRequest): Promise<PaymentResponse> {
+    const response = await this.request<PaymentResponse>(`${this.baseUrl}/${id}/refund`, 'POST', refundData);
+    if (response.success && response.data) {
+      return response.data;
+    }
+    throw new Error('Failed to process refund');
+  }
+
+  // Utility Methods
+
+  /**
+   * Format currency amount
+   */
+  static formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-CA', {
+      style: 'currency',
+      currency: 'CAD',
+      minimumFractionDigits: 2
+    }).format(amount);
+  }
+
+  /**
+   * Format date for display
+   */
+  static formatDate(dateString: string): string {
+    return new Date(dateString).toLocaleDateString('en-CA', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
+  /**
+   * Format date and time for display
+   */
+  static formatDateTime(dateString: string): string {
+    return new Date(dateString).toLocaleString('en-CA', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  /**
+   * Get status color for UI
+   */
+  static getStatusColor(status: PaymentStatus): string {
+    switch (status) {
+      case PaymentStatus.COMPLETED:
+        return 'text-green-600 bg-green-100';
+      case PaymentStatus.PENDING:
+        return 'text-yellow-600 bg-yellow-100';
+      case PaymentStatus.PARTIAL:
+        return 'text-blue-600 bg-blue-100';
+      case PaymentStatus.FAILED:
+        return 'text-red-600 bg-red-100';
+      case PaymentStatus.REFUNDED:
+        return 'text-purple-600 bg-purple-100';
+      case PaymentStatus.WRITEOFF:
+        return 'text-gray-600 bg-gray-100';
+      default:
+        return 'text-gray-600 bg-gray-100';
+    }
+  }
+
+  /**
+   * Get payment type description
+   */
+  static getPaymentTypeDescription(paymentType: PaymentType): string {
+    switch (paymentType) {
+      case PaymentType.POP:
+        return 'Patient Out of Pocket';
+      case PaymentType.POPFP:
+        return 'Patient Out of Pocket - Final Payment';
+      case PaymentType.DPA:
+        return 'Direct Payment Authorization';
+      case PaymentType.DPAFP:
+        return 'DPA Final Payment';
+      case PaymentType.COB_1:
+        return 'Coordination of Benefits - Primary';
+      case PaymentType.COB_2:
+        return 'Coordination of Benefits - Secondary';
+      case PaymentType.COB_3:
+        return 'Coordination of Benefits - Tertiary';
+      case PaymentType.INSURANCE_1ST:
+        return '1st Insurance Payment';
+      case PaymentType.INSURANCE_2ND:
+        return '2nd Insurance Payment';
+      case PaymentType.INSURANCE_3RD:
+        return '3rd Insurance Payment';
+      case PaymentType.SALES_REFUND:
+        return 'Sales Refund';
+      case PaymentType.WRITEOFF:
+        return 'Write-off Amount';
+      case PaymentType.NO_INSUR_FP:
+        return 'No Insurance Final Payment';
+      default:
+        return paymentType;
+    }
+  }
+
+  /**
+   * Calculate payment completion percentage
+   */
+  static getPaymentCompletionPercentage(amounts: PaymentAmounts): number {
+    if (amounts.totalPaymentAmount === 0) return 0;
+    return Math.round((amounts.totalPaid / amounts.totalPaymentAmount) * 100);
+  }
+
+  /**
+   * Check if payment is overdue (for pending/partial payments)
+   */
+  static isPaymentOverdue(payment: Payment, dueDays: number = 30): boolean {
+    if (payment.status === PaymentStatus.COMPLETED || payment.status === PaymentStatus.REFUNDED) {
+      return false;
+    }
+    
+    const paymentDate = new Date(payment.paymentDate);
+    const dueDate = new Date(paymentDate);
+    dueDate.setDate(dueDate.getDate() + dueDays);
+    
+    return new Date() > dueDate;
+  }
+
+  /**
+   * Export payments to CSV
+   */
+  static exportToCSV(payments: Payment[], filename: string = 'payments.csv'): void {
+    const headers = [
+      'Payment Number', 'Client Name', 'Clinic Name', 'Payment Date', 
+      'Payment Method', 'Payment Type', 'Status', 'Total Amount', 
+      'Total Paid', 'Total Owed', 'Notes'
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...payments.map(payment => [
+        payment.paymentNumber,
+        payment.clientName || '',
+        payment.clinicName,
+        this.formatDate(payment.paymentDate),
+        payment.paymentMethod,
+        payment.paymentType,
+        payment.status,
+        payment.amounts.totalPaymentAmount,
+        payment.amounts.totalPaid,
+        payment.amounts.totalOwed,
+        payment.notes || ''
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  /**
+   * Clear payment cache
    */
   static clearPaymentCache(): void {
-    this.clearCache('payments_');
-    this.clearCache('payment_');
-    this.clearCache('invoice_');
-    this.clearCache('copay_summary_');
-    this.clearCache('marketing_budget_');
-    this.clearCache('payment_stats_');
-    this.clearCache('payment_search_');
+    this.clearCache('/api/v1/payments');
   }
 }
 
-/**
- * Legacy export for backwards compatibility
- * @deprecated Use PaymentApiService instead
- */
-export const PaymentService = PaymentApiService;
+// Export utility functions for convenience
+export const formatCurrency = PaymentApiService.formatCurrency;
+export const formatDate = PaymentApiService.formatDate;
+export const formatDateTime = PaymentApiService.formatDateTime;
+export const getStatusColor = PaymentApiService.getStatusColor;
+export const getPaymentTypeDescription = PaymentApiService.getPaymentTypeDescription;

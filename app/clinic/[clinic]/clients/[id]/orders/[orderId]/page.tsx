@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   ArrowLeft, 
@@ -15,7 +15,13 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  DollarSign
+  DollarSign,
+  Calendar,
+  MapPin,
+  Building,
+  Briefcase,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
 import { Button } from '@/components/ui/button';
@@ -24,167 +30,63 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { generateLink } from '@/lib/route-utils';
 
-interface OrderItem {
-  id: string;
-  name: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-}
-
-interface OrderData {
-  id: string;
-  clientId: string;
-  clientName: string;
-  clientEmail: string;
-  clientPhone: string;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled';
-  orderDate: string;
-  dueDate: string;
-  completedDate?: string;
-  items: OrderItem[];
-  subtotal: number;
-  tax: number;
-  total: number;
-  notes: string;
-  assignedTo: string;
-  priority: 'low' | 'medium' | 'high';
-}
-
-const themeColors = {
-  primary: '#6366f1',
-  secondary: '#8b5cf6',
-  accent: '#06b6d4',
-  success: '#10b981',
-  warning: '#f59e0b',
-  error: '#ef4444',
-};
+// Import real API hooks and utilities
+import { 
+  useOrder, 
+  useClient, 
+  useOrdersByClient,
+  OrderUtils,
+  OrderStatus,
+  PaymentStatus,
+  type Order,
+  type OrderLineItem
+} from "@/lib/hooks";
 
 export default function ViewClientOrderPage() {
   const router = useRouter();
   const params = useParams();
   const clinic = params.clinic as string;
-  const clientId = params.id as string;
+  const clientId = parseInt(params.id as string);
   const orderId = params.orderId as string;
   
-  const [orderData, setOrderData] = useState<OrderData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Get clinic data for context
+  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+  
+  // Fetch order using real API
+  const { 
+    order, 
+    loading: orderLoading, 
+    error: orderError,
+    refetch: refetchOrder
+  } = useOrder({
+    id: orderId,
+    autoFetch: !!orderId
+  });
 
-  // Generate realistic data based on clinic and client
-  useEffect(() => {
-    const fetchOrder = async () => {
-      setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        const clinicData = slugToClinic(clinic);
-        const mockOrder: OrderData = generateOrderData(clinicData, orderId, clientId);
-        setOrderData(mockOrder);
-        setIsLoading(false);
-      }, 1000);
-    };
+  // Fetch client data for comprehensive information
+  const { 
+    client, 
+    loading: clientLoading,
+    error: clientError
+  } = useClient({
+    id: clientId,
+    autoFetch: !!clientId
+  });
 
-    fetchOrder();
-  }, [orderId, clientId, clinic]);
-
-  // Generate order data based on clinic info
-  const generateOrderData = (clinicData: { displayName?: string; status?: string } | undefined, orderId: string, clientId: string): OrderData => {
-    const isActive = clinicData?.status === 'active';
-    const clinicName = clinicData?.displayName || 'Unknown Clinic';
-    
-    // Client names based on common IDs from real DB
-    const clientNames: { [key: string]: { name: string; email: string; phone: string } } = {
-      "16883465": { name: "ROBINSON, DAVID", email: "d.robinson@email.com", phone: "416-555-1234" },
-      "21770481": { name: "HEALTH BIOFORM", email: "info@healthbioform.com", phone: "905-670-0204" },
-      "30000": { name: "ANDERSON, SARAH", email: "sarah.anderson@email.com", phone: "416-555-5678" },
-      "30001": { name: "THOMPSON, MICHAEL", email: "michael.thompson@email.com", phone: "416-555-9012" },
-      // Add more client IDs that match the actual IDs in the system
-      "91000": { name: "JOHNSON, ROBERT", email: "r.johnson@email.com", phone: "416-555-1111" },
-      "91001": { name: "WILLIAMS, JENNIFER", email: "j.williams@email.com", phone: "416-555-2222" },
-      "91002": { name: "BROWN, JAMES", email: "j.brown@email.com", phone: "416-555-3333" },
-      "91003": { name: "DAVIS, PATRICIA", email: "p.davis@email.com", phone: "416-555-4444" },
-      "91004": { name: "MILLER, JOHN", email: "j.miller@email.com", phone: "416-555-5555" },
-      "91005": { name: "WILSON, LINDA", email: "l.wilson@email.com", phone: "416-555-6666" },
-      "91006": { name: "MOORE, BARBARA", email: "b.moore@email.com", phone: "416-555-7777" },
-      "91007": { name: "TAYLOR, RICHARD", email: "r.taylor@email.com", phone: "416-555-8888" },
-      "91008": { name: "ANDERSON, SUSAN", email: "s.anderson@email.com", phone: "416-555-9999" },
-      "91009": { name: "THOMAS, CHARLES", email: "c.thomas@email.com", phone: "416-555-0000" }
-    };
-
-    const client = clientNames[clientId] || { 
-      name: "UNKNOWN CLIENT", 
-      email: "client@email.com", 
-      phone: "416-555-0000" 
-    };
-
-    // Different services based on clinic type
-    const getClinicServices = () => {
-      if (clinicName.includes('Physio') || clinicName.includes('Physical')) {
-        return [
-          { name: "Physical Therapy Session", description: "60-minute individual therapy session", price: 120.00 },
-          { name: "Exercise Equipment Package", description: "Resistance bands and therapy balls", price: 85.00 },
-          { name: "Home Exercise Program", description: "Custom exercise plan with video instructions", price: 50.00 },
-          { name: "Manual Therapy", description: "Hands-on treatment techniques", price: 95.00 }
-        ];
-      } else if (clinicName.includes('Orthopedic') || clinicName.includes('Orthotic')) {
-        return [
-          { name: "Custom Orthotic Assessment", description: "Comprehensive foot and gait analysis", price: 180.00 },
-          { name: "Orthotic Device", description: "Custom-made orthotic insoles", price: 450.00 },
-          { name: "Follow-up Adjustment", description: "Orthotic fitting and adjustment", price: 75.00 }
-        ];
-      } else {
-        return [
-          { name: "Consultation", description: "Initial health assessment", price: 150.00 },
-          { name: "Treatment Session", description: "Therapeutic intervention", price: 100.00 },
-          { name: "Equipment Rental", description: "Medical equipment rental", price: 60.00 }
-        ];
-      }
-    };
-
-    const availableServices = getClinicServices();
-    const selectedServices = availableServices.slice(0, Math.floor(Math.random() * 3) + 1);
-    
-    const items: OrderItem[] = selectedServices.map((service, index) => {
-      const quantity = Math.floor(Math.random() * 3) + 1;
-      const totalPrice = service.price * quantity;
-      return {
-        id: (index + 1).toString(),
-        name: service.name,
-        description: service.description,
-        quantity,
-        unitPrice: service.price,
-        totalPrice
-      };
-    });
-
-    const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-    const tax = subtotal * 0.13;
-    const total = subtotal + tax;
-
-    return {
-      id: orderId,
-      clientId: clientId,
-      clientName: client.name,
-      clientEmail: client.email,
-      clientPhone: client.phone,
-      status: isActive ? (Math.random() > 0.5 ? "processing" : "completed") : "completed",
-      orderDate: isActive ? "2024-01-15" : "2023-08-15",
-      dueDate: isActive ? "2024-02-01" : "2023-09-01",
-      items,
-      subtotal,
-      tax,
-      total,
-      notes: `${clinicName} - Client prefers ${Math.random() > 0.5 ? 'morning' : 'afternoon'} appointments. Focus on ${clinicName.includes('Physio') ? 'rehabilitation' : 'treatment'}.`,
-      assignedTo: `Dr. ${Math.random() > 0.5 ? 'Sarah Johnson' : 'Michael Chen'}`,
-      priority: Math.random() > 0.5 ? "medium" : "high"
-    };
-  };
+  // Fetch client's order history for context
+  const { 
+    orders: clientOrderHistory, 
+    loading: historyLoading
+  } = useOrdersByClient({
+    clientId: clientId,
+    autoFetch: !!clientId
+  });
 
   const handleBack = () => {
     router.push(generateLink('clinic', `clients/${clientId}`, clinic));
   };
 
-  const handleEditOrder = () => {
+  const handleEdit = () => {
     router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}/edit`, clinic));
   };
 
@@ -193,299 +95,514 @@ export default function ViewClientOrderPage() {
   };
 
   const handleDownload = () => {
-    // In a real app, this would generate and download a PDF
-    alert('Order summary downloaded');
+    // Future implementation for PDF generation
+    console.log('Download functionality will be implemented');
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'processing':
-        return 'bg-blue-100 text-blue-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return 'bg-red-100 text-red-800';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'low':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="h-4 w-4" />;
-      case 'processing':
-        return <Clock className="h-4 w-4" />;
-      case 'pending':
-        return <AlertCircle className="h-4 w-4" />;
-      case 'cancelled':
-        return <AlertCircle className="h-4 w-4" />;
-      default:
-        return <Clock className="h-4 w-4" />;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
-
-  if (isLoading) {
+  // Loading state
+  if (orderLoading || clientLoading) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
-        <div className="flex items-center justify-center min-h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="flex items-center justify-center h-64">
+          <div className="flex items-center space-x-2">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+            <span className="text-lg text-gray-600">Loading order details...</span>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!orderData) {
+  // Error states
+  if (orderError || clientError) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive">Order Not Found</h1>
-          <p className="text-muted-foreground mt-2">
-            The order you&apos;re looking for doesn&apos;t exist or has been removed.
-          </p>
-          <Button onClick={handleBack} className="mt-4">
-            Back to Client
-          </Button>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="mx-auto h-12 w-12 text-red-500" />
+            <h3 className="mt-2 text-lg font-medium text-gray-900">Error Loading Order</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {orderError || clientError}
+            </p>
+            <div className="mt-4 space-x-2">
+              <Button variant="outline" onClick={handleBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Client
+              </Button>
+              <Button onClick={refetchOrder}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
+
+  // Order not found
+  if (!order) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Package className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-lg font-medium text-gray-900">Order Not Found</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              The requested order could not be found.
+            </p>
+            <Button variant="outline" onClick={handleBack} className="mt-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Client
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate order summary
+  const orderSummary = {
+    totalItems: order.items.length,
+    totalQuantity: order.items.reduce((sum, item) => sum + item.quantity, 0),
+    subtotal: order.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0),
+    totalDuration: order.totalDuration || order.items.reduce((sum, item) => sum + item.duration, 0)
+  };
+
+  // Get status colors and icons
+  const getStatusIcon = (status: OrderStatus) => {
+    switch (status) {
+      case OrderStatus.COMPLETED:
+        return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case OrderStatus.IN_PROGRESS:
+        return <Clock className="h-5 w-5 text-blue-600" />;
+      case OrderStatus.SCHEDULED:
+        return <Calendar className="h-5 w-5 text-yellow-600" />;
+      case OrderStatus.CANCELLED:
+        return <AlertTriangle className="h-5 w-5 text-red-600" />;
+      case OrderStatus.NO_SHOW:
+        return <AlertCircle className="h-5 w-5 text-gray-600" />;
+      default:
+        return <Clock className="h-5 w-5 text-gray-600" />;
+    }
+  };
+
+  const getPaymentStatusIcon = (status: PaymentStatus) => {
+    switch (status) {
+      case PaymentStatus.PAID:
+        return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case PaymentStatus.PARTIAL:
+        return <Clock className="h-5 w-5 text-yellow-600" />;
+      case PaymentStatus.PENDING:
+        return <Clock className="h-5 w-5 text-orange-600" />;
+      case PaymentStatus.OVERDUE:
+        return <AlertTriangle className="h-5 w-5 text-red-600" />;
+      case PaymentStatus.REFUNDED:
+        return <RefreshCw className="h-5 w-5 text-purple-600" />;
+      default:
+        return <Clock className="h-5 w-5 text-gray-600" />;
+    }
+  };
 
   return (
-    <div className="container mx-auto py-8 px-4 sm:px-6 max-w-4xl">
-      {/* Back Navigation */}
-      <div className="mb-8">
-        <Button 
-          variant="outline" 
-          onClick={handleBack}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft size={16} />
-          Back to {orderData.clientName}
-        </Button>
-      </div>
-
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: themeColors.primary }}>
-            Order #{orderData.id}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {slugToClinic(clinic)?.displayName || clinic.replace('-', ' ')} • {orderData.clientName}
-          </p>
+    <div className="container mx-auto py-8 px-4 sm:px-6 max-w-7xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBack}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft size={16} />
+            Back to Client
+          </Button>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Order Details</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {clinicData?.name || clinic} • {client?.firstName} {client?.lastName}
+            </p>
+          </div>
         </div>
         
-        <div className="flex flex-wrap gap-2">
-          <Button 
-            variant="outline" 
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleEdit}
+            className="flex items-center gap-2 flex-1 sm:flex-none"
+          >
+            <Edit size={16} />
+            Edit
+          </Button>
+          <Button
+            variant="outline"
             size="sm"
             onClick={handlePrint}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 sm:flex-none no-print"
           >
             <Printer size={16} />
             Print
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={handleDownload}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 sm:flex-none"
           >
             <Download size={16} />
             Download
           </Button>
-          <Button 
-            onClick={handleEditOrder}
-            size="sm"
-            className="flex items-center gap-2"
-            style={{ backgroundColor: themeColors.primary }}
-          >
-            <Edit size={16} />
-            Edit Order
-          </Button>
         </div>
       </div>
 
-      {/* Order Status & Info */}
-      <div className="grid gap-6 md:grid-cols-2 mb-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Order Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Status</span>
-              <Badge variant="secondary" className={getStatusColor(orderData.status)}>
-                {getStatusIcon(orderData.status)}
-                <span className="ml-2 capitalize">{orderData.status}</span>
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Priority</span>
-              <Badge variant="secondary" className={getPriorityColor(orderData.priority)}>
-                <span className="capitalize">{orderData.priority}</span>
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Order Date</span>
-              <span className="font-medium">{formatDate(orderData.orderDate)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Due Date</span>
-              <span className="font-medium">{formatDate(orderData.dueDate)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Assigned To</span>
-              <span className="font-medium">{orderData.assignedTo}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Client Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Name</span>
-              <span className="font-medium">{orderData.clientName}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Email</span>
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-gray-400" />
-                <span className="font-medium">{orderData.clientEmail}</span>
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Order Overview */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Package size={20} />
+                  Order Overview
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(order.status)}
+                  <Badge className={OrderUtils.getStatusColor(order.status)}>
+                    {OrderUtils.getStatusLabel(order.status)}
+                  </Badge>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Phone</span>
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-gray-400" />
-                <span className="font-medium">{orderData.clientPhone}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Client ID</span>
-              <span className="font-medium">#{orderData.clientId}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Order Items */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Order Items
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {orderData.items.map((item, index) => (
-              <div key={item.id}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <h4 className="font-medium">{item.name}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Order Number:</span>
+                    <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                      {order.orderNumber}
+                    </span>
                   </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
-                    <div className="text-sm text-gray-600">
-                      Qty: <span className="font-medium">{item.quantity}</span>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Order Date:</span>
+                    <span className="text-sm">{OrderUtils.formatDate(order.orderDate)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Service Date:</span>
+                    <span className="text-sm">{OrderUtils.formatDate(order.serviceDate)}</span>
+                  </div>
+                  {order.endDate && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm font-medium">End Date:</span>
+                      <span className="text-sm">{OrderUtils.formatDate(order.endDate)}</span>
                     </div>
-                    <div className="text-sm text-gray-600">
-                      Unit: <span className="font-medium">{formatCurrency(item.unitPrice)}</span>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Payment Status:</span>
+                    <div className="flex items-center gap-2">
+                      {getPaymentStatusIcon(order.paymentStatus)}
+                      <Badge className={OrderUtils.getPaymentStatusColor(order.paymentStatus)}>
+                        {OrderUtils.getPaymentStatusLabel(order.paymentStatus)}
+                      </Badge>
                     </div>
-                    <div className="font-medium">
-                      {formatCurrency(item.totalPrice)}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Total Items:</span>
+                    <span className="text-sm">{orderSummary.totalItems}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Duration:</span>
+                    <span className="text-sm">{orderSummary.totalDuration} minutes</span>
+                  </div>
+                  {order.location && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm font-medium">Location:</span>
+                      <span className="text-sm">{order.location}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {order.description && (
+                <div className="mt-4">
+                  <span className="text-sm font-medium">Description:</span>
+                  <p className="text-sm text-gray-600 mt-1">{order.description}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Order Items */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package size={20} />
+                Order Items
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {order.items.map((item: OrderLineItem, index: number) => (
+                  <div key={index} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">{item.productName}</h4>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-3 text-sm text-gray-600">
+                          <div>
+                            <span className="font-medium">Quantity:</span> {item.quantity}
+                          </div>
+                          <div>
+                            <span className="font-medium">Duration:</span> {item.duration} min
+                          </div>
+                          <div>
+                            <span className="font-medium">Unit Price:</span> {OrderUtils.formatCurrency(item.unitPrice)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-gray-900">
+                          {OrderUtils.formatCurrency(item.subtotal)}
+                        </p>
+                        <p className="text-sm text-gray-500">Subtotal</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <Separator />
+                
+                {/* Order Summary */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>{OrderUtils.formatCurrency(orderSummary.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-lg font-bold border-t pt-2">
+                      <span>Total Amount:</span>
+                      <span>{OrderUtils.formatCurrency(order.totalAmount)}</span>
                     </div>
                   </div>
                 </div>
-                {index < orderData.items.length - 1 && <Separator className="mt-4" />}
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* Order Summary */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Order Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Subtotal</span>
-              <span className="font-medium">{formatCurrency(orderData.subtotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Tax</span>
-              <span className="font-medium">{formatCurrency(orderData.tax)}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total</span>
-              <span>{formatCurrency(orderData.total)}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          {/* Billing Information */}
+          {(order.billDate || order.invoiceDate || order.readyToBill) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign size={20} />
+                  Billing Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {order.readyToBill && (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-600">Ready to Bill</span>
+                    </div>
+                  )}
+                  {order.billDate && (
+                    <div>
+                      <span className="text-sm font-medium">Bill Date:</span>
+                      <p className="text-sm text-gray-600">{OrderUtils.formatDate(order.billDate)}</p>
+                    </div>
+                  )}
+                  {order.invoiceDate && (
+                    <div>
+                      <span className="text-sm font-medium">Invoice Date:</span>
+                      <p className="text-sm text-gray-600">{OrderUtils.formatDate(order.invoiceDate)}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-      {/* Notes */}
-      {orderData.notes && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Order Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-700 whitespace-pre-wrap">{orderData.notes}</p>
-          </CardContent>
-        </Card>
-      )}
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Client Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User size={20} />
+                Client Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {client ? (
+                <div className="space-y-3">
+                  <div>
+                    <p className="font-medium text-lg">
+                      {client.firstName} {client.lastName}
+                    </p>
+                    <p className="text-sm text-gray-600">ID: {client.clientId}</p>
+                  </div>
+                  
+                  {client.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm">{client.email}</span>
+                    </div>
+                  )}
+                  
+                  {client.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm">{client.phone}</span>
+                    </div>
+                  )}
+                  
+                  {client.address && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm">{client.address}</span>
+                    </div>
+                  )}
+
+                  <div className="pt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => router.push(generateLink('clinic', `clients/${clientId}`, clinic))}
+                    >
+                      View Client Profile
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">Client information not available</div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Clinic Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building size={20} />
+                Clinic Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div>
+                  <p className="font-medium">{order.clinicName}</p>
+                </div>
+                {clinicData && (
+                  <>
+                    <div>
+                      <p className="text-sm text-gray-600">{clinicData.address}</p>
+                      <p className="text-sm text-gray-600">
+                        {clinicData.city}, {clinicData.province} {clinicData.postalCode}
+                      </p>
+                    </div>
+                    {clinicData.description && (
+                      <div>
+                        <p className="text-sm text-gray-600">{clinicData.description}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Order History Summary */}
+          {!historyLoading && clientOrderHistory && clientOrderHistory.length > 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase size={20} />
+                  Order History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="text-sm text-gray-600">
+                    <p>Total Orders: <span className="font-medium">{clientOrderHistory.length}</span></p>
+                    <p>Completed: <span className="font-medium text-green-600">
+                      {clientOrderHistory.filter(o => o.status === OrderStatus.COMPLETED).length}
+                    </span></p>
+                    <p>In Progress: <span className="font-medium text-blue-600">
+                      {clientOrderHistory.filter(o => o.status === OrderStatus.IN_PROGRESS).length}
+                    </span></p>
+                  </div>
+                  
+                  <div className="pt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => router.push(generateLink('clinic', `clients/${clientId}`, clinic))}
+                    >
+                      View All Orders
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={handleEdit}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Order
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start no-print"
+                onClick={handlePrint}
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Print Order
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={handleDownload}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => router.push(generateLink('clinic', 'orders', clinic))}
+              >
+                <Package className="h-4 w-4 mr-2" />
+                All Orders
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 } 

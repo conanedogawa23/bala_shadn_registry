@@ -1,39 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { ArrowLeft, Edit2, Printer, FileText, DollarSign, User, Calendar } from "lucide-react";
+import { ArrowLeft, Edit2, Printer, FileText, DollarSign, User, Calendar, AlertCircle, Package } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { MockDataService, type Client } from "@/lib/data/mockDataService";
 import { generateLink } from "@/lib/route-utils";
+import { slugToClinic } from "@/lib/data/clinics";
 
-// Define Order type locally
-interface OrderProduct {
-  name: string;
-  description: string;
-  price: number;
-  quantity: number;
-}
-
-interface Order {
-  id: string;
-  orderNumber: string;
-  orderDate: string;
-  clientName: string;
-  clientId: string;
-  productCount: number;
-  totalAmount: number;
-  totalPaid: number;
-  totalOwed: number;
-  status: "paid" | "partially paid" | "unpaid";
-  products: OrderProduct[];
-  clinic: string;
-}
+// Import real API hooks and utilities
+import { 
+  useOrder, 
+  useClient, 
+  OrderUtils,
+  OrderStatus,
+  PaymentStatus
+} from "@/lib/hooks";
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -41,47 +27,31 @@ export default function OrderDetailPage() {
   const clinic = params.clinic as string;
   const orderId = params.id as string;
   
-  const [isLoading, setIsLoading] = useState(true);
-  const [order, setOrder] = useState<Order | null>(null);
-  const [client, setClient] = useState<Client | null>(null);
+  // Get clinic data for context
+  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+  
+  // Fetch order using real API
+  const { 
+    order, 
+    loading: orderLoading, 
+    error: orderError 
+  } = useOrder({
+    id: orderId,
+    autoFetch: !!orderId
+  });
 
-  useEffect(() => {
-    const fetchOrderData = async () => {
-      setIsLoading(true);
-      try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Get clinic data from slug
-        const clinicData = MockDataService.getClinicsBySlug(clinic);
-        if (clinicData) {
-          // Get all orders for this clinic
-          const orders = MockDataService.getOrdersByClinic(clinicData.name);
-          
-          // Find the specific order
-          const foundOrder = orders.find(o => o.id === orderId);
-          if (foundOrder) {
-            setOrder(foundOrder);
-            
-            // Try to find the client if we have a valid clientId
-            if (foundOrder.clientId) {
-              const clients = MockDataService.getClientsByClinic(clinicData.name);
-              const foundClient = clients.find(c => c.id === foundOrder.clientId);
-              if (foundClient) {
-                setClient(foundClient);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching order:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchOrderData();
-  }, [clinic, orderId]);
+  // Fetch client data when we have order client ID
+  const { 
+    client, 
+    loading: clientLoading,
+    error: clientError
+  } = useClient({
+    id: order?.clientId || 0,
+    autoFetch: !!order?.clientId
+  });
+
+  const isLoading = orderLoading || clientLoading;
+  const hasError = orderError || clientError;
 
   // Handle back navigation
   const handleBack = () => {
@@ -98,19 +68,74 @@ export default function OrderDetailPage() {
     window.print();
   };
 
-  // Get status badge
-  const getStatusBadge = (status: Order["status"]) => {
-    switch (status) {
-      case "paid":
-        return <Badge className="bg-green-500">Paid</Badge>;
-      case "partially paid":
-        return <Badge className="bg-yellow-500">Partially Paid</Badge>;
-      case "unpaid":
-        return <Badge className="bg-red-500">Unpaid</Badge>;
-      default:
-        return null;
-    }
+  // Get status badge with our real enums
+  const getStatusBadge = (orderStatus: OrderStatus, paymentStatus: PaymentStatus) => {
+    const orderColor = OrderUtils.getStatusColor(orderStatus);
+    const paymentColor = OrderUtils.getPaymentStatusColor(paymentStatus);
+    
+    return (
+      <div className="flex flex-col gap-1">
+        <Badge className={`${orderColor} text-xs`}>
+          {orderStatus === OrderStatus.SCHEDULED && "Scheduled"}
+          {orderStatus === OrderStatus.IN_PROGRESS && "In Progress"}
+          {orderStatus === OrderStatus.COMPLETED && "Completed"}
+          {orderStatus === OrderStatus.CANCELLED && "Cancelled"}
+          {orderStatus === OrderStatus.NO_SHOW && "No Show"}
+        </Badge>
+        <Badge className={`${paymentColor} text-xs`}>
+          {paymentStatus === PaymentStatus.PENDING && "Payment Pending"}
+          {paymentStatus === PaymentStatus.PARTIAL && "Partially Paid"}
+          {paymentStatus === PaymentStatus.PAID && "Paid"}
+          {paymentStatus === PaymentStatus.OVERDUE && "Overdue"}
+          {paymentStatus === PaymentStatus.REFUNDED && "Refunded"}
+        </Badge>
+      </div>
+    );
   };
+
+  // Calculate tax and totals
+  const calculateTotals = () => {
+    if (!order) return { subtotal: 0, tax: 0, total: 0, paid: 0, due: 0 };
+    
+    const subtotal = order.totalAmount;
+    const tax = subtotal * 0.13; // 13% HST for Ontario
+    const total = subtotal + tax;
+    
+    // For now, we'll use payment status to estimate paid amount
+    let paid = 0;
+    let due = total;
+    
+    if (order.paymentStatus === PaymentStatus.PAID) {
+      paid = total;
+      due = 0;
+    } else if (order.paymentStatus === PaymentStatus.PARTIAL) {
+      paid = total * 0.5; // Assume 50% paid for partial
+      due = total - paid;
+    }
+    
+    return { subtotal, tax, total, paid, due };
+  };
+
+  const totals = calculateTotals();
+
+  // Error state
+  if (hasError) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Order</h2>
+            <p className="text-gray-600 mb-4">{orderError || clientError}</p>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={handleBack} variant="outline">Back to Orders</Button>
+              <Button onClick={() => window.location.reload()}>Try Again</Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -125,14 +150,17 @@ export default function OrderDetailPage() {
   if (!order) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive">Order Not Found</h1>
-          <p className="text-muted-foreground mt-2">
-            The order you&apos;re looking for doesn&apos;t exist or has been removed.
-          </p>
-          <Button onClick={handleBack} className="mt-4">
-            Back to Orders
-          </Button>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-destructive">Order Not Found</h1>
+            <p className="text-muted-foreground mt-2">
+              The order you&apos;re looking for doesn&apos;t exist or has been removed.
+            </p>
+            <Button onClick={handleBack} className="mt-4">
+              Back to Orders
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -156,19 +184,21 @@ export default function OrderDetailPage() {
               Order #{order.orderNumber}
             </h1>
             <p className="text-gray-600 mt-1">
-              {formatDate(order.orderDate)} - {clinic.replace('-', ' ')}
+              {formatDate(order.serviceDate)} - {clinicData?.displayName || clinicData?.name || clinic}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 self-start">
-          <Button
-            variant="outline"
-            onClick={handleEdit}
-            className="flex items-center gap-2"
-          >
-            <Edit2 size={16} />
-            Edit
-          </Button>
+          {(order.status === OrderStatus.SCHEDULED || order.status === OrderStatus.IN_PROGRESS) && (
+            <Button
+              variant="outline"
+              onClick={handleEdit}
+              className="flex items-center gap-2"
+            >
+              <Edit2 size={16} />
+              Edit
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={handlePrint}
@@ -202,15 +232,15 @@ export default function OrderDetailPage() {
                     <div className="font-medium">{order.orderNumber}</div>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm text-muted-foreground">Order Date</div>
+                    <div className="text-sm text-muted-foreground">Service Date</div>
                     <div className="font-medium flex items-center gap-1">
                       <Calendar size={14} />
-                      {formatDate(order.orderDate)}
+                      {formatDate(order.serviceDate)}
                     </div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-sm text-muted-foreground">Status</div>
-                    <div>{getStatusBadge(order.status)}</div>
+                    <div>{getStatusBadge(order.status, order.paymentStatus)}</div>
                   </div>
                   <div className="space-y-1">
                     <div className="text-sm text-muted-foreground">Client</div>
@@ -219,25 +249,42 @@ export default function OrderDetailPage() {
                       {order.clientName}
                     </div>
                   </div>
+                  {order.location && (
+                    <div className="space-y-1">
+                      <div className="text-sm text-muted-foreground">Location</div>
+                      <div className="font-medium">{order.location}</div>
+                    </div>
+                  )}
+                  {order.description && (
+                    <div className="space-y-1">
+                      <div className="text-sm text-muted-foreground">Description</div>
+                      <div className="font-medium">{order.description}</div>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />
 
-                {/* Products */}
+                {/* Services/Products */}
                 <div>
-                  <h3 className="font-medium mb-3">Products & Services</h3>
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <Package size={16} />
+                    Services & Products
+                  </h3>
                   <div className="space-y-4">
-                    {order.products.map((product, index) => (
+                    {order.items.map((item, index) => (
                       <div key={index} className="flex justify-between items-start border-b pb-3">
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          <div className="text-sm text-muted-foreground">{product.description}</div>
+                        <div className="flex-1">
+                          <div className="font-medium">{item.productName}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Duration: {item.duration} minutes
+                          </div>
                           <div className="text-sm mt-1">
-                            {formatCurrency(product.price)} × {product.quantity}
+                            {OrderUtils.formatCurrency(item.unitPrice)} × {item.quantity}
                           </div>
                         </div>
                         <div className="font-medium">
-                          {formatCurrency(product.price * product.quantity)}
+                          {OrderUtils.formatCurrency(item.subtotal)}
                         </div>
                       </div>
                     ))}
@@ -250,25 +297,27 @@ export default function OrderDetailPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <div className="text-sm text-muted-foreground">Subtotal</div>
-                    <div>{formatCurrency(order.totalAmount)}</div>
+                    <div>{OrderUtils.formatCurrency(totals.subtotal)}</div>
                   </div>
                   <div className="flex justify-between">
-                    <div className="text-sm text-muted-foreground">Tax</div>
-                    <div>{formatCurrency(order.totalAmount * 0.13)}</div>
+                    <div className="text-sm text-muted-foreground">Tax (13% HST)</div>
+                    <div>{OrderUtils.formatCurrency(totals.tax)}</div>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-medium">
                     <div>Total</div>
-                    <div>{formatCurrency(order.totalAmount * 1.13)}</div>
+                    <div>{OrderUtils.formatCurrency(totals.total)}</div>
                   </div>
-                  <div className="flex justify-between text-green-600">
-                    <div>Paid</div>
-                    <div>{formatCurrency(order.totalPaid)}</div>
-                  </div>
-                  {order.totalOwed > 0 && (
+                  {totals.paid > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <div>Paid</div>
+                      <div>{OrderUtils.formatCurrency(totals.paid)}</div>
+                    </div>
+                  )}
+                  {totals.due > 0 && (
                     <div className="flex justify-between text-red-600 font-medium">
                       <div>Balance Due</div>
-                      <div>{formatCurrency(order.totalOwed)}</div>
+                      <div>{OrderUtils.formatCurrency(totals.due)}</div>
                     </div>
                   )}
                 </div>
@@ -278,7 +327,7 @@ export default function OrderDetailPage() {
         </div>
 
         {/* Client Info */}
-        <div>
+        <div className="space-y-6">
           <Card className="shadow-sm border border-gray-200">
             <CardHeader className="bg-slate-50 pb-3 pt-4">
               <CardTitle className="text-base font-medium flex items-center gap-2">
@@ -289,80 +338,135 @@ export default function OrderDetailPage() {
             <CardContent className="pt-4">
               {client ? (
                 <div className="space-y-4">
-                  <div className="space-y-1">
+                  <div>
                     <div className="text-sm text-muted-foreground">Name</div>
-                    <div className="font-medium">{client.name}</div>
+                    <div className="font-medium">
+                      {client.firstName && client.lastName 
+                        ? `${client.firstName} ${client.lastName}` 
+                        : client.name || order.clientName}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="text-sm text-muted-foreground">Email</div>
-                    <div>{client.email}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-sm text-muted-foreground">Phone</div>
-                    <div>{client.phone}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-sm text-muted-foreground">Address</div>
-                    <div>{client.city}, {client.province}</div>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    className="w-full mt-2"
-                    onClick={() => {
-                      router.push(generateLink('clinic', `clients/${client.id}`, clinic));
-                    }}
-                  >
-                    View Client Profile
-                  </Button>
+                  {client.email && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">Email</div>
+                      <div className="font-medium">{client.email}</div>
+                    </div>
+                  )}
+                  {client.phone && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">Phone</div>
+                      <div className="font-medium">{client.phone}</div>
+                    </div>
+                  )}
+                  {client.dateOfBirth && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">Date of Birth</div>
+                      <div className="font-medium">{formatDate(client.dateOfBirth)}</div>
+                    </div>
+                  )}
+                  {client.gender && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">Gender</div>
+                      <div className="font-medium capitalize">{client.gender}</div>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <div className="text-muted-foreground">Client information not available</div>
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Name</div>
+                    <div className="font-medium">{order.clientName}</div>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Additional client details not available
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Payment Status */}
-          <Card className="shadow-sm border border-gray-200 mt-6">
+          {/* Order Timeline */}
+          <Card className="shadow-sm border border-gray-200">
             <CardHeader className="bg-slate-50 pb-3 pt-4">
               <CardTitle className="text-base font-medium flex items-center gap-2">
-                <DollarSign size={18} />
-                Payment Status
+                <Calendar size={18} />
+                Order Timeline
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-muted-foreground">Status</div>
-                  <div>{getStatusBadge(order.status)}</div>
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <div>
+                    <div className="text-sm font-medium">Order Created</div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatDate(order.orderDate)}
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Total Amount</div>
-                  <div className="font-medium">{formatCurrency(order.totalAmount * 1.13)}</div>
+                <div className="flex items-center gap-3">
+                  <div className={`w-2 h-2 rounded-full ${
+                    order.status === OrderStatus.COMPLETED ? 'bg-green-500' : 'bg-gray-300'
+                  }`}></div>
+                  <div>
+                    <div className="text-sm font-medium">Service Date</div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatDate(order.serviceDate)}
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Amount Paid</div>
-                  <div className="font-medium text-green-600">{formatCurrency(order.totalPaid)}</div>
-                </div>
-                {order.totalOwed > 0 && (
-                  <div className="space-y-1">
-                    <div className="text-sm text-muted-foreground">Balance Due</div>
-                    <div className="font-medium text-red-600">{formatCurrency(order.totalOwed)}</div>
+                {order.billDate && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div>
+                      <div className="text-sm font-medium">Billed</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatDate(order.billDate)}
+                      </div>
+                    </div>
                   </div>
                 )}
-                <Button 
-                  className="w-full mt-2"
-                  style={{ 
-                    background: themeColors.gradient.primary,
-                    boxShadow: themeColors.shadow.button
-                  }}
-                >
-                  Record Payment
-                </Button>
+                {order.invoiceDate && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <div>
+                      <div className="text-sm font-medium">Invoice Generated</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatDate(order.invoiceDate)}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
+
+          {/* Actions */}
+          {totals.due > 0 && order.status === OrderStatus.COMPLETED && (
+            <Card className="shadow-sm border border-yellow-200 bg-yellow-50">
+              <CardHeader className="pb-3 pt-4">
+                <CardTitle className="text-base font-medium flex items-center gap-2 text-yellow-800">
+                  <DollarSign size={18} />
+                  Payment Required
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <p className="text-sm text-yellow-700 mb-3">
+                  This order has an outstanding balance of {OrderUtils.formatCurrency(totals.due)}.
+                </p>
+                <Button 
+                  size="sm" 
+                  className="w-full"
+                  onClick={() => {
+                    // Navigate to payment processing
+                    console.log('Process payment for order:', order._id);
+                  }}
+                >
+                  Process Payment
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

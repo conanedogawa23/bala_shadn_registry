@@ -18,6 +18,10 @@ export interface Client {
   phone: string;
   email: string;
   clinic: string;
+  status?: string;
+  dateOfBirth?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Order {

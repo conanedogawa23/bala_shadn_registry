@@ -106,11 +106,15 @@ export class ClientApiService extends BaseApiService {
       const queryString = query ? `?${query}` : '';
       const endpoint = `${this.ENDPOINT}/clinic/${encodeURIComponent(clinicName)}/frontend-compatible${queryString}`;
       
-      const response = await this.request<PaginatedClientResponse>(endpoint);
+      const response = await this.request<Client[]>(endpoint);
       
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
+      if (response.success && response.data && response.pagination) {
+        const paginatedResponse: PaginatedClientResponse = {
+          clients: response.data,
+          pagination: response.pagination
+        };
+        this.setCached(cacheKey, paginatedResponse, this.CACHE_TTL);
+        return paginatedResponse;
       }
       
       throw new Error('Invalid response format');

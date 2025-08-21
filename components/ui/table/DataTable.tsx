@@ -83,6 +83,12 @@ interface DataTableProps<TData, TValue> {
   defaultPageSize?: number;
   
   /**
+   * Whether to show the built-in pagination controls
+   * @default true
+   */
+  showPagination?: boolean;
+  
+  /**
    * CSS class name for the table container
    */
   className?: string;
@@ -127,6 +133,7 @@ export function DataTable<TData, TValue>({
   filterPlaceholder = "Filter...",
   globalFilterKey,
   defaultPageSize = 10,
+  showPagination = true,
   className,
 }: DataTableProps<TData, TValue>) {
   // State for table features
@@ -315,66 +322,68 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          Showing{" "}
-          <strong>
-            {table.getFilteredRowModel().rows.length > 0
-              ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1
-              : 0}
-            -
-            {Math.min(
-              (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-              table.getFilteredRowModel().rows.length
-            )}
-          </strong>{" "}
-          of <strong>{table.getFilteredRowModel().rows.length}</strong> results
-        </div>
-        <div className="flex items-center space-x-6 lg:space-x-8">
-          <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">Rows per page</p>
-            <select
-              value={table.getState().pagination.pageSize}
-              onChange={(e) => {
-                table.setPageSize(Number(e.target.value));
-              }}
-              className="h-8 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm"
-            >
-              {[10, 20, 30, 40, 50].map((pageSize) => (
-                <option key={pageSize} value={pageSize}>
-                  {pageSize}
-                </option>
-              ))}
-            </select>
+      {showPagination && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Showing{" "}
+            <strong>
+              {table.getFilteredRowModel().rows.length > 0
+                ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1
+                : 0}
+              -
+              {Math.min(
+                (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+                table.getFilteredRowModel().rows.length
+              )}
+            </strong>{" "}
+            of <strong>{table.getFilteredRowModel().rows.length}</strong> results
           </div>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-              className="h-8 w-8 p-0"
-            >
-              <span className="sr-only">Go to previous page</span>
-              <ChevronDown className="h-4 w-4 rotate-90" />
-            </Button>
-            <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-              Page {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
+          <div className="flex items-center space-x-6 lg:space-x-8">
+            <div className="flex items-center space-x-2">
+              <p className="text-sm font-medium">Rows per page</p>
+              <select
+                value={table.getState().pagination.pageSize}
+                onChange={(e) => {
+                  table.setPageSize(Number(e.target.value));
+                }}
+                className="h-8 w-16 rounded-md border border-input bg-background px-2 py-1 text-sm"
+              >
+                {[10, 20, 30, 40, 50].map((pageSize) => (
+                  <option key={pageSize} value={pageSize}>
+                    {pageSize}
+                  </option>
+                ))}
+              </select>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-              className="h-8 w-8 p-0"
-            >
-              <span className="sr-only">Go to next page</span>
-              <ChevronDown className="h-4 w-4 -rotate-90" />
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+                className="h-8 w-8 p-0"
+              >
+                <span className="sr-only">Go to previous page</span>
+                <ChevronDown className="h-4 w-4 rotate-90" />
+              </Button>
+              <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+                Page {table.getState().pagination.pageIndex + 1} of{" "}
+                {table.getPageCount()}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+                className="h-8 w-8 p-0"
+              >
+                <span className="sr-only">Go to next page</span>
+                <ChevronDown className="h-4 w-4 -rotate-90" />
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
