@@ -5,7 +5,12 @@ import { cn } from "@/lib/utils";
 import NavMenu from "./nav-menu";
 import { ClinicProvider } from "@/lib/contexts/clinic-context";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ 
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  preload: true
+});
 
 export const metadata: Metadata = {
   title: "Body Bliss Management System",

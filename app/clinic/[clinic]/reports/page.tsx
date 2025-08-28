@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { DatePicker } from '@/components/ui/date-picker';
 import { 
   BarChart, 
   ArrowLeft, 
@@ -19,7 +20,9 @@ import {
   AlertCircle,
   Calendar,
   Package,
-  CreditCard
+  CreditCard,
+  CalendarDays,
+  RefreshCw
 } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
 import { generateLink } from '@/lib/route-utils';
@@ -33,9 +36,9 @@ import {
   useOrdersByClinic,
   useClients,
   OrderUtils,
-  OrderStatus,
-  PaymentStatus
+  OrderStatus
 } from '@/lib/hooks';
+import { PaymentStatus } from '@/lib/api/orderService';
 import { ReportApiService } from '@/lib/api/reportService';
 
 interface ReportMetrics {
@@ -69,9 +72,22 @@ export default function ReportsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('last6months');
   const [isExporting, setIsExporting] = useState(false);
   const [selectedExportFormat, setSelectedExportFormat] = useState<'csv' | 'json' | 'pdf'>('csv');
+  
+  // Custom date range state
+  const [useCustomRange, setUseCustomRange] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Calculate date ranges based on selected period
+  // Calculate date ranges based on selected period or custom dates
   const dateRange = useMemo(() => {
+    if (useCustomRange && customStartDate && customEndDate) {
+      return {
+        startDate: customStartDate.toISOString().split('T')[0],
+        endDate: customEndDate.toISOString().split('T')[0]
+      };
+    }
+    
     const endDate = new Date();
     const startDate = new Date();
     
@@ -96,7 +112,7 @@ export default function ReportsPage() {
       startDate: startDate.toISOString().split('T')[0],
       endDate: endDate.toISOString().split('T')[0]
     };
-  }, [selectedPeriod]);
+  }, [selectedPeriod, useCustomRange, customStartDate, customEndDate]);
 
   // Fetch real analytics data
   const { 
@@ -175,7 +191,9 @@ export default function ReportsPage() {
     const currentYear = new Date().getFullYear();
     
     const newClientsThisMonth = clients.filter(client => {
-      const clientDate = new Date(client.createdAt || client.dateOfBirth);
+      const dateToUse = client.createdAt || client.dateOfBirth;
+      if (!dateToUse) return false;
+      const clientDate = new Date(dateToUse);
       return clientDate.getMonth() === currentMonth && clientDate.getFullYear() === currentYear;
     }).length;
 
@@ -230,6 +248,62 @@ export default function ReportsPage() {
 
   const handleBack = () => {
     router.push(generateLink('clinic', '', clinicSlug));
+  };
+
+  // Handle custom date range toggle
+  const handleCustomRangeToggle = (enabled: boolean) => {
+    setUseCustomRange(enabled);
+    if (!enabled) {
+      setCustomStartDate(undefined);
+      setCustomEndDate(undefined);
+    }
+  };
+
+  // Handle quick date range presets for custom selection
+  const handleQuickDateRange = (preset: string) => {
+    const endDate = new Date();
+    let startDate = new Date();
+
+    switch (preset) {
+      case 'thisWeek':
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - dayOfWeek);
+        break;
+      case 'thisMonth':
+        startDate = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+        break;
+      case 'lastMonth':
+        startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 1, 1);
+        endDate.setDate(0); // Last day of previous month
+        break;
+      case 'thisQuarter':
+        const quarter = Math.floor(endDate.getMonth() / 3);
+        startDate = new Date(endDate.getFullYear(), quarter * 3, 1);
+        break;
+      case 'thisYear':
+        startDate = new Date(endDate.getFullYear(), 0, 1);
+        break;
+      default:
+        return;
+    }
+
+    setCustomStartDate(startDate);
+    setCustomEndDate(endDate);
+    setUseCustomRange(true);
+  };
+
+  // Handle manual refresh of reports
+  const handleRefreshReports = async () => {
+    setIsRefreshing(true);
+    try {
+      // Clear cache and refetch data by updating a dependency
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate refresh
+      window.location.reload(); // Simple approach to refresh all data
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleExportReport = async (reportType: string) => {
@@ -360,25 +434,105 @@ export default function ReportsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold">
               Reports & Analytics - {clinic.displayName || clinic.name}
             </h1>
-            <p className="text-gray-600 mt-1">
-              Real-time business insights and performance metrics
-            </p>
+            <div className="flex flex-col sm:flex-row gap-2 mt-1">
+              <p className="text-gray-600">
+                Real-time business insights and performance metrics
+              </p>
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-blue-600" />
+                <Badge variant="outline" className="text-blue-700 border-blue-300">
+                  {useCustomRange ? 'Custom Range' : selectedPeriod.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([0-9])([a-z])/g, '$1 $2')}
+                </Badge>
+                <span className="text-gray-500">
+                  {new Date(dateRange.startDate).toLocaleDateString('en-CA')} - {new Date(dateRange.endDate).toLocaleDateString('en-CA')}
+                </span>
+                {useCustomRange && (!customStartDate || !customEndDate) && (
+                  <Badge variant="destructive" className="text-xs">
+                    Select both dates
+                  </Badge>
+                )}
+                {useCustomRange && customStartDate && customEndDate && customStartDate > customEndDate && (
+                  <Badge variant="destructive" className="text-xs">
+                    Start date must be before end date
+                  </Badge>
+                )}
+              </div>
+            </div>
           </div>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3">
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-full sm:w-48">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="last30days">Last 30 Days</SelectItem>
-              <SelectItem value="last3months">Last 3 Months</SelectItem>
-              <SelectItem value="last6months">Last 6 Months</SelectItem>
-              <SelectItem value="lastyear">Last Year</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Date Range Selection */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant={useCustomRange ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleCustomRangeToggle(!useCustomRange)}
+              className="flex items-center gap-2"
+            >
+              <CalendarDays className="h-4 w-4" />
+              {useCustomRange ? "Custom Range" : "Quick Periods"}
+            </Button>
+            
+            {!useCustomRange ? (
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Select period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="last30days">Last 30 Days</SelectItem>
+                  <SelectItem value="last3months">Last 3 Months</SelectItem>
+                  <SelectItem value="last6months">Last 6 Months</SelectItem>
+                  <SelectItem value="lastyear">Last Year</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <DatePicker
+                  date={customStartDate}
+                  setDate={setCustomStartDate}
+                  className="w-full sm:w-40"
+                />
+                <span className="text-sm text-gray-500 self-center">to</span>
+                <DatePicker
+                  date={customEndDate}
+                  setDate={setCustomEndDate}
+                  className="w-full sm:w-40"
+                />
+              </div>
+            )}
+          </div>
+          
+          {/* Quick Date Presets for Custom Range */}
+          {useCustomRange && (
+            <div className="flex flex-wrap gap-1">
+              <Button variant="ghost" size="sm" onClick={() => handleQuickDateRange('thisWeek')}>
+                This Week
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleQuickDateRange('thisMonth')}>
+                This Month
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleQuickDateRange('thisQuarter')}>
+                This Quarter
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleQuickDateRange('thisYear')}>
+                This Year
+              </Button>
+            </div>
+          )}
+          
+          {/* Refresh Button */}
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleRefreshReports}
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
           
           <Select value={selectedExportFormat} onValueChange={(value: 'csv' | 'json' | 'pdf') => setSelectedExportFormat(value)}>
             <SelectTrigger className="w-full sm:w-32">

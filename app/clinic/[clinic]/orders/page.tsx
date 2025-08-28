@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/table/Table";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { Search, Calendar, Plus, ChevronRight, ChevronLeft, Eye, Edit2, Trash2, Printer, FileText, DollarSign, UserCircle, AlertCircle } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, isValidDate } from "@/lib/utils";
 import { slugToClinic } from "@/lib/data/clinics";
 import { generateLink } from "@/lib/route-utils";
 
@@ -72,14 +72,20 @@ export default function OrdersPage() {
     if (!searchQuery.trim()) return orders;
     
     const query = searchQuery.toLowerCase();
-    return orders.filter(order =>
-      order.orderNumber.toLowerCase().includes(query) ||
-      order.clientName.toLowerCase().includes(query) ||
-      order.status.toLowerCase().includes(query) ||
-      order.paymentStatus.toLowerCase().includes(query) ||
-      formatDate(order.orderDate).toLowerCase().includes(query) ||
-      formatDate(order.serviceDate).toLowerCase().includes(query)
-    );
+    return orders.filter(order => {
+      // Basic string matches
+      const basicMatches = 
+        order.orderNumber.toLowerCase().includes(query) ||
+        order.clientName.toLowerCase().includes(query) ||
+        order.status.toLowerCase().includes(query) ||
+        order.paymentStatus.toLowerCase().includes(query);
+      
+      // Date matches - only if dates are valid
+      const orderDateMatch = isValidDate(order.orderDate) && formatDate(order.orderDate).toLowerCase().includes(query);
+      const serviceDateMatch = isValidDate(order.serviceDate) && formatDate(order.serviceDate).toLowerCase().includes(query);
+      
+      return basicMatches || orderDateMatch || serviceDateMatch;
+    });
   }, [orders, searchQuery]);
   
   // Calculate pagination

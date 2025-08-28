@@ -54,7 +54,7 @@ export default function ClientDetailPage() {
   const router = useRouter();
   const params = useParams();
   const clinic = params.clinic as string;
-  const clientId = parseInt(params.id as string);
+  const clientId = params.id as string;
   
   // State for order filtering and search
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,19 +72,22 @@ export default function ClientDetailPage() {
     error: clientError,
     refetch: refetchClient
   } = useClient({
-    id: clientId,
+    clientId: clientId,
     autoFetch: !!clientId
   });
 
-  // Fetch client's order history
+  // State to control when to load orders
+  const [shouldLoadOrders, setShouldLoadOrders] = useState(false);
+
+  // Fetch client's order history only when needed
   const { 
     orders, 
     loading: ordersLoading,
     error: ordersError,
     refetch: refetchOrders
   } = useOrdersByClient({
-    clientId: clientId,
-    autoFetch: !!clientId
+    clientId: parseInt(clientId),
+    autoFetch: shouldLoadOrders && !!clientId && !isNaN(parseInt(clientId))
   });
 
   const handleBack = () => {
@@ -340,39 +343,62 @@ export default function ClientDetailPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <CardTitle className="flex items-center gap-2">
                   <Package size={20} />
-                  Order History ({filteredOrders.length})
+                  Order History {shouldLoadOrders ? `(${filteredOrders.length})` : ''}
                 </CardTitle>
                 
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:w-64">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search orders..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
+                {!shouldLoadOrders && (
+                  <Button 
+                    onClick={() => setShouldLoadOrders(true)}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <RefreshCw size={16} />
+                    Load Order History
+                  </Button>
+                )}
+                
+                {shouldLoadOrders && (
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search orders..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        {Object.values(OrderStatus).map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {OrderUtils.getStatusLabel(status)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      {Object.values(OrderStatus).map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {OrderUtils.getStatusLabel(status)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {paginatedOrders.length === 0 ? (
+                {!shouldLoadOrders ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Package className="mx-auto h-12 w-12 text-gray-300" />
+                    <p className="mt-2">Click "Load Order History" to view client orders</p>
+                  </div>
+                ) : ordersLoading ? (
+                  <div className="text-center py-8">
+                    <RefreshCw className="mx-auto h-8 w-8 animate-spin text-gray-400" />
+                    <p className="mt-2 text-gray-500">Loading order history...</p>
+                  </div>
+                ) : paginatedOrders.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <Package className="mx-auto h-12 w-12 text-gray-300" />
                     <p className="mt-2">
@@ -568,19 +594,23 @@ export default function ClientDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {orders?.slice(0, 5).map((order) => (
-                  <div key={order._id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(order.status)}
-                      <span className="truncate">Order #{order.orderNumber}</span>
+                {!shouldLoadOrders ? (
+                  <p className="text-sm text-gray-500">Load order history to see recent activity</p>
+                ) : ordersLoading ? (
+                  <p className="text-sm text-gray-500">Loading recent activity...</p>
+                ) : orders && orders.length > 0 ? (
+                  orders.slice(0, 5).map((order) => (
+                    <div key={order._id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(order.status)}
+                        <span className="truncate">Order #{order.orderNumber}</span>
+                      </div>
+                      <span className="text-gray-500 text-xs">
+                        {OrderUtils.formatDate(order.orderDate)}
+                      </span>
                     </div>
-                    <span className="text-gray-500 text-xs">
-                      {OrderUtils.formatDate(order.orderDate)}
-                    </span>
-                  </div>
-                ))}
-                
-                {(!orders || orders.length === 0) && (
+                  ))
+                ) : (
                   <p className="text-sm text-gray-500">No recent activity</p>
                 )}
               </div>

@@ -52,7 +52,6 @@ export interface PaymentLineItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  taxable: boolean;
 }
 
 export interface Payment {
@@ -64,9 +63,6 @@ export interface Payment {
   orderNumber?: string;
   paymentMethod: string;
   amount: number;
-  subtotal: number;
-  taxAmount: number;
-  taxRate: number;
   discountAmount?: number;
   netAmount: number;
   status: "completed" | "pending" | "failed" | "refunded" | "partial";
@@ -377,11 +373,8 @@ export class MockDataService {
         const dueDate = new Date(invoiceDate);
         dueDate.setDate(dueDate.getDate() + 30);
         
-        const subtotal = order.totalAmount;
-        const taxRate = 0.13; // Ontario HST
-        const taxAmount = Math.round(subtotal * taxRate * 100) / 100;
-        const discountAmount = Math.random() > 0.8 ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
-        const netAmount = Math.round((subtotal + taxAmount - discountAmount) * 100) / 100;
+        const discountAmount = Math.random() > 0.8 ? Math.round(order.totalAmount * 0.05 * 100) / 100 : 0;
+        const netAmount = Math.round((order.totalAmount - discountAmount) * 100) / 100;
         
         // Generate line items from order products
         const lineItems: PaymentLineItem[] = order.products.map((product, index) => ({
@@ -391,8 +384,7 @@ export class MockDataService {
           description: product.description,
           quantity: product.quantity,
           unitPrice: product.price,
-          totalPrice: Math.round(product.price * product.quantity * 100) / 100,
-          taxable: true
+          totalPrice: Math.round(product.price * product.quantity * 100) / 100
         }));
         
         const paymentType = paymentTypes[Math.floor(Math.random() * paymentTypes.length)];
@@ -407,9 +399,6 @@ export class MockDataService {
           orderNumber: order.orderNumber,
           paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
           amount: order.totalPaid,
-          subtotal,
-          taxAmount,
-          taxRate,
           discountAmount,
           netAmount,
           status: paymentStatus,
@@ -439,10 +428,7 @@ export class MockDataService {
         const dueDate = new Date(invoiceDate);
         dueDate.setDate(dueDate.getDate() + 30);
         
-        const subtotal = order.totalAmount;
-        const taxRate = 0.13;
-        const taxAmount = Math.round(subtotal * taxRate * 100) / 100;
-        const netAmount = Math.round((subtotal + taxAmount) * 100) / 100;
+        const netAmount = order.totalAmount;
         
         const lineItems: PaymentLineItem[] = order.products.map((product, index) => ({
           id: `LI${order.id}_${index + 1}`,
@@ -451,8 +437,7 @@ export class MockDataService {
           description: product.description,
           quantity: product.quantity,
           unitPrice: product.price,
-          totalPrice: Math.round(product.price * product.quantity * 100) / 100,
-          taxable: true
+          totalPrice: Math.round(product.price * product.quantity * 100) / 100
         }));
         
         payments.push({
@@ -464,9 +449,6 @@ export class MockDataService {
           orderNumber: order.orderNumber,
           paymentMethod: "Credit Card",
           amount: 0,
-          subtotal,
-          taxAmount,
-          taxRate,
           discountAmount: 0,
           netAmount,
           status: Math.random() > 0.5 ? "pending" : "failed",

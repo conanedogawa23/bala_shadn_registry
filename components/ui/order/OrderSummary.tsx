@@ -110,8 +110,7 @@ export function OrderSummary({
   // Calculate order totals
   const itemCount = items.reduce((total, item) => total + item.quantity, 0)
   const subtotal = items.reduce((total, item) => total + (item.price * item.quantity), 0)
-  const tax = subtotal * 0.1 // Example tax calculation (10%)
-  const total = subtotal + tax
+  const total = subtotal
 
   // Format currency values
   const formatCurrency = (amount: number) => {
@@ -182,15 +181,6 @@ export function OrderSummary({
               
               <Separator className="my-1" />
               
-              <div className="flex justify-between text-sm py-1">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatCurrency(subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm py-1">
-                <span className="text-muted-foreground">Tax</span>
-                <span>{formatCurrency(tax)}</span>
-              </div>
-              <Separator className="my-1" />
               <div className="flex justify-between font-medium py-1">
                 <span>Total</span>
                 <span>{formatCurrency(total)}</span>

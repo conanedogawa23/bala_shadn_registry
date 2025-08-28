@@ -20,6 +20,7 @@ export {
   usePaymentsByClient,
   usePaymentStats,
   useOutstandingPayments,
+  usePaymentsByOrder,
   useRevenueData
 } from './usePayments';
 

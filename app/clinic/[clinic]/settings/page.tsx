@@ -254,14 +254,7 @@ export default function SettingsPage() {
                     defaultValue="LIC-123456"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label htmlFor="taxId" className="text-sm font-medium">Tax ID</label>
-                  <Input
-                    id="taxId"
-                    placeholder="Tax ID"
-                    defaultValue="12-3456789"
-                  />
-                </div>
+
               </div>
 
               <div className="space-y-2">
@@ -330,15 +323,6 @@ export default function SettingsPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label htmlFor="taxRate" className="text-sm font-medium">Tax Rate (%)</label>
-                  <Input
-                    id="taxRate"
-                    type="number"
-                    placeholder="8.5"
-                    defaultValue="8.5"
-                  />
-                </div>
                 <div className="space-y-2">
                   <label htmlFor="lateFee" className="text-sm font-medium">Late Payment Fee ($)</label>
                   <Input

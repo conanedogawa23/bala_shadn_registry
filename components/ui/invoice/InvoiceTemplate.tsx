@@ -114,30 +114,30 @@ const UniversalPaymentBreakdown = ({ payment }: { payment: Payment }) => (
       </thead>
       <tbody>
         <tr>
-          <td className="border border-gray-900 px-3 py-2">{PaymentApiService.getPaymentTypeDescription(payment.paymentType)}</td>
-          <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)}</td>
+          <td className="border border-gray-900 px-3 py-2">{payment.paymentType ? PaymentApiService.getPaymentTypeDescription(payment.paymentType) : 'N/A'}</td>
+          <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts?.totalPaymentAmount || payment.total || 0)}</td>
           <td className="border border-gray-900 px-3 py-2 text-center">
             {PaymentApiService.formatDate(payment.paymentDate)}
           </td>
         </tr>
-        {payment.amounts.popAmount > 0 && (
+        {(payment.amounts?.popAmount || 0) > 0 && (
           <tr>
             <td className="border border-gray-900 px-3 py-2">Patient Out of Pocket (POP)</td>
-            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts.popAmount)}</td>
+            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts?.popAmount || 0)}</td>
             <td className="border border-gray-900 px-3 py-2 text-center">-</td>
           </tr>
         )}
-        {payment.amounts.dpaAmount > 0 && (
+        {(payment.amounts?.dpaAmount || 0) > 0 && (
           <tr>
             <td className="border border-gray-900 px-3 py-2">Direct Payment Authorization (DPA)</td>
-            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts.dpaAmount)}</td>
+            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts?.dpaAmount || 0)}</td>
             <td className="border border-gray-900 px-3 py-2 text-center">-</td>
           </tr>
         )}
-        {payment.amounts.insurance1stAmount > 0 && (
+        {(payment.amounts?.insurance1stAmount || 0) > 0 && (
           <tr>
             <td className="border border-gray-900 px-3 py-2">Insurance (Primary)</td>
-            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts.insurance1stAmount)}</td>
+            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts?.insurance1stAmount || 0)}</td>
             <td className="border border-gray-900 px-3 py-2 text-center">-</td>
           </tr>
         )}
@@ -150,13 +150,13 @@ const UniversalPaymentBreakdown = ({ payment }: { payment: Payment }) => (
 const UniversalTotalSection = ({ payment }: { payment: Payment }) => (
   <div className="text-right mb-8">
     <div className="text-xl font-bold">
-      Total: {PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)}
+      Total: {PaymentApiService.formatCurrency(payment.amounts?.totalPaymentAmount || payment.total || 0)}
     </div>
     <div className="text-lg text-green-600">
-      Paid: {PaymentApiService.formatCurrency(payment.amounts.totalPaid)}
+      Paid: {PaymentApiService.formatCurrency(payment.amounts?.totalPaid || payment.amountPaid || 0)}
     </div>
     <div className="text-lg text-orange-600">
-      Outstanding: {PaymentApiService.formatCurrency(payment.amounts.totalOwed)}
+      Outstanding: {PaymentApiService.formatCurrency(payment.amounts?.totalOwed || payment.amountDue || 0)}
     </div>
   </div>
 );
@@ -166,12 +166,12 @@ const UniversalPaymentDetails = ({ payment }: { payment: Payment }) => (
   <div className="space-y-4">
     {/* Payment Information */}
     <div className="space-y-2 text-sm">
-      <p>Total Amount: {PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)}</p>
-      <p>Amount Paid: {PaymentApiService.formatCurrency(payment.amounts.totalPaid)}</p>
-      <p>Amount Due: {PaymentApiService.formatCurrency(payment.amounts.totalOwed)}</p>
+      <p>Total Amount: {PaymentApiService.formatCurrency(payment.amounts?.totalPaymentAmount || payment.total || 0)}</p>
+      <p>Amount Paid: {PaymentApiService.formatCurrency(payment.amounts?.totalPaid || payment.amountPaid || 0)}</p>
+      <p>Amount Due: {PaymentApiService.formatCurrency(payment.amounts?.totalOwed || payment.amountDue || 0)}</p>
       <p>Payment Date: {PaymentApiService.formatDate(payment.paymentDate)}</p>
-      <p>Payment Method: {payment.paymentMethod.toUpperCase()}</p>
-      <p>Payment Type: {PaymentApiService.getPaymentTypeDescription(payment.paymentType)}</p>
+      <p>Payment Method: {payment.paymentMethod?.toUpperCase() || 'N/A'}</p>
+      <p>Payment Type: {payment.paymentType ? PaymentApiService.getPaymentTypeDescription(payment.paymentType) : 'N/A'}</p>
     </div>
 
     {/* Signature Section */}

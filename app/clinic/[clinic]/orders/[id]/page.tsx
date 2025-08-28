@@ -40,18 +40,21 @@ export default function OrderDetailPage() {
     autoFetch: !!orderId
   });
 
-  // Fetch client data when we have order client ID
+  // Fetch client data when we have order client ID (but don't fail if not found)
   const { 
     client, 
     loading: clientLoading,
     error: clientError
   } = useClient({
-    id: order?.clientId || 0,
-    autoFetch: !!order?.clientId
+    clientId: order?.clientId?.toString() || "",
+    autoFetch: !!(order?.clientId)
   });
 
+  // Don't treat missing client as a fatal error since we have client info in the order
+  const hasClientError = clientError && !clientError.includes('not found');
+
   const isLoading = orderLoading || clientLoading;
-  const hasError = orderError || clientError;
+  const hasError = orderError || hasClientError;
 
   // Handle back navigation
   const handleBack = () => {
@@ -93,27 +96,16 @@ export default function OrderDetailPage() {
     );
   };
 
-  // Calculate tax and totals
+  // Calculate totals using API data
   const calculateTotals = () => {
-    if (!order) return { subtotal: 0, tax: 0, total: 0, paid: 0, due: 0 };
+    if (!order) return { total: 0, paid: 0, due: 0 };
     
-    const subtotal = order.totalAmount;
-    const tax = subtotal * 0.13; // 13% HST for Ontario
-    const total = subtotal + tax;
+    // Use the values provided by the API directly
+    const total = order.totalAmount || 0;
+    const paid = order.amountPaid || 0;
+    const due = order.amountDue || 0;
     
-    // For now, we'll use payment status to estimate paid amount
-    let paid = 0;
-    let due = total;
-    
-    if (order.paymentStatus === PaymentStatus.PAID) {
-      paid = total;
-      due = 0;
-    } else if (order.paymentStatus === PaymentStatus.PARTIAL) {
-      paid = total * 0.5; // Assume 50% paid for partial
-      due = total - paid;
-    }
-    
-    return { subtotal, tax, total, paid, due };
+    return { total, paid, due };
   };
 
   const totals = calculateTotals();
@@ -126,7 +118,7 @@ export default function OrderDetailPage() {
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Order</h2>
-            <p className="text-gray-600 mb-4">{orderError || clientError}</p>
+            <p className="text-gray-600 mb-4">{orderError || hasClientError}</p>
             <div className="flex gap-2 justify-center">
               <Button onClick={handleBack} variant="outline">Back to Orders</Button>
               <Button onClick={() => window.location.reload()}>Try Again</Button>
@@ -199,6 +191,14 @@ export default function OrderDetailPage() {
               Edit
             </Button>
           )}
+          <Button
+            variant="outline"
+            onClick={() => router.push(generateLink('clinic', `orders/${orderId}/invoice`, clinic))}
+            className="flex items-center gap-2"
+          >
+            <FileText size={16} />
+            View Invoice
+          </Button>
           <Button
             variant="outline"
             onClick={handlePrint}
@@ -275,16 +275,16 @@ export default function OrderDetailPage() {
                     {order.items.map((item, index) => (
                       <div key={index} className="flex justify-between items-start border-b pb-3">
                         <div className="flex-1">
-                          <div className="font-medium">{item.productName}</div>
+                          <div className="font-medium">{item.description || item.productName || 'Service'}</div>
                           <div className="text-sm text-muted-foreground">
-                            Duration: {item.duration} minutes
+                            Duration: {item.duration || 0} minutes
                           </div>
                           <div className="text-sm mt-1">
-                            {OrderUtils.formatCurrency(item.unitPrice)} × {item.quantity}
+                            {OrderUtils.formatCurrency(item.unitPrice || 0)} × {item.quantity || 1}
                           </div>
                         </div>
                         <div className="font-medium">
-                          {OrderUtils.formatCurrency(item.subtotal)}
+                          {OrderUtils.formatCurrency(item.amount || 0)}
                         </div>
                       </div>
                     ))}
@@ -295,15 +295,6 @@ export default function OrderDetailPage() {
 
                 {/* Totals */}
                 <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <div className="text-sm text-muted-foreground">Subtotal</div>
-                    <div>{OrderUtils.formatCurrency(totals.subtotal)}</div>
-                  </div>
-                  <div className="flex justify-between">
-                    <div className="text-sm text-muted-foreground">Tax (13% HST)</div>
-                    <div>{OrderUtils.formatCurrency(totals.tax)}</div>
-                  </div>
-                  <Separator />
                   <div className="flex justify-between font-medium">
                     <div>Total</div>
                     <div>{OrderUtils.formatCurrency(totals.total)}</div>
@@ -377,8 +368,18 @@ export default function OrderDetailPage() {
                     <div className="text-sm text-muted-foreground">Name</div>
                     <div className="font-medium">{order.clientName}</div>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    Additional client details not available
+                  <div>
+                    <div className="text-sm text-muted-foreground">Client ID</div>
+                    <div className="font-medium">{order.clientId}</div>
+                  </div>
+                  <div className="text-sm text-gray-500 bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      <span>Detailed client profile not available</span>
+                    </div>
+                    <div className="mt-1 text-xs">
+                      Client information shown is from order records only.
+                    </div>
                   </div>
                 </div>
               )}
@@ -454,16 +455,48 @@ export default function OrderDetailPage() {
                 <p className="text-sm text-yellow-700 mb-3">
                   This order has an outstanding balance of {OrderUtils.formatCurrency(totals.due)}.
                 </p>
-                <Button 
-                  size="sm" 
-                  className="w-full"
-                  onClick={() => {
-                    // Navigate to payment processing
-                    console.log('Process payment for order:', order._id);
-                  }}
-                >
-                  Process Payment
-                </Button>
+                <div className="space-y-2">
+                  <Button 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => {
+                      // Navigate to payment processing with order details pre-populated
+                      const params = new URLSearchParams({
+                        clientId: order.clientId.toString(),
+                        clientName: order.clientName,
+                        orderNumber: order.orderNumber,
+                        amount: totals.due.toString()
+                      });
+                      router.push(generateLink('clinic', `payments/new?${params.toString()}`, clinic));
+                    }}
+                  >
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Process Payment
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => {
+                      // Navigate to payments list for this client
+                      router.push(generateLink('clinic', `payments?search=${order.clientName}`, clinic));
+                    }}
+                  >
+                    View Payment History
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => {
+                      // Navigate to order invoice
+                      router.push(generateLink('clinic', `orders/${orderId}/invoice`, clinic));
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    View Full Invoice
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

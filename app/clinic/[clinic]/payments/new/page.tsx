@@ -1,14 +1,13 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Plus, Trash2, DollarSign, User, CreditCard, AlertCircle } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
 import { generateLink } from '@/lib/route-utils';
@@ -30,7 +29,7 @@ interface FormLineItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  taxable: boolean;
+
 }
 
 // Form data interface
@@ -48,6 +47,7 @@ interface PaymentFormData {
 export default function NewPaymentPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
   const clinic = slugToClinic(clinicSlug);
 
@@ -72,13 +72,37 @@ export default function NewPaymentPage() {
         quantity: 1,
         unitPrice: 0,
         totalPrice: 0,
-        taxable: true
+
       }
     ]
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pre-populate form from URL parameters
+  useEffect(() => {
+    const clientId = searchParams.get('clientId');
+    const clientName = searchParams.get('clientName');
+    const orderNumber = searchParams.get('orderNumber');
+    const amount = searchParams.get('amount');
+
+    if (clientId || clientName || orderNumber || amount) {
+      setFormData(prev => ({
+        ...prev,
+        clientId: clientId ? parseInt(clientId, 10) : prev.clientId,
+        clientName: clientName || prev.clientName,
+        orderNumber: orderNumber || prev.orderNumber,
+        lineItems: amount ? [{
+          ...prev.lineItems[0],
+          serviceName: 'Payment Processing',
+          description: `Payment for order ${orderNumber || ''}`.trim(),
+          unitPrice: parseFloat(amount) || 0,
+          totalPrice: parseFloat(amount) || 0
+        }] : prev.lineItems
+      }));
+    }
+  }, [searchParams]);
 
   // Navigation handlers
   const handleBack = useCallback(() => {
@@ -122,8 +146,7 @@ export default function NewPaymentPage() {
       description: '',
       quantity: 1,
       unitPrice: 0,
-      totalPrice: 0,
-      taxable: true
+      totalPrice: 0
     };
 
     setFormData(prev => ({
@@ -143,12 +166,9 @@ export default function NewPaymentPage() {
 
   // Calculation functions
   const calculateTotals = useCallback(() => {
-    const subtotal = formData.lineItems.reduce((sum, item) => sum + Number(item.totalPrice), 0);
-    const taxRate = 0.13; // Ontario HST
-    const taxAmount = Math.round(subtotal * taxRate * 100) / 100;
-    const total = Math.round((subtotal + taxAmount) * 100) / 100;
+    const total = formData.lineItems.reduce((sum, item) => sum + Number(item.totalPrice), 0);
 
-    return { subtotal, taxAmount, total, taxRate };
+    return { subtotal: total, total };
   }, [formData.lineItems]);
 
   // Form submission
@@ -175,7 +195,7 @@ export default function NewPaymentPage() {
     setIsLoading(true);
 
     try {
-      const { subtotal, taxAmount, total } = calculateTotals();
+      const { total } = calculateTotals();
 
       // Convert form line items to API format
       const lineItems = formData.lineItems.map(item => ({
@@ -185,8 +205,7 @@ export default function NewPaymentPage() {
         description: item.description,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
-        totalPrice: Number(item.totalPrice),
-        taxable: item.taxable
+        totalPrice: Number(item.totalPrice)
       }));
 
       // Create payment amounts structure
@@ -245,7 +264,7 @@ export default function NewPaymentPage() {
     }
   };
 
-  const { subtotal, taxAmount, total } = calculateTotals();
+  const { total } = calculateTotals();
 
   if (!clinic) {
     return (
@@ -505,15 +524,6 @@ export default function NewPaymentPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>{PaymentApiService.formatCurrency(subtotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>HST (13%):</span>
-                <span>{PaymentApiService.formatCurrency(taxAmount)}</span>
-              </div>
-              <Separator />
               <div className="flex justify-between text-lg font-semibold">
                 <span>Total:</span>
                 <span>{PaymentApiService.formatCurrency(total)}</span>

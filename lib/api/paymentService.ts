@@ -66,33 +66,54 @@ export interface PaymentAmounts {
   badDebtAmount: number;
 }
 
-// Payment Interface - Updated to match MongoDB data structure
+// Payment Interface - Updated to match MongoDB data structure exactly
 export interface Payment {
   _id: string;
-  paymentId: string;
-  invoiceNumber: string;
-  clientId: string;
+  paymentNumber: string;              // Primary payment identifier (auto-generated)
+  orderNumber?: string;               // Order reference
+  clientId: number;                   // Client ID (number, not string)
   clientName?: string;
   clinicName: string;
   
   // Payment Details
   paymentDate: string;
-  paymentMethod: string;
-  status: string;
+  paymentMethod: PaymentMethod;
+  paymentType: PaymentType;
+  status: PaymentStatus;
   
-  // Amount Information
-  subtotal: number;
-  taxRate: number;
-  taxAmount: number;
-  total: number;
-  amountPaid: number;
-  amountDue: number;
+  // Amount Information (nested structure to match backend)
+  amounts: PaymentAmounts;
   
-  // Invoice Details
+  // References and Notes
+  referringNo?: string;
+  notes?: string;
+  
+  // Order/Appointment Link
+  orderId?: string;
+  advancedBillingId?: number;
+  
+  // Audit Fields
+  deletedStatus?: string;
+  userLoginName?: string;
+  debuggingColumn?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+  updatedBy?: string;
+  
+  // Payment ID field (actual database field)
+  paymentId?: string;                 // Primary payment identifier in database
+  invoiceNumber?: string;             // Invoice number field
+  total?: number;                     // Computed from amounts.totalPaymentAmount
+  amountPaid?: number;                // Computed from amounts.totalPaid
+  amountDue?: number;                 // Computed from amounts.totalOwed
+  
+  // Optional invoice-related fields for display
+  subtotal?: number;
   invoiceDate?: string;
   dueDate?: string;
   
-  // Line Items
+  // Line Items (optional for invoice display)
   lineItems?: Array<{
     itemId: string;
     description: string;
@@ -116,18 +137,6 @@ export interface Payment {
       status: string;
     };
   };
-  
-  // References and Notes
-  notes?: string;
-  
-  // Audit Fields
-  createdAt: string;
-  updatedAt: string;
-  
-  // Legacy fields for backward compatibility
-  paymentNumber?: string; // Alias for paymentId
-  amounts?: PaymentAmounts; // Legacy nested amounts structure
-  paymentType?: PaymentType; // Legacy payment type enum
 }
 
 // API Response Interfaces
@@ -192,6 +201,8 @@ export interface PaymentFilters {
   paymentType?: PaymentType;
   clinicName?: string;
   clientId?: number;
+  orderNumber?: string;
+  orderId?: string;
   startDate?: string;
   endDate?: string;
   outstanding?: boolean;
@@ -252,6 +263,8 @@ export class PaymentApiService extends BaseApiService {
       if (filters.paymentType) params.append('paymentType', filters.paymentType);
       if (filters.clinicName) params.append('clinicName', filters.clinicName);
       if (filters.clientId) params.append('clientId', filters.clientId.toString());
+      if (filters.orderNumber) params.append('orderNumber', filters.orderNumber);
+      if (filters.orderId) params.append('orderId', filters.orderId);
       if (filters.startDate) params.append('startDate', filters.startDate);
       if (filters.endDate) params.append('endDate', filters.endDate);
       if (filters.outstanding !== undefined) params.append('outstanding', filters.outstanding.toString());
@@ -270,18 +283,64 @@ export class PaymentApiService extends BaseApiService {
   }
 
   /**
-   * Get payment by ID
+   * Get payments by order number
+   */
+  static async getPaymentsByOrder(orderNumber: string): Promise<PaymentListResponse> {
+    try {
+      if (!orderNumber || orderNumber.trim().length === 0) {
+        throw new Error('Order number is required');
+      }
+
+      const response = await this.getAllPayments({ orderNumber });
+      return response;
+    } catch (error) {
+      console.error('[getPaymentsByOrder] Error:', error);
+      throw error instanceof Error ? error : new Error('Failed to fetch payments for order');
+    }
+  }
+
+  /**
+   * Get payment by ID (accepts both MongoDB _id and paymentNumber)
    */
   static async getPaymentById(id: string): Promise<PaymentResponse> {
     try {
+      // Validate ID format
+      if (!id || id.trim().length === 0) {
+        throw new Error('Payment ID is required');
+      }
+
       const response = await this.request<PaymentResponse>(`${this.baseUrl}/${id}`);
       
       if (response.success && response.data) {
-        return response.data;
+        // Transform response to ensure compatibility
+        const payment = response.data;
+        
+        // Add computed fields for backward compatibility
+        if (payment.amounts) {
+          payment.total = payment.amounts.totalPaymentAmount;
+          payment.amountPaid = payment.amounts.totalPaid;
+          payment.amountDue = payment.amounts.totalOwed;
+        }
+        
+        // Set paymentId and invoiceNumber if not present
+        payment.paymentId = payment.paymentId || payment._id;
+        payment.invoiceNumber = payment.invoiceNumber || payment.paymentNumber;
+        
+        return response;
       }
       
       throw new Error('Payment not found');
     } catch (error) {
+      // Enhanced error handling with more specific messages
+      if (error instanceof Error) {
+        if (error.message.includes('404')) {
+          throw this.handleError(new Error('Payment not found - the specified payment ID does not exist'), 'getPaymentById');
+        } else if (error.message.includes('400')) {
+          throw this.handleError(new Error('Invalid payment ID format'), 'getPaymentById');
+        } else if (error.message.includes('timeout')) {
+          throw this.handleError(new Error('Request timeout - please try again'), 'getPaymentById');
+        }
+      }
       throw this.handleError(error, 'getPaymentById');
     }
   }
@@ -667,6 +726,44 @@ export class PaymentApiService extends BaseApiService {
    */
   static clearPaymentCache(): void {
     this.clearCache('/api/v1/payments');
+  }
+
+  /**
+   * Debug utility: Get all payment IDs for testing
+   */
+  static async getAllPaymentIds(): Promise<{ _id: string; paymentId?: string; paymentNumber?: string; clientName?: string }[]> {
+    try {
+      const response = await this.getAllPayments({ limit: 100 });
+      return response.data.map(payment => ({
+        _id: payment._id,
+        paymentId: payment.paymentId || payment.paymentNumber, // Support both fields
+        paymentNumber: payment.paymentNumber,
+        clientName: payment.clientName
+      }));
+    } catch (error) {
+      console.error('Error fetching payment IDs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Validate payment ID format
+   */
+  static isValidPaymentId(id: string): boolean {
+    if (!id || id.trim().length === 0) return false;
+    
+    // Check if it's a valid MongoDB ObjectId (24 hex characters)
+    const mongoIdRegex = /^[0-9a-fA-F]{24}$/;
+    
+    // Check if it's a valid payment ID format
+    // Supports multiple formats:
+    // - PAY-XXX-YYYY-XXX (e.g., PAY-001-2025-001) - main format
+    // - PAY-XXXXXXXX (8 digits) - legacy format
+    // - PAY-YYYY-XXX (year-sequence format) - legacy format
+    const paymentIdRegex = /^PAY-\d{3}-\d{4}-\d{3}$/; // Main format: PAY-001-2025-001
+    const paymentLegacyRegex = /^PAY-[\d-]+$/; // Legacy formats
+    
+    return mongoIdRegex.test(id) || paymentIdRegex.test(id) || paymentLegacyRegex.test(id);
   }
 }
 

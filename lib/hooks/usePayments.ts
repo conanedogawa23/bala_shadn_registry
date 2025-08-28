@@ -345,12 +345,25 @@ export function usePayment(paymentId: string | null): UsePaymentResult {
       setLoading(true);
       setError(null);
       
+      console.log('usePayment: Fetching payment with ID:', paymentId);
+      
       const response = await PaymentApiService.getPaymentById(paymentId);
-      setPayment(response.data);
+      
+      console.log('usePayment: Response received:', response);
+      
+      if (response.success && response.data) {
+        setPayment(response.data);
+      } else {
+        throw new Error('Invalid response format from server');
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch payment';
       setError(errorMessage);
-      console.error('Error fetching payment:', err);
+      console.error('usePayment: Error fetching payment:', {
+        paymentId,
+        error: err,
+        errorMessage
+      });
     } finally {
       setLoading(false);
     }
@@ -465,6 +478,61 @@ export function usePaymentStats(clinicName: string): UsePaymentStatsResult {
     loading,
     error,
     refetch: fetchStats,
+    clearError
+  };
+}
+
+/**
+ * Hook for payments by order number
+ */
+export function usePaymentsByOrder(orderNumber: string): UsePaymentsResult {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<UsePaymentsResult['pagination']>(null);
+
+  const fetchPayments = useCallback(async () => {
+    if (!orderNumber) {
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await PaymentApiService.getPaymentsByOrder(orderNumber);
+      
+      setPayments(response.data);
+      setPagination(response.pagination);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch order payments';
+      setError(errorMessage);
+      console.error('Error fetching order payments:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [orderNumber]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
+
+  return {
+    payments,
+    loading,
+    error,
+    pagination,
+    refetch: fetchPayments,
+    createPayment: async () => { throw new Error('Not implemented for order payments'); },
+    updatePayment: async () => { throw new Error('Not implemented for order payments'); },
+    deletePayment: async () => { throw new Error('Not implemented for order payments'); },
+    addPaymentAmount: async () => { throw new Error('Not implemented for order payments'); },
+    processRefund: async () => { throw new Error('Not implemented for order payments'); },
     clearError
   };
 }

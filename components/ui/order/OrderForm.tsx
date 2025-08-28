@@ -48,9 +48,6 @@ const orderFormSchema = z.object({
   }).default(new Date()),
   lineItems: z.array(lineItemSchema).min(1, "At least one item is required"),
   notes: z.string().optional(),
-  subtotal: z.number().optional(),
-  taxRate: z.coerce.number().min(0, "Tax rate cannot be negative").max(100, "Tax rate cannot exceed 100%").default(0),
-  taxAmount: z.number().optional(),
   total: z.number().optional(),
 });
 
@@ -90,7 +87,7 @@ interface OrderFormProps {
  * 
  * Features:
  * - Dynamic line items management (add/remove)
- * - Automatic calculation of subtotals, tax, and total
+ * - Automatic calculation of line item subtotals and order total
  * - Product selection with price auto-fill
  * - Customer selection
  * - Full form validation with Zod
@@ -104,15 +101,12 @@ export function OrderForm({
   onCancel,
   isLoading = false,
 }: OrderFormProps) {
-  // Calculate the default values with proper subtotals
+  // Calculate the default values
   const initialValues: OrderFormValues = {
     orderDate: new Date(),
-    taxRate: 0,
     customerId: "",
     lineItems: [{ productId: "", quantity: 1, unitPrice: 0 }],
     notes: "",
-    subtotal: 0,
-    taxAmount: 0,
     total: 0,
     ...defaultValues,
   };
@@ -162,12 +156,7 @@ function OrderFormContent({
     name: "lineItems",
   });
   
-  const taxRate = useWatch({
-    control: form.control,
-    name: "taxRate",
-  });
-
-  // Auto-calculate totals whenever line items or tax rate changes
+  // Auto-calculate totals whenever line items change
   useEffect(() => {
     if (!lineItems) return;
     
@@ -177,16 +166,12 @@ function OrderFormContent({
       subtotal: item.quantity * item.unitPrice,
     }));
     
-    const subtotal = calculatedLineItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
-    const taxAmount = subtotal * (taxRate / 100);
-    const total = subtotal + taxAmount;
+    const total = calculatedLineItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
     
     // Update form values with calculations
     form.setValue("lineItems", calculatedLineItems);
-    form.setValue("subtotal", subtotal);
-    form.setValue("taxAmount", taxAmount);
     form.setValue("total", total);
-  }, [lineItems, taxRate, form]);
+  }, [lineItems, form]);
 
   // Handle product selection change
   const handleProductChange = (index: number, productId: string) => {
@@ -431,41 +416,9 @@ function OrderFormContent({
 
         {/* Order Totals */}
         <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Subtotal:</span>
-            <span>{form.watch("subtotal")?.toFixed(2) || "0.00"}</span>
-          </div>
 
-          <div className="flex justify-between items-center gap-4">
-            <FormField
-              control={form.control}
-              name="taxRate"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <div className="flex items-center">
-                    <FormLabel className="flex-none mr-2">Tax Rate (%):</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.1}
-                        {...field}
-                        className="max-w-[100px]"
-                        disabled={isLoading}
-                        aria-label="Tax rate percentage"
-                      />
-                    </FormControl>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="flex justify-between min-w-[160px]">
-              <span>Tax Amount:</span>
-              <span>${form.watch("taxAmount")?.toFixed(2) || "0.00"}</span>
-            </div>
-          </div>
+
+
 
           <div className="flex justify-between font-semibold text-lg pt-2">
             <span>Total:</span>

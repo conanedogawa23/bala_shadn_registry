@@ -315,19 +315,19 @@ export default function PaymentDetailsPage() {
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="text-center p-4 border rounded-lg">
                     <p className="text-2xl font-bold text-gray-900">
-                      {PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)}
+                      {PaymentApiService.formatCurrency(payment.amounts?.totalPaymentAmount || payment.total || 0)}
                     </p>
                     <p className="text-sm text-gray-600 mt-1">Total Amount</p>
                   </div>
                   <div className="text-center p-4 border rounded-lg">
                     <p className="text-2xl font-bold text-green-600">
-                      {PaymentApiService.formatCurrency(payment.amounts.totalPaid)}
+                      {PaymentApiService.formatCurrency(payment.amounts?.totalPaid || payment.amountPaid || 0)}
                     </p>
                     <p className="text-sm text-gray-600 mt-1">Total Paid</p>
                   </div>
                   <div className="text-center p-4 border rounded-lg">
                     <p className="text-2xl font-bold text-orange-600">
-                      {PaymentApiService.formatCurrency(payment.amounts.totalOwed)}
+                      {PaymentApiService.formatCurrency(payment.amounts?.totalOwed || payment.amountDue || 0)}
                     </p>
                     <p className="text-sm text-gray-600 mt-1">Outstanding</p>
                   </div>
@@ -336,95 +336,97 @@ export default function PaymentDetailsPage() {
                 <Separator />
 
                 {/* Canadian Healthcare Payment Types */}
-                <div>
-                  <h4 className="font-medium mb-3">Canadian Healthcare Payment Types</h4>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {payment.amounts.popAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">Patient Out of Pocket (POP):</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.popAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.popfpAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">POP Final Payment:</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.popfpAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.dpaAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">Direct Payment Authorization (DPA):</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.dpaAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.dpafpAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">DPA Final Payment:</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.dpafpAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.cob1Amount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">COB Primary:</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.cob1Amount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.cob2Amount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">COB Secondary:</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.cob2Amount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.cob3Amount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">COB Tertiary:</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.cob3Amount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.insurance1stAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">1st Insurance:</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.insurance1stAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.insurance2ndAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">2nd Insurance:</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.insurance2ndAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.insurance3rdAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">3rd Insurance:</span>
-                        <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.insurance3rdAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.refundAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-purple-600">Refund:</span>
-                        <span className="text-sm font-medium text-purple-600">-{PaymentApiService.formatCurrency(payment.amounts.refundAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.salesRefundAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-purple-600">Sales Refund:</span>
-                        <span className="text-sm font-medium text-purple-600">-{PaymentApiService.formatCurrency(payment.amounts.salesRefundAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.writeoffAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Write-off:</span>
-                        <span className="text-sm font-medium text-gray-600">-{PaymentApiService.formatCurrency(payment.amounts.writeoffAmount)}</span>
-                      </div>
-                    )}
-                    {payment.amounts.badDebtAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-red-600">Bad Debt:</span>
-                        <span className="text-sm font-medium text-red-600">-{PaymentApiService.formatCurrency(payment.amounts.badDebtAmount)}</span>
-                      </div>
-                    )}
+                {payment.amounts && (
+                  <div>
+                    <h4 className="font-medium mb-3">Canadian Healthcare Payment Types</h4>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {(payment.amounts?.popAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">Patient Out of Pocket (POP):</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.popAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.popfpAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">POP Final Payment:</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.popfpAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.dpaAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">Direct Payment Authorization (DPA):</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.dpaAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.dpafpAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">DPA Final Payment:</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.dpafpAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.cob1Amount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">COB Primary:</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.cob1Amount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.cob2Amount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">COB Secondary:</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.cob2Amount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.cob3Amount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">COB Tertiary:</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.cob3Amount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.insurance1stAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">1st Insurance:</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.insurance1stAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.insurance2ndAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">2nd Insurance:</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.insurance2ndAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.insurance3rdAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm">3rd Insurance:</span>
+                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.insurance3rdAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.refundAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-purple-600">Refund:</span>
+                          <span className="text-sm font-medium text-purple-600">-{PaymentApiService.formatCurrency(payment.amounts.refundAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.salesRefundAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-purple-600">Sales Refund:</span>
+                          <span className="text-sm font-medium text-purple-600">-{PaymentApiService.formatCurrency(payment.amounts.salesRefundAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.writeoffAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Write-off:</span>
+                          <span className="text-sm font-medium text-gray-600">-{PaymentApiService.formatCurrency(payment.amounts.writeoffAmount)}</span>
+                        </div>
+                      )}
+                      {(payment.amounts?.badDebtAmount || 0) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-red-600">Bad Debt:</span>
+                          <span className="text-sm font-medium text-red-600">-{PaymentApiService.formatCurrency(payment.amounts.badDebtAmount)}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -474,20 +476,26 @@ export default function PaymentDetailsPage() {
                 <div className="flex justify-between text-sm">
                   <span>Completion:</span>
                   <span className="font-medium">
-                    {PaymentApiService.getPaymentCompletionPercentage(payment.amounts)}%
+                    {payment.amounts 
+                      ? PaymentApiService.getPaymentCompletionPercentage(payment.amounts)
+                      : Math.round(((payment.amountPaid || 0) / (payment.total || 1)) * 100)
+                    }%
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-green-600 h-2 rounded-full transition-all duration-300"
                     style={{ 
-                      width: `${PaymentApiService.getPaymentCompletionPercentage(payment.amounts)}%` 
+                      width: `${payment.amounts 
+                        ? PaymentApiService.getPaymentCompletionPercentage(payment.amounts)
+                        : Math.round(((payment.amountPaid || 0) / (payment.total || 1)) * 100)
+                      }%` 
                     }}
                   ></div>
                 </div>
                 <div className="text-xs text-gray-500">
-                  {payment.amounts.totalPaid > 0 ? (
-                    `${PaymentApiService.formatCurrency(payment.amounts.totalPaid)} of ${PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)} paid`
+                  {(payment.amounts?.totalPaid || payment.amountPaid || 0) > 0 ? (
+                    `${PaymentApiService.formatCurrency(payment.amounts?.totalPaid || payment.amountPaid || 0)} of ${PaymentApiService.formatCurrency(payment.amounts?.totalPaymentAmount || payment.total || 0)} paid`
                   ) : (
                     'No payments received yet'
                   )}

@@ -642,6 +642,38 @@ export const OrderUtils = {
   },
 
   /**
+   * Get order status label for UI display
+   */
+  getStatusLabel: (status: OrderStatus): string => {
+    const statusOptions = OrderService.getOrderStatusOptions();
+    return statusOptions.find(option => option.value === status)?.label || status;
+  },
+
+  /**
+   * Get payment status label for UI display
+   */
+  getPaymentStatusLabel: (status: PaymentStatus): string => {
+    const statusOptions = OrderService.getPaymentStatusOptions();
+    return statusOptions.find(option => option.value === status)?.label || status;
+  },
+
+  /**
+   * Format date for display
+   */
+  formatDate: (date: string | Date): string => {
+    try {
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      return dateObj.toLocaleDateString('en-CA', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  },
+
+  /**
    * Format currency for display
    */
   formatCurrency: OrderService.formatCurrency,

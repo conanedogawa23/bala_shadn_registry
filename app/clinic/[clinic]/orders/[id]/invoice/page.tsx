@@ -6,8 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { slugToClinic } from "@/lib/data/clinics";
-import { PaymentApiService, type Payment } from "@/lib/hooks";
-import InvoiceTemplate from "@/components/ui/invoice/InvoiceTemplate";
+import { useOrder, usePaymentsByOrder, type Order, type Payment } from "@/lib/hooks";
+import OrderInvoiceTemplate from "@/components/ui/invoice/OrderInvoiceTemplate";
 
 // Loading component
 const LoadingSpinner = () => (
@@ -40,96 +40,71 @@ const ErrorDisplay = ({ error, onRetry }: { error: string; onRetry: () => void }
   </div>
 );
 
-export default function InvoicePage() {
+export default function OrderInvoicePage() {
   const params = useParams();
   const clinic = params.clinic as string;
-  const paymentId = params.id as string;
+  const orderId = params.id as string;
   
   // State management
-  const [payment, setPayment] = useState<Payment | null>(null);
   const [clinicInfo, setClinicInfo] = useState<Record<string, unknown> | null>(null);
   const [clientInfo, setClientInfo] = useState<Record<string, unknown> | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isDataReady, setIsDataReady] = useState(false);
 
   // Get clinic data
   const clinicData = slugToClinic(clinic);
 
-  // Fetch invoice data
-  const fetchInvoiceData = useCallback(async () => {
-    if (!clinicData || !paymentId) {
-      setError("Invalid clinic or payment ID");
-      setIsLoading(false);
-      return;
-    }
+  // Fetch order data
+  const { order, loading: orderLoading, error: orderError } = useOrder({
+    id: orderId,
+    autoFetch: !!orderId
+  });
 
-    try {
-      setIsLoading(true);
-      setError(null);
+  // Fetch payments for this order
+  const { 
+    payments, 
+    loading: paymentsLoading, 
+    error: paymentsError 
+  } = usePaymentsByOrder(order?.orderNumber || "");
 
-      console.log('Fetching payment with ID:', paymentId);
-      
-      // Validate payment ID format first
-      if (!PaymentApiService.isValidPaymentId(paymentId)) {
-        throw new Error(`Invalid payment ID format: ${paymentId}. Expected MongoDB ObjectId or PAY-XXXXXXXX format.`);
-      }
+  const isLoading = orderLoading || (order?.orderNumber && paymentsLoading) || !isDataReady;
+  const error = orderError || paymentsError;
 
-      // Get payment data from the backend
-      const paymentResponse = await PaymentApiService.getPaymentById(paymentId);
-      const paymentData = paymentResponse.data;
-      
-      console.log('Payment data received:', paymentData);
-      
-      if (!paymentData) {
-        throw new Error('No payment data received from server');
-      }
-      
-      setPayment(paymentData);
-      setClinicInfo({
-        name: clinicData.name,
-        displayName: clinicData.displayName,
-        address: clinicData.address,
-        city: clinicData.city,
-        province: clinicData.province,
-        postalCode: clinicData.postalCode,
-        phone: '(416) 555-0123', // Default values for BodyBliss format
-        fax: '(416) 555-0124'
-      });
-      setClientInfo({
-        name: paymentData.clientName || 'Unknown Client',
-        address: '',
-        city: '',
-        province: '',
-        postalCode: ''
-      });
-    } catch (err) {
-      console.error('Error loading invoice data:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load invoice';
-      setError(errorMessage);
-      
-      // Additional debugging information
-      if (err instanceof Error && err.message.includes('[getPaymentById]')) {
-        console.error('Payment fetch error details:', {
-          paymentId,
-          clinicData: clinicData.name,
-          errorMessage: err.message
-        });
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [clinicData, paymentId]);
+  // Setup clinic and client info
+  const setupInvoiceData = useCallback(() => {
+    if (!clinicData || !order) return;
+
+    setClinicInfo({
+      name: clinicData.name,
+      displayName: clinicData.displayName,
+      address: clinicData.address,
+      city: clinicData.city,
+      province: clinicData.province,
+      postalCode: clinicData.postalCode,
+      phone: '(416) 555-0123', // Default values for BodyBliss format
+      fax: '(416) 555-0124'
+    });
+
+    setClientInfo({
+      name: order.clientName || 'Unknown Client',
+      address: '',
+      city: '',
+      province: '',
+      postalCode: ''
+    });
+
+    setIsDataReady(true);
+  }, [clinicData, order]);
 
   // Handle retry
   const handleRetry = () => {
-    fetchInvoiceData();
+    setIsDataReady(false);
+    window.location.reload();
   };
 
   // Handle download PDF (placeholder for future implementation)
   const handleDownload = async () => {
     try {
       // For now, just trigger print
-      // In the future, this could generate a PDF blob and download it
       window.print();
     } catch (err) {
       console.error('Download failed:', err);
@@ -138,8 +113,8 @@ export default function InvoicePage() {
 
   // Effects
   useEffect(() => {
-    fetchInvoiceData();
-  }, [fetchInvoiceData]);
+    setupInvoiceData();
+  }, [setupInvoiceData]);
 
   // Error states
   if (!clinicData) {
@@ -163,10 +138,10 @@ export default function InvoicePage() {
     );
   }
 
-  if (!payment) {
+  if (!order) {
     return (
       <ErrorDisplay 
-        error="Payment not found" 
+        error="Order not found" 
         onRetry={handleRetry} 
       />
     );
@@ -185,7 +160,7 @@ export default function InvoicePage() {
   };
 
   const defaultClientInfo = {
-    name: (clientInfo as Record<string, string>)?.name || payment?.clientName || 'Unknown Client',
+    name: (clientInfo as Record<string, string>)?.name || order?.clientName || 'Unknown Client',
     address: (clientInfo as Record<string, string>)?.address || '',
     city: (clientInfo as Record<string, string>)?.city || '',
     province: (clientInfo as Record<string, string>)?.province || '',
@@ -195,11 +170,12 @@ export default function InvoicePage() {
   };
 
   return (
-    <InvoiceTemplate
-      payment={payment}
+    <OrderInvoiceTemplate
+      order={order}
+      payments={payments}
       clinicInfo={defaultClinicInfo}
       clientInfo={defaultClientInfo}
       onDownload={handleDownload}
     />
   );
-} 
+}

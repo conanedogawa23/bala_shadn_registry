@@ -211,15 +211,14 @@ export default function EditClientOrderPage() {
   }, []);
 
   const calculateTotals = useCallback(() => {
-    const subtotal = items.reduce((sum, item) => sum + calculateItemSubtotal(item), 0);
+    const total = items.reduce((sum, item) => sum + calculateItemSubtotal(item), 0);
     const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
     const totalDuration = items.reduce((sum, item) => sum + (item.duration * item.quantity), 0);
     
     return {
-      subtotal,
       totalQuantity,
       totalDuration,
-      total: subtotal // For healthcare, typically no tax
+      total // For healthcare, no tax calculation needed
     };
   }, [items, calculateItemSubtotal]);
 
@@ -247,7 +246,7 @@ export default function EditClientOrderPage() {
           quantity: item.quantity,
           duration: item.duration,
           unitPrice: item.unitPrice,
-          subtotal: calculateItemSubtotal(item)
+          subtotal: calculateItemSubtotal(item) // Line item subtotal (not order subtotal)
         })),
         totalAmount: totals.total,
         totalDuration: totals.totalDuration

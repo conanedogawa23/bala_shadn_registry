@@ -22,7 +22,7 @@ interface RequestOptions extends RequestInit {
 }
 
 export abstract class BaseApiService {
-  protected static readonly API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+  protected static readonly API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://e47b8b3acdac.ngrok-free.app/api/v1';
   protected static readonly DEFAULT_TIMEOUT = 30000; // 30 seconds
   
   /**

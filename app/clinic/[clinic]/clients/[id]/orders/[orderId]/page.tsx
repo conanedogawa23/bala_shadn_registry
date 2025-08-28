@@ -165,7 +165,7 @@ export default function ViewClientOrderPage() {
   const orderSummary = {
     totalItems: order.items.length,
     totalQuantity: order.items.reduce((sum, item) => sum + item.quantity, 0),
-    subtotal: order.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0),
+    // subtotal calculation removed (no tax structure needed for healthcare)
     totalDuration: order.totalDuration || order.items.reduce((sum, item) => sum + item.duration, 0)
   };
 
@@ -373,9 +373,9 @@ export default function ViewClientOrderPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-gray-900">
-                          {OrderUtils.formatCurrency(item.subtotal)}
+                          {OrderUtils.formatCurrency(item.unitPrice * item.quantity)}
                         </p>
-                        <p className="text-sm text-gray-500">Subtotal</p>
+                        <p className="text-sm text-gray-500">Total</p>
                       </div>
                     </div>
                   </div>
@@ -386,10 +386,6 @@ export default function ViewClientOrderPage() {
                 {/* Order Summary */}
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Subtotal:</span>
-                      <span>{OrderUtils.formatCurrency(orderSummary.subtotal)}</span>
-                    </div>
                     <div className="flex justify-between text-lg font-bold border-t pt-2">
                       <span>Total Amount:</span>
                       <span>{OrderUtils.formatCurrency(order.totalAmount)}</span>
