@@ -59,17 +59,32 @@ export abstract class BaseApiService {
     config.signal = controller.signal;
     
     try {
+      console.log(`[API] ${method} ${this.API_BASE_URL}${endpoint}`, data ? { body: data } : '');
+      
       const response = await fetch(`${this.API_BASE_URL}${endpoint}`, config);
       clearTimeout(timeoutId);
       
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
+      }
+      
+      console.log(`[API] Response ${response.status}:`, result);
       
       if (!response.ok) {
-        throw new Error(result.error?.message || result.message || `HTTP ${response.status}: ${response.statusText}`);
+        const errorMessage = result.error?.message || result.message || `HTTP ${response.status}: ${response.statusText}`;
+        const errorDetails = result.error?.details || result.details;
+        console.error(`[API] Error ${response.status}:`, { errorMessage, errorDetails, result });
+        throw new Error(errorMessage);
       }
       
       if (!result.success) {
-        throw new Error(result.error?.message || result.message || 'API request failed');
+        const errorMessage = result.error?.message || result.message || 'API request failed';
+        const errorDetails = result.error?.details || result.details;
+        console.error('[API] Request failed:', { errorMessage, errorDetails, result });
+        throw new Error(errorMessage);
       }
       
       return result;
@@ -77,9 +92,11 @@ export abstract class BaseApiService {
       clearTimeout(timeoutId);
       
       if (error instanceof Error && error.name === 'AbortError') {
+        console.error(`[API] Request timeout after ${timeout}ms for ${method} ${endpoint}`);
         throw new Error(`Request timeout after ${timeout}ms`);
       }
       
+      console.error(`[API] Request failed for ${method} ${endpoint}:`, error);
       throw error;
     }
   }
@@ -149,6 +166,8 @@ export abstract class BaseApiService {
     }
     
     const keysToDelete = Array.from(this.cache.keys()).filter(key => key.includes(pattern));
-    keysToDelete.map(key => this.cache.delete(key));
+    for (const key of keysToDelete) {
+      this.cache.delete(key);
+    }
   }
 }

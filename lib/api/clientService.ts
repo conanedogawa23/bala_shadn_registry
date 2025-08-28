@@ -13,22 +13,49 @@ interface CreateClientRequest {
     firstName: string;
     lastName: string;
     dateOfBirth?: Date;
+    birthday?: {
+      day: string;
+      month: string;
+      year: string;
+    };
     gender: 'Male' | 'Female' | 'Other';
   };
   contact: {
     address: {
       street: string;
+      apartment?: string;
       city: string;
       province: string;
-      postalCode: string;
+      postalCode: string | {
+        first3: string;
+        last3: string;
+        full?: string;
+      };
     };
     phones: {
-      home?: string;
-      cell?: string;
-      work?: string;
+      home?: string | {
+        countryCode: string;
+        areaCode: string;
+        number: string;
+        full?: string;
+      };
+      cell?: string | {
+        countryCode: string;
+        areaCode: string;
+        number: string;
+        full?: string;
+      };
+      work?: string | {
+        countryCode: string;
+        areaCode: string;
+        number: string;
+        extension?: string;
+        full?: string;
+      };
     };
     email?: string;
     company?: string;
+    companyOther?: string;
   };
   medical: {
     familyMD?: string;
@@ -37,20 +64,40 @@ interface CreateClientRequest {
   };
   insurance: Array<{
     type: '1st' | '2nd' | '3rd';
+    dpa?: boolean;
     policyHolder: string;
+    cob?: string;
+    policyHolderName?: string;
+    birthday?: {
+      day: string;
+      month: string;
+      year: string;
+    };
     company: string;
+    companyAddress?: string;
+    city?: string;
+    province?: string;
+    postalCode?: {
+      first3: string;
+      last3: string;
+    };
     groupNumber?: string;
     certificateNumber: string;
     coverage: {
-      orthotics?: number;
-      physiotherapy?: number;
-      massage?: number;
+      numberOfOrthotics?: string;
+      totalAmountPerOrthotic?: number;
+      totalAmountPerYear?: number;
+      frequency?: string;
+      numOrthoticsPerYear?: string;
       orthopedicShoes?: number;
       compressionStockings?: number;
+      physiotherapy?: number;
+      massage?: number;
       other?: number;
     };
   }>;
   defaultClinic: string;
+  clientId?: string;
 }
 
 interface UpdateClientRequest extends Partial<CreateClientRequest> {
@@ -77,6 +124,40 @@ interface ClientStatsResponse {
   averageAge: number;
   genderDistribution: Record<string, number>;
   topCities: Array<{ city: string; count: number }>;
+}
+
+// Add proper phone type definition
+interface PhoneStructure {
+  countryCode: string;
+  areaCode: string;
+  number: string;
+  extension?: string;
+  full?: string;
+}
+
+// Add transformed client data type
+interface TransformedClientData extends Omit<CreateClientRequest, 'contact'> {
+  contact: {
+    address: {
+      street: string;
+      apartment?: string;
+      city: string;
+      province: string;
+      postalCode: {
+        first3: string;
+        last3: string;
+        full?: string;
+      };
+    };
+    phones: {
+      home?: PhoneStructure;
+      cell?: PhoneStructure;
+      work?: PhoneStructure & { extension?: string };
+    };
+    email?: string;
+    company?: string;
+    companyOther?: string;
+  };
 }
 
 export class ClientApiService extends BaseApiService {
@@ -147,14 +228,109 @@ export class ClientApiService extends BaseApiService {
   }
 
   /**
+   * Transform frontend data to backend-compatible format
+   */
+  private static transformClientData(clientData: CreateClientRequest | UpdateClientRequest): TransformedClientData {
+    const transformedData = { ...clientData } as any;
+
+    // Safely transform dateOfBirth to birthday format if provided
+    if (clientData.personalInfo?.dateOfBirth && !clientData.personalInfo?.birthday) {
+      const date = new Date(clientData.personalInfo.dateOfBirth);
+      if (!isNaN(date.getTime())) {
+        transformedData.personalInfo = {
+          ...transformedData.personalInfo,
+          birthday: {
+            day: date.getDate().toString().padStart(2, '0'),
+            month: (date.getMonth() + 1).toString().padStart(2, '0'),
+            year: date.getFullYear().toString()
+          }
+        };
+      }
+    }
+
+    // Transform postal code from string to object format
+    if (clientData.contact?.address?.postalCode && typeof clientData.contact.address.postalCode === 'string') {
+      const postalCode = clientData.contact.address.postalCode.replace(/\s+/g, '');
+      if (postalCode.length >= 6) {
+        transformedData.contact = {
+          ...transformedData.contact,
+          address: {
+            ...transformedData.contact.address,
+            postalCode: {
+              first3: postalCode.substring(0, 3).toUpperCase(),
+              last3: postalCode.substring(3, 6).toUpperCase(),
+              full: `${postalCode.substring(0, 3).toUpperCase()} ${postalCode.substring(3, 6).toUpperCase()}`
+            }
+          }
+        };
+      }
+    }
+
+    // Transform phone numbers from string to object format
+    const transformPhone = (phone: string | PhoneStructure): PhoneStructure => {
+      if (typeof phone === 'string') {
+        // Parse phone number - assuming format like "(416) 123-4567" or "4161234567"
+        const cleaned = phone.replace(/\D/g, '');
+        if (cleaned.length === 10) {
+          return {
+            countryCode: '1',
+            areaCode: cleaned.substring(0, 3),
+            number: `${cleaned.substring(3, 6)}-${cleaned.substring(6)}`,
+            full: `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6)}`
+          };
+        } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+          return {
+            countryCode: '1',
+            areaCode: cleaned.substring(1, 4),
+            number: `${cleaned.substring(4, 7)}-${cleaned.substring(7)}`,
+            full: `(${cleaned.substring(1, 4)}) ${cleaned.substring(4, 7)}-${cleaned.substring(7)}`
+          };
+        }
+        // If can't parse, return as is with basic structure
+        return {
+          countryCode: '1',
+          areaCode: '',
+          number: phone,
+          full: phone
+        };
+      }
+      return phone; // Already in correct format
+    };
+
+    // Safely transform phone numbers
+    if (clientData.contact?.phones) {
+      transformedData.contact = {
+        ...transformedData.contact,
+        phones: {
+          ...transformedData.contact.phones
+        }
+      };
+
+      if (clientData.contact.phones.home) {
+        transformedData.contact.phones.home = transformPhone(clientData.contact.phones.home);
+      }
+      if (clientData.contact.phones.cell) {
+        transformedData.contact.phones.cell = transformPhone(clientData.contact.phones.cell);
+      }
+      if (clientData.contact.phones.work) {
+        transformedData.contact.phones.work = transformPhone(clientData.contact.phones.work);
+      }
+    }
+
+    return transformedData as TransformedClientData;
+  }
+
+  /**
    * Create new client
    */
   static async createClient(clientData: CreateClientRequest): Promise<Client> {
     try {
+      const transformedData = this.transformClientData(clientData);
+      
       const response = await this.request<Client>(
         this.ENDPOINT,
         'POST',
-        clientData
+        transformedData
       );
       
       if (response.success && response.data) {
@@ -174,10 +350,12 @@ export class ClientApiService extends BaseApiService {
    */
   static async updateClient(clientId: string, updates: UpdateClientRequest): Promise<Client> {
     try {
+      const transformedData = this.transformClientData(updates);
+      
       const response = await this.request<Client>(
         `${this.ENDPOINT}/${encodeURIComponent(clientId)}`,
         'PUT',
-        updates
+        transformedData
       );
       
       if (response.success && response.data) {
