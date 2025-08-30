@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ import {
   Package,
   CreditCard,
   CalendarDays,
-  RefreshCw
+
 } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
 import { generateLink } from '@/lib/route-utils';
@@ -77,7 +77,8 @@ export default function ReportsPage() {
   const [useCustomRange, setUseCustomRange] = useState(false);
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dateRangeValid, setDateRangeValid] = useState(true);
+  const [selectedQuickPreset, setSelectedQuickPreset] = useState<string | null>(null);
 
   // Calculate date ranges based on selected period or custom dates
   const dateRange = useMemo(() => {
@@ -114,6 +115,45 @@ export default function ReportsPage() {
     };
   }, [selectedPeriod, useCustomRange, customStartDate, customEndDate]);
 
+  // Validate date range
+  useEffect(() => {
+    setDateRangeValid(true); // Simplified validation - always allow data loading
+  }, [useCustomRange, customStartDate, customEndDate]);
+
+  // Clear selected preset when dates are manually changed or switching to non-custom range
+  useEffect(() => {
+    if (!useCustomRange && selectedQuickPreset) {
+      setSelectedQuickPreset(null);
+    } else if (useCustomRange && (customStartDate || customEndDate) && selectedQuickPreset) {
+      // Only clear if dates don't match the current preset
+      const now = new Date();
+      let expectedStart = new Date();
+      
+      switch (selectedQuickPreset) {
+        case 'thisWeek':
+          const dayOfWeek = now.getDay();
+          expectedStart.setDate(now.getDate() - dayOfWeek);
+          break;
+        case 'thisMonth':
+          expectedStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'thisQuarter':
+          const quarter = Math.floor(now.getMonth() / 3);
+          expectedStart = new Date(now.getFullYear(), quarter * 3, 1);
+          break;
+        default:
+          return;
+      }
+      
+      // If manually changed dates don't match preset, clear selection
+      if (customStartDate && expectedStart.toDateString() !== customStartDate.toDateString()) {
+        setSelectedQuickPreset(null);
+      }
+    }
+  }, [customStartDate, customEndDate, useCustomRange, selectedQuickPreset]);
+
+
+
   // Fetch real analytics data
   const { 
     analytics: revenueAnalytics, 
@@ -121,22 +161,24 @@ export default function ReportsPage() {
     error: revenueError,
     totalRevenue,
     totalOrders: analyticsOrderCount,
-    avgOrderValue
+    avgOrderValue,
+    refetch: refetchRevenue
   } = useRevenueAnalytics({
     clinicName: clinic?.name || "",
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
-    autoFetch: !!clinic?.name
+    autoFetch: !!clinic?.name && dateRangeValid
   });
 
   const { 
     performance: productPerformance, 
     loading: performanceLoading, 
-    error: performanceError 
+    error: performanceError,
+    refetch: refetchPerformance
   } = useProductPerformance({
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
-    autoFetch: true
+    autoFetch: dateRangeValid
   });
 
   const { 
@@ -251,16 +293,22 @@ export default function ReportsPage() {
   };
 
   // Handle custom date range toggle
-  const handleCustomRangeToggle = (enabled: boolean) => {
+  const handleCustomRangeToggle = useCallback((enabled: boolean) => {
     setUseCustomRange(enabled);
     if (!enabled) {
       setCustomStartDate(undefined);
       setCustomEndDate(undefined);
+      setSelectedQuickPreset(null);
     }
-  };
+    // Clear cache to force data refresh
+    if (typeof window !== 'undefined') {
+      // Clear any cached data when switching date modes
+      sessionStorage.removeItem('reportCache');
+    }
+  }, []);
 
   // Handle quick date range presets for custom selection
-  const handleQuickDateRange = (preset: string) => {
+  const handleQuickDateRange = useCallback((preset: string) => {
     const endDate = new Date();
     let startDate = new Date();
 
@@ -292,55 +340,31 @@ export default function ReportsPage() {
     setCustomStartDate(startDate);
     setCustomEndDate(endDate);
     setUseCustomRange(true);
-  };
+    setSelectedQuickPreset(preset);
+  }, []);
 
-  // Handle manual refresh of reports
-  const handleRefreshReports = async () => {
-    setIsRefreshing(true);
-    try {
-      // Clear cache and refetch data by updating a dependency
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate refresh
-      window.location.reload(); // Simple approach to refresh all data
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const handleExportReport = async (reportType: string) => {
-    if (!clinic?.name || isExporting) return;
-    
-    setIsExporting(true);
-    try {
-      const reportTypeMap: Record<string, string> = {
-        'Summary': 'account-summary',
-        'Payment Summary': 'payment-summary', 
-        'Timesheet': 'timesheet',
-        'Order Status': 'order-status',
-        'Co Pay Summary': 'copay-summary',
-        'Marketing Budget': 'marketing-budget'
-      };
-      
-      const apiReportType = reportTypeMap[reportType] || 'account-summary';
-      
-      await ReportApiService.exportReport(
-        apiReportType,
-        clinic.name,
-        selectedExportFormat,
-        {
-          startDate: new Date(dateRange.startDate),
-          endDate: new Date(dateRange.endDate)
+  // Force data refresh when date range changes - positioned after all hooks
+  useEffect(() => {
+    if (clinic?.name && dateRangeValid) {
+      // Clear cache when date range changes to ensure fresh data
+      if (typeof window !== 'undefined') {
+        const cacheKeys = Object.keys(localStorage);
+        for (const key of cacheKeys) {
+          if (key.includes('revenue_analytics') || key.includes('product_performance')) {
+            localStorage.removeItem(key);
+          }
         }
-      );
+      }
+      // Force hooks to refetch with new date range
+      const timeoutId = setTimeout(() => {
+        refetchRevenue();
+        refetchPerformance();
+      }, 100); // Small delay to ensure state updates are complete
       
-      console.log(`✅ ${reportType} report exported successfully in ${selectedExportFormat.toUpperCase()} format`);
-    } catch (error) {
-      console.error('Export failed:', error);
-      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsExporting(false);
+      return () => clearTimeout(timeoutId);
     }
-  };
-  
+  }, [dateRange.startDate, dateRange.endDate, clinic?.name, dateRangeValid, refetchRevenue, refetchPerformance]);
+
   const handleExportAllReports = async () => {
     if (!clinic?.name || isExporting) return;
     
@@ -372,10 +396,16 @@ export default function ReportsPage() {
   };
 
   // Loading state
-  const isLoading = revenueLoading || performanceLoading || ordersLoading || clientsLoading;
+  const isLoading = useMemo(() => 
+    revenueLoading || performanceLoading || ordersLoading || clientsLoading,
+    [revenueLoading, performanceLoading, ordersLoading, clientsLoading]
+  );
 
   // Error state
-  const hasError = revenueError || performanceError || ordersError || clientsError;
+  const hasError = useMemo(() => 
+    revenueError || performanceError || ordersError || clientsError,
+    [revenueError, performanceError, ordersError, clientsError]
+  );
   const errorMessage = revenueError || performanceError || ordersError || clientsError;
 
   if (!clinic) {
@@ -434,137 +464,111 @@ export default function ReportsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold">
               Reports & Analytics - {clinic.displayName || clinic.name}
             </h1>
-            <div className="flex flex-col sm:flex-row gap-2 mt-1">
-              <p className="text-gray-600">
-                Real-time business insights and performance metrics
-              </p>
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-blue-600" />
-                <Badge variant="outline" className="text-blue-700 border-blue-300">
-                  {useCustomRange ? 'Custom Range' : selectedPeriod.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([0-9])([a-z])/g, '$1 $2')}
-                </Badge>
-                <span className="text-gray-500">
-                  {new Date(dateRange.startDate).toLocaleDateString('en-CA')} - {new Date(dateRange.endDate).toLocaleDateString('en-CA')}
-                </span>
-                {useCustomRange && (!customStartDate || !customEndDate) && (
-                  <Badge variant="destructive" className="text-xs">
-                    Select both dates
-                  </Badge>
-                )}
-                {useCustomRange && customStartDate && customEndDate && customStartDate > customEndDate && (
-                  <Badge variant="destructive" className="text-xs">
-                    Start date must be before end date
-                  </Badge>
-                )}
-              </div>
-            </div>
+            <p className="text-gray-600 mt-1">
+              Real-time business insights and performance metrics
+            </p>
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Date Range Selection */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              variant={useCustomRange ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleCustomRangeToggle(!useCustomRange)}
-              className="flex items-center gap-2"
-            >
-              <CalendarDays className="h-4 w-4" />
-              {useCustomRange ? "Custom Range" : "Quick Periods"}
-            </Button>
+        <div className="flex flex-col sm:flex-row gap-4 items-start">
+          {/* Date Range Controls */}
+          <div className="flex-1">
+            <div className="flex flex-col sm:flex-row gap-3 items-start">
+              <Button
+                variant={useCustomRange ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleCustomRangeToggle(!useCustomRange)}
+                className="flex items-center gap-2"
+              >
+                <CalendarDays className="h-4 w-4" />
+                {useCustomRange ? "Custom Range" : "Quick Periods"}
+              </Button>
+              
+              {!useCustomRange ? (
+                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                  <SelectTrigger className="w-48">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="last30days">Last 30 Days</SelectItem>
+                    <SelectItem value="last3months">Last 3 Months</SelectItem>
+                    <SelectItem value="last6months">Last 6 Months</SelectItem>
+                    <SelectItem value="lastyear">Last Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-2 items-start">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">From:</span>
+                    <DatePicker
+                      date={customStartDate}
+                      setDate={setCustomStartDate}
+                      className="w-40"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">To:</span>
+                    <DatePicker
+                      date={customEndDate}
+                      setDate={setCustomEndDate}
+                      className="w-40"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
             
-            {!useCustomRange ? (
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Select period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="last30days">Last 30 Days</SelectItem>
-                  <SelectItem value="last3months">Last 3 Months</SelectItem>
-                  <SelectItem value="last6months">Last 6 Months</SelectItem>
-                  <SelectItem value="lastyear">Last Year</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="flex flex-col sm:flex-row gap-2">
-                <DatePicker
-                  date={customStartDate}
-                  setDate={setCustomStartDate}
-                  className="w-full sm:w-40"
-                />
-                <span className="text-sm text-gray-500 self-center">to</span>
-                <DatePicker
-                  date={customEndDate}
-                  setDate={setCustomEndDate}
-                  className="w-full sm:w-40"
-                />
+            {useCustomRange && (
+              <div className="flex gap-2 mt-2">
+                <Button 
+                  variant={selectedQuickPreset === 'thisWeek' ? "default" : "ghost"} 
+                  size="sm" 
+                  onClick={() => handleQuickDateRange('thisWeek')}
+                >
+                  This Week
+                </Button>
+                <Button 
+                  variant={selectedQuickPreset === 'thisMonth' ? "default" : "ghost"} 
+                  size="sm" 
+                  onClick={() => handleQuickDateRange('thisMonth')}
+                >
+                  This Month
+                </Button>
+                <Button 
+                  variant={selectedQuickPreset === 'thisQuarter' ? "default" : "ghost"} 
+                  size="sm" 
+                  onClick={() => handleQuickDateRange('thisQuarter')}
+                >
+                  This Quarter
+                </Button>
               </div>
             )}
           </div>
           
-          {/* Quick Date Presets for Custom Range */}
-          {useCustomRange && (
-            <div className="flex flex-wrap gap-1">
-              <Button variant="ghost" size="sm" onClick={() => handleQuickDateRange('thisWeek')}>
-                This Week
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleQuickDateRange('thisMonth')}>
-                This Month
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleQuickDateRange('thisQuarter')}>
-                This Quarter
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleQuickDateRange('thisYear')}>
-                This Year
-              </Button>
-            </div>
-          )}
-          
-          {/* Refresh Button */}
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleRefreshReports}
-            disabled={isRefreshing}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-          
-          <Select value={selectedExportFormat} onValueChange={(value: 'csv' | 'json' | 'pdf') => setSelectedExportFormat(value)}>
-            <SelectTrigger className="w-full sm:w-32">
-              <FileText className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Format" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="csv">CSV</SelectItem>
-              <SelectItem value="json">JSON</SelectItem>
-              <SelectItem value="pdf">PDF</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Button 
-            variant="outline" 
-            className="flex items-center gap-2"
-            onClick={() => handleExportReport('Summary')}
-            disabled={isExporting}
-          >
-            <Download size={16} />
-            {isExporting ? 'Exporting...' : 'Export Current'}
-          </Button>
-          
-          <Button 
-            variant="default" 
-            className="flex items-center gap-2"
-            onClick={handleExportAllReports}
-            disabled={isExporting}
-          >
-            <Download size={16} />
-            {isExporting ? 'Exporting...' : 'Export All Reports'}
-          </Button>
+          {/* Export Controls */}
+          <div className="flex items-center gap-2">
+            <Select value={selectedExportFormat} onValueChange={(value: 'csv' | 'json' | 'pdf') => setSelectedExportFormat(value)}>
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="csv">CSV</SelectItem>
+                <SelectItem value="json">JSON</SelectItem>
+                <SelectItem value="pdf">PDF</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Button 
+              variant="default" 
+              size="sm"
+              onClick={handleExportAllReports}
+              disabled={isExporting}
+            >
+              <Download size={14} />
+              Export All
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -676,7 +680,7 @@ export default function ReportsPage() {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => handleExportReport('Summary')}
+                  onClick={handleExportAllReports}
                   disabled={isExporting}
                   className="flex items-center gap-1"
                 >
@@ -803,7 +807,7 @@ export default function ReportsPage() {
                   <Button 
                   variant="outline" 
                     size="sm" 
-                  onClick={() => handleExportReport('Summary')}
+                  onClick={handleExportAllReports}
                   disabled={isExporting}
                   className="flex items-center gap-1"
                   >
@@ -872,7 +876,7 @@ export default function ReportsPage() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => handleExportReport('Summary')}
+                          onClick={handleExportAllReports}
                           disabled={isExporting}
                           className="flex-1"
                         >
@@ -900,7 +904,7 @@ export default function ReportsPage() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => handleExportReport('Payment Summary')}
+                          onClick={handleExportAllReports}
                           disabled={isExporting}
                           className="flex-1"
                         >
@@ -928,7 +932,7 @@ export default function ReportsPage() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => handleExportReport('Timesheet')}
+                          onClick={handleExportAllReports}
                           disabled={isExporting}
                           className="flex-1"
                         >
@@ -956,7 +960,7 @@ export default function ReportsPage() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => handleExportReport('Order Status')}
+                          onClick={handleExportAllReports}
                           disabled={isExporting}
                           className="flex-1"
                         >
@@ -984,7 +988,7 @@ export default function ReportsPage() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => handleExportReport('Co Pay Summary')}
+                          onClick={handleExportAllReports}
                           disabled={isExporting}
                           className="flex-1"
                         >
@@ -1012,7 +1016,7 @@ export default function ReportsPage() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          onClick={() => handleExportReport('Marketing Budget')}
+                          onClick={handleExportAllReports}
                           disabled={isExporting}
                           className="flex-1"
                         >

@@ -17,30 +17,43 @@ interface DatePickerProps {
   date: Date | undefined
   setDate: (date: Date | undefined) => void
   className?: string
+  placeholder?: string
+  disabled?: boolean
 }
 
-export function DatePicker({ date, setDate, className }: DatePickerProps) {
+export function DatePicker({ 
+  date, 
+  setDate, 
+  className,
+  placeholder = "Pick a date",
+  disabled = false
+}: DatePickerProps) {
   return (
     <div className={cn("grid gap-2", className)}>
       <Popover>
         <PopoverTrigger asChild>
           <Button
             variant={"outline"}
+            disabled={disabled}
             className={cn(
-              "w-full justify-start text-left font-normal h-10",
-              !date && "text-muted-foreground"
+              "w-full justify-start text-left font-normal h-10 min-w-40",
+              !date && "text-muted-foreground",
+              disabled && "opacity-50 cursor-not-allowed"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date ? format(date, "PPP") : <span>Pick a date</span>}
+            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+            <span className="truncate">
+              {date ? format(date, "PPP") : placeholder}
+            </span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0" align="start" sideOffset={5}>
           <Calendar
             mode="single"
             selected={date}
             onSelect={setDate}
             initialFocus
+            disabled={disabled}
           />
         </PopoverContent>
       </Popover>

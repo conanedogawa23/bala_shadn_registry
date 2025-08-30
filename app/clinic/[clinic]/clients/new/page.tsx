@@ -18,6 +18,7 @@ import { FormSelect } from "@/components/ui/form/FormSelect";
 import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { ArrowLeft, Save, UserPlus } from "lucide-react";
+import { ClientApiService } from "@/lib/api/clientService";
 
 // Define the client schema using zod for validation
 const clientSchema = z.object({
@@ -54,17 +55,60 @@ export default function NewClientPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Handle client creation
-  const handleClientSubmit = React.useCallback((data: ClientFormValues) => {
+  const handleClientSubmit = React.useCallback(async (data: ClientFormValues) => {
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log("New client created for clinic:", clinic, data);
-      setIsSubmitting(false);
+    try {
+      // Transform form data to match API format
+      const [firstName, ...lastNameParts] = data.name.split(' ');
+      const lastName = lastNameParts.join(' ') || '';
+      
+      const clientData = {
+        personalInfo: {
+          firstName: firstName || '',
+          lastName: lastName || '',
+          dateOfBirth: data.dateOfBirth,
+          gender: data.gender === 'male' ? 'Male' as const : 
+                 data.gender === 'female' ? 'Female' as const : 
+                 'Other' as const
+        },
+        contact: {
+          address: {
+            street: data.address,
+            city: '', // You may want to parse this from address
+            province: '', // You may want to parse this from address  
+            postalCode: '' // You may want to add postal code field to form
+          },
+          phones: {
+            cell: data.cellPhone,
+            home: data.homePhone || undefined,
+            work: data.workPhone || undefined
+          },
+          email: data.email,
+          company: data.companyName || undefined
+        },
+        medical: {
+          familyMD: data.familyMD || undefined,
+          referringMD: data.referringMD || undefined
+        },
+        insurance: [], // Empty for now - you may want to add insurance fields to form
+        defaultClinic: clinic
+      };
+
+      // Call real API
+      await ClientApiService.createClient(clientData);
+      
+      console.log("✅ New client created successfully for clinic:", clinic);
       
       // Navigate back to clients page
       router.push(`/clinic/${clinic}/clients`);
-    }, 1000);
+    } catch (error) {
+      console.error("❌ Failed to create client:", error);
+      // You may want to show an error message to the user
+      alert(`Failed to create client: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   }, [clinic, router]);
 
   // Handle back navigation

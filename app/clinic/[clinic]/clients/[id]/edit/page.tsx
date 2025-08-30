@@ -19,6 +19,8 @@ import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { ArrowLeft, Save, Edit3 } from "lucide-react";
 import { generateLink } from "@/lib/route-utils";
+import { ClientApiService } from "@/lib/api/clientService";
+import type { Client } from "@/lib/data/mockDataService";
 
 // Define the client schema using zod for validation
 const clientSchema = z.object({
@@ -56,47 +58,110 @@ export default function EditClientPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [clientData, setClientData] = useState<ClientFormValues | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - in real app, this would come from an API
+  // Fetch real client data from API
   useEffect(() => {
     const fetchClient = async () => {
       setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
+      setError(null);
+      
+      try {
+        const client: Client = await ClientApiService.getClientById(clientId);
+        
+        // Transform API data to form format
+        const fullName = `${client.personalInfo?.firstName || ''} ${client.personalInfo?.lastName || ''}`.trim();
+        const dateOfBirth = client.personalInfo?.birthday 
+          ? new Date(`${client.personalInfo.birthday.year}-${client.personalInfo.birthday.month}-${client.personalInfo.birthday.day}`)
+          : client.personalInfo?.dateOfBirth 
+            ? new Date(client.personalInfo.dateOfBirth)
+            : new Date();
+            
         setClientData({
-          name: "John Doe",
-          dateOfBirth: new Date("1985-06-15"),
-          gender: "male",
-          email: "john.doe@email.com",
-          cellPhone: "(555) 123-4567",
-          homePhone: "(555) 987-6543",
-          workPhone: "(555) 555-0123",
-          extension: "456",
-          address: "123 Main St, Anytown, ST 12345",
-          companyName: "ABC Corporation",
-          referringMD: "Dr. Smith",
-          familyMD: "Dr. Johnson",
-          heardAboutUs: "Google search",
+          name: fullName,
+          dateOfBirth,
+          gender: client.personalInfo?.gender?.toLowerCase() as "male" | "female" | "other" || "male",
+          email: client.contact?.email || "",
+          cellPhone: typeof client.contact?.phones?.cell === 'string' 
+            ? client.contact.phones.cell 
+            : client.contact?.phones?.cell?.full || "",
+          homePhone: typeof client.contact?.phones?.home === 'string' 
+            ? client.contact.phones.home 
+            : client.contact?.phones?.home?.full || "",
+          workPhone: typeof client.contact?.phones?.work === 'string' 
+            ? client.contact.phones.work 
+            : client.contact?.phones?.work?.full || "",
+          extension: typeof client.contact?.phones?.work === 'object' && client.contact?.phones?.work?.extension || "",
+          address: client.contact?.address?.street || "",
+          companyName: client.contact?.company || "",
+          referringMD: client.medical?.referringMD || "",
+          familyMD: client.medical?.familyMD || "",
+          heardAboutUs: "", // This field might not exist in API data
         });
+      } catch (err) {
+        console.error("❌ Failed to fetch client:", err);
+        setError(err instanceof Error ? err.message : 'Failed to load client');
+      } finally {
         setIsLoading(false);
-      }, 1000);
+      }
     };
 
     fetchClient();
   }, [clientId]);
 
   // Handle client update
-  const handleClientSubmit = React.useCallback((data: ClientFormValues) => {
+  const handleClientSubmit = React.useCallback(async (data: ClientFormValues) => {
     setIsSubmitting(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Client updated for clinic:", clinic, "Client ID:", clientId, data);
-      setIsSubmitting(false);
+    try {
+      // Transform form data to match API format
+      const [firstName, ...lastNameParts] = data.name.split(' ');
+      const lastName = lastNameParts.join(' ') || '';
+      
+      const updateData = {
+        personalInfo: {
+          firstName: firstName || '',
+          lastName: lastName || '',
+          dateOfBirth: data.dateOfBirth,
+          gender: data.gender === 'male' ? 'Male' as const : 
+                 data.gender === 'female' ? 'Female' as const : 
+                 'Other' as const
+        },
+        contact: {
+          address: {
+            street: data.address,
+            city: '', // You may want to parse this from address
+            province: '', // You may want to parse this from address  
+            postalCode: '' // You may want to add postal code field to form
+          },
+          phones: {
+            cell: data.cellPhone,
+            home: data.homePhone || undefined,
+            work: data.workPhone || undefined
+          },
+          email: data.email,
+          company: data.companyName || undefined
+        },
+        medical: {
+          familyMD: data.familyMD || undefined,
+          referringMD: data.referringMD || undefined
+        }
+      };
+
+      // Call real API
+      await ClientApiService.updateClient(clientId, updateData);
+      
+      console.log("✅ Client updated successfully for clinic:", clinic, "Client ID:", clientId);
       
       // Navigate back to clients page
       router.push(generateLink('clinic', 'clients', clinic));
-    }, 1000);
+    } catch (error) {
+      console.error("❌ Failed to update client:", error);
+      // You may want to show an error message to the user
+      alert(`Failed to update client: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   }, [clinic, clientId, router]);
 
   // Handle back navigation
@@ -109,6 +174,23 @@ export default function EditClientPage() {
       <div className="container mx-auto py-8 px-4 sm:px-6">
         <div className="flex items-center justify-center min-h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex flex-col items-center justify-center min-h-64 gap-4">
+          <div className="text-red-600 text-center">
+            <h2 className="text-xl font-semibold mb-2">Error Loading Client</h2>
+            <p>{error}</p>
+          </div>
+          <Button onClick={handleBack} variant="outline">
+            <ArrowLeft size={16} className="mr-2" />
+            Back to Clients
+          </Button>
         </div>
       </div>
     );
