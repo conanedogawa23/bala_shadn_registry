@@ -196,7 +196,7 @@ export function usePayments(filters: PaymentFilters = {}): UsePaymentsResult {
  */
 export function usePaymentsByClinic(
   clinicName: string, 
-  filters: { page?: number; limit?: number; status?: PaymentStatus; outstanding?: boolean } = {}
+  filters: { page?: number; limit?: number; status?: PaymentStatus; outstanding?: boolean; autoFetch?: boolean } = {}
 ): UsePaymentsResult {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,7 +210,9 @@ export function usePaymentsByClinic(
       setLoading(true);
       setError(null);
       
-      const response = await PaymentApiService.getPaymentsByClinic(clinicName, filters);
+      // Extract autoFetch from filters before passing to API
+      const { autoFetch, ...apiFilters } = filters;
+      const response = await PaymentApiService.getPaymentsByClinic(clinicName, apiFilters);
       
       setPayments(response.data);
       setPagination(response.pagination);
@@ -308,8 +310,11 @@ export function usePaymentsByClinic(
   }, []);
 
   useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
+    // Only auto-fetch if autoFetch is not explicitly set to false
+    if (filters.autoFetch !== false) {
+      fetchPayments();
+    }
+  }, [fetchPayments, filters.autoFetch]);
 
   return {
     payments,

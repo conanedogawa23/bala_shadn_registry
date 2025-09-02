@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   ProductService, 
   Product, 
@@ -40,6 +40,17 @@ export function useProducts({
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<UseProductsReturn['pagination']>(null);
 
+  // Optimize query dependency to prevent unnecessary re-renders
+  const queryStringified = useMemo(() => JSON.stringify(query), [
+    query?.clinicName,
+    query?.status,
+    query?.category,
+    query?.page,
+    query?.limit,
+    query?.sortBy,
+    query?.sortOrder
+  ]);
+
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -55,7 +66,7 @@ export function useProducts({
     } finally {
       setLoading(false);
     }
-  }, [JSON.stringify(query)]);
+  }, [queryStringified]);
 
   const clearError = useCallback(() => {
     setError(null);

@@ -315,30 +315,6 @@ export default function ClinicOrdersNewPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Quick Actions */}
-      <div className="mt-8 flex flex-col sm:flex-row gap-4">
-        <Card className="flex-1">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <User className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium">Need to add a new client?</h3>
-                <p className="text-sm text-gray-600">Create a client profile first, then come back to create an order.</p>
-              </div>
-              <Button 
-                variant="outline"
-                onClick={() => router.push(generateLink('clinic', 'clients/new', clinic))}
-              >
-                <Plus size={16} className="mr-2" />
-                Add Client
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 } 

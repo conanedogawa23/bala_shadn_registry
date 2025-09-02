@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Plus, Trash2, DollarSign, User, CreditCard, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, DollarSign, User, CreditCard, AlertCircle, Clock } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
 import { generateLink } from '@/lib/route-utils';
 import { 
-  usePaymentsByClinic,
   PaymentApiService, 
   PaymentMethod, 
   PaymentType,
@@ -20,16 +19,22 @@ import {
   type PaymentAmounts
 } from '@/lib/hooks';
 
-// Line item interface for the form
+// Import product-related hooks and types
+import { useProductsByClinic } from '@/lib/hooks/useProducts';
+import { ProductStatus } from '@/lib/api/productService';
+
+// Line item interface for the form - updated to include product data
 interface FormLineItem {
   id: string;
+  productKey?: number;
+  productName: string;
   serviceCode: string;
   serviceName: string;
   description: string;
+  duration?: number;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-
 }
 
 // Form data interface
@@ -51,8 +56,30 @@ export default function NewPaymentPage() {
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
   const clinic = slugToClinic(clinicSlug);
 
-  // Payment hooks
-  const { createPayment } = usePaymentsByClinic(clinic?.name || '', {});
+  // No payment hooks needed - we'll use PaymentApiService directly for create operations
+
+  // Get the real clinic name that matches our MongoDB data (memoized)
+  const realClinicName = useMemo(() => {
+    if (!clinic) return '';
+    // Map the clinic slug to the actual clinic name used in MongoDB
+    const clinicNameMap: Record<string, string> = {
+      'bodybliss-physio': 'BodyBlissPhysio',
+      'physio-bliss': 'Physio Bliss',
+      'ortholine-duncan-mills': 'Ortholine Duncan Mills',
+      'bodyblissoneCare': 'BodyBlissOneCare',
+      'markham-orthopedic': 'Markham Orthopedic',
+      'my-cloud': 'My Cloud',
+      'extremephysio': 'ExtremePhysio'
+    };
+    return clinicNameMap[clinic?.name] || clinic?.displayName || clinic?.name || '';
+  }, [clinic?.name, clinic?.displayName]);
+
+  // Optimized: Use clinic-specific hook to reduce API calls
+  const { products: availableProducts, loading: isProductsLoading, error: productsError, refetch: refetchProducts } = useProductsByClinic({
+    clinicName: realClinicName,
+    status: ProductStatus.ACTIVE,
+    autoFetch: !!realClinicName
+  });
 
   // Form state
   const [formData, setFormData] = useState<PaymentFormData>({
@@ -66,13 +93,15 @@ export default function NewPaymentPage() {
     lineItems: [
       {
         id: 'item1',
+        productKey: undefined,
+        productName: '',
         serviceCode: 'SVC001',
         serviceName: '',
         description: '',
+        duration: undefined,
         quantity: 1,
         unitPrice: 0,
-        totalPrice: 0,
-
+        totalPrice: 0
       }
     ]
   });
@@ -138,37 +167,76 @@ export default function NewPaymentPage() {
     });
   }, []);
 
+  // Optimized: Remove dependency on formData.lineItems.length
   const addLineItem = useCallback(() => {
-    const newItem: FormLineItem = {
-      id: `item${formData.lineItems.length + 1}`,
-      serviceCode: `SVC${(formData.lineItems.length + 1).toString().padStart(3, '0')}`,
-      serviceName: '',
-      description: '',
-      quantity: 1,
-      unitPrice: 0,
-      totalPrice: 0
-    };
+    setFormData(prev => {
+      const newItem: FormLineItem = {
+        id: `item${prev.lineItems.length + 1}`,
+        productKey: undefined,
+        productName: '',
+        serviceCode: `SVC${(prev.lineItems.length + 1).toString().padStart(3, '0')}`,
+        serviceName: '',
+        description: '',
+        duration: undefined,
+        quantity: 1,
+        unitPrice: 0,
+        totalPrice: 0
+      };
 
-    setFormData(prev => ({
-      ...prev,
-      lineItems: [...prev.lineItems, newItem]
-    }));
-  }, [formData.lineItems.length]);
-
-  const removeLineItem = useCallback((index: number) => {
-    if (formData.lineItems.length > 1) {
-      setFormData(prev => ({
+      return {
         ...prev,
-        lineItems: prev.lineItems.filter((_, i) => i !== index)
-      }));
+        lineItems: [...prev.lineItems, newItem]
+      };
+    });
+  }, []);
+
+  // Optimized: Remove formData dependency, use functional updates
+  const handleProductSelection = useCallback((index: number, productKey: string) => {
+    const product = availableProducts.find(p => p.productKey.toString() === productKey);
+    if (product) {
+      setFormData(prev => {
+        const updatedItems = [...prev.lineItems];
+        updatedItems[index] = {
+          ...updatedItems[index],
+          productKey: product.productKey,
+          productName: product.name,
+          serviceName: product.name,
+          serviceCode: product.productKey.toString(),
+          duration: product.duration,
+          unitPrice: product.price,
+          totalPrice: updatedItems[index].quantity * product.price
+        };
+
+        return {
+          ...prev,
+          lineItems: updatedItems
+        };
+      });
     }
-  }, [formData.lineItems.length]);
+  }, [availableProducts]);
 
-  // Calculation functions
-  const calculateTotals = useCallback(() => {
-    const total = formData.lineItems.reduce((sum, item) => sum + Number(item.totalPrice), 0);
+  // Currency formatting helper
+  const formatCurrency = useCallback((amount: number) => {
+    return PaymentApiService.formatCurrency(amount);
+  }, []);
 
-    return { subtotal: total, total };
+  // Optimized: Remove formData dependency, use functional updates
+  const removeLineItem = useCallback((index: number) => {
+    setFormData(prev => {
+      if (prev.lineItems.length > 1) {
+        return {
+          ...prev,
+          lineItems: prev.lineItems.filter((_, i) => i !== index)
+        };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Optimized: Calculate totals directly from current formData, use useMemo instead
+  const { subtotal, total } = useMemo(() => {
+    const calculatedTotal = formData.lineItems.reduce((sum, item) => sum + Number(item.totalPrice), 0);
+    return { subtotal: calculatedTotal, total: calculatedTotal };
   }, [formData.lineItems]);
 
   // Form submission
@@ -195,7 +263,7 @@ export default function NewPaymentPage() {
     setIsLoading(true);
 
     try {
-      const { total } = calculateTotals();
+      // Use the memoized total value directly
 
       // Convert form line items to API format
       const lineItems = formData.lineItems.map(item => ({
@@ -251,8 +319,8 @@ export default function NewPaymentPage() {
         referringNo: formData.referringNo || undefined
       };
 
-      // Submit payment
-      await createPayment(paymentData);
+      // Submit payment using API service directly (no unnecessary data fetching)
+      await PaymentApiService.createPayment(paymentData);
 
       // Navigate back to payments list
       router.push(generateLink('clinic', 'payments', clinicSlug));
@@ -263,8 +331,6 @@ export default function NewPaymentPage() {
       setIsLoading(false);
     }
   };
-
-  const { total } = calculateTotals();
 
   if (!clinic) {
     return (
@@ -424,6 +490,9 @@ export default function NewPaymentPage() {
               <div className="flex items-center gap-2">
                 <DollarSign size={20} />
                 Service Line Items
+                {isProductsLoading && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary ml-2"></div>
+                )}
               </div>
               <Button
                 type="button"
@@ -431,6 +500,7 @@ export default function NewPaymentPage() {
                 size="sm"
                 onClick={addLineItem}
                 className="flex items-center gap-2"
+                disabled={isProductsLoading}
               >
                 <Plus size={16} />
                 Add Item
@@ -438,6 +508,46 @@ export default function NewPaymentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Products Loading/Error States */}
+            {isProductsLoading && formData.lineItems.length === 1 && !formData.lineItems[0].productKey && (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                  <p className="text-sm text-gray-600">Loading available services...</p>
+                </div>
+              </div>
+            )}
+
+            {productsError && (
+              <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                  <p className="text-sm text-red-700">Failed to load services: {productsError}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={refetchProducts} 
+                    className="ml-auto"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!isProductsLoading && !productsError && availableProducts.length === 0 && (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600">No services available for {clinic?.displayName || clinic?.name}</p>
+                  <Button variant="outline" size="sm" onClick={refetchProducts} className="mt-2">
+                    Refresh Services
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Service Line Items */}
             {formData.lineItems.map((item, index) => (
               <div key={item.id} className="grid gap-4 p-4 border rounded-lg">
                 <div className="flex justify-between items-center">
@@ -454,25 +564,60 @@ export default function NewPaymentPage() {
                     </Button>
                   )}
                 </div>
+
+                {/* Product Selection */}
+                <div className="grid gap-4">
+                  <div>
+                    <Label htmlFor={`product-${index}`}>Select Service *</Label>
+                    <Select 
+                      value={item.productKey?.toString() || ''}
+                      onValueChange={(value) => handleProductSelection(index, value)}
+                      disabled={isProductsLoading || availableProducts.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          isProductsLoading 
+                            ? "Loading services..." 
+                            : availableProducts.length === 0 
+                              ? "No services available" 
+                              : "Select a service"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableProducts.map(product => (
+                          <SelectItem key={product.productKey} value={product.productKey.toString()}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{product.name}</span>
+                              <div className="flex items-center gap-2 text-sm text-gray-500 ml-2">
+                                <Clock size={12} />
+                                <span>{product.duration}min</span>
+                                <span>•</span>
+                                <span>{formatCurrency(product.price)}</span>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Service Details */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <div>
-                    <Label htmlFor={`serviceCode-${index}`}>Service Code</Label>
+                    <Label>Service Code</Label>
                     <Input
-                      id={`serviceCode-${index}`}
                       value={item.serviceCode}
                       onChange={(e) => handleLineItemChange(index, 'serviceCode', e.target.value)}
-                      placeholder="SVC001"
+                      placeholder="Auto-filled"
                     />
                   </div>
                   <div>
-                    <Label htmlFor={`serviceName-${index}`}>Service Name *</Label>
-                    <Input
-                      id={`serviceName-${index}`}
-                      value={item.serviceName}
-                      onChange={(e) => handleLineItemChange(index, 'serviceName', e.target.value)}
-                      placeholder="Enter service name"
-                      required
-                    />
+                    <Label>Duration</Label>
+                    <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-gray-50">
+                      <Clock size={14} />
+                      <span className="text-sm">{item.duration ? `${item.duration} min` : 'N/A'}</span>
+                    </div>
                   </div>
                   <div>
                     <Label htmlFor={`quantity-${index}`}>Quantity *</Label>
@@ -498,19 +643,23 @@ export default function NewPaymentPage() {
                     />
                   </div>
                 </div>
+
+                {/* Description */}
                 <div>
                   <Label htmlFor={`description-${index}`}>Description</Label>
                   <Textarea
                     id={`description-${index}`}
                     value={item.description}
                     onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
-                    placeholder="Enter service description"
+                    placeholder="Enter additional notes or description for this service"
                     rows={2}
                   />
                 </div>
+
+                {/* Total Price */}
                 <div className="flex justify-between items-center pt-2 border-t">
-                  <span className="text-sm text-gray-600">Total Price:</span>
-                  <span className="font-medium">{PaymentApiService.formatCurrency(item.totalPrice)}</span>
+                  <span className="text-sm text-gray-600">Line Total:</span>
+                  <span className="font-medium text-lg">{formatCurrency(item.totalPrice)}</span>
                 </div>
               </div>
             ))}

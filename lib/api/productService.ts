@@ -32,10 +32,12 @@ export interface Product {
   type: string;
   duration: number;
   price: number;
+  currency?: string;
   status: ProductStatus;
   isActive: boolean;
-  clinics: string[];
-  usage: ProductUsage;
+  clinics?: string[];
+  applicableClinics?: string[];
+  usage?: ProductUsage;
   popularityScore?: number;
   createdAt: string;
   updatedAt: string;
