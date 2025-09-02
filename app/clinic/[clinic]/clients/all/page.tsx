@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   ArrowLeft, 
@@ -37,14 +37,29 @@ export default function AllClientsPage() {
   const params = useParams();
   const clinic = params.clinic as string;
   
-  // Pagination state
+  // Pagination and search state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   
   // Get clinic data for API calls
   const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+
+  // Debounce search query for server-side search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      // Reset to page 1 when search changes to avoid empty results
+      if (searchQuery !== debouncedSearchQuery) {
+        setCurrentPage(1);
+      }
+    }, 500); // 500ms debounce for server calls
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, debouncedSearchQuery]);
   
-  // Fetch clients using real API with pagination
+  // Fetch clients using real API with pagination and server-side search
   const { 
     clients: rawClients, 
     loading: isLoading, 
@@ -55,6 +70,7 @@ export default function AllClientsPage() {
     clinicName: clinicData?.name || "",
     page: currentPage,
     limit: pageSize,
+    search: debouncedSearchQuery || undefined, // Pass search query to API
     autoFetch: !!clinicData?.name
   });
 
@@ -131,6 +147,11 @@ export default function AllClientsPage() {
       setCurrentPage(prev => prev + 1);
     }
   }, [pagination?.hasNext]);
+
+  // Search handler for server-side search
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -423,63 +444,145 @@ export default function AllClientsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            All Clients ({clientStats.total})
+            {debouncedSearchQuery ? (
+              <>Search Results ({clientStats.total})</>
+            ) : (
+              <>All Clients ({clientStats.total})</>
+            )}
+            {isLoading && (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary ml-2"></div>
+            )}
+            {searchQuery !== debouncedSearchQuery && searchQuery && (
+              <div className="text-sm text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+                Searching...
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {clientStats.total === 0 ? (
             <div className="text-center py-8">
               <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No clients found</h3>
-              <p className="text-gray-600 mb-4">
-                Get started by adding your first client to this clinic.
-              </p>
-              <Button onClick={handleAddClient}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add First Client
-              </Button>
+              {debouncedSearchQuery ? (
+                <>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No clients found</h3>
+                  <p className="text-gray-600 mb-4">
+                    No clients match your search for "{debouncedSearchQuery}". Try adjusting your search terms.
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setSearchQuery('');
+                        setDebouncedSearchQuery('');
+                      }}
+                    >
+                      Clear Search
+                    </Button>
+                    <Button onClick={handleAddClient}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add New Client
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No clients found</h3>
+                  <p className="text-gray-600 mb-4">
+                    Get started by adding your first client to this clinic.
+                  </p>
+                  <Button onClick={handleAddClient}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Client
+                  </Button>
+                </>
+              )}
             </div>
           ) : (
             <>
               <DataTable 
                 columns={columns} 
                 data={clients}
-                searchPlaceholder="Search clients by name, email, or phone..."
+                filterPlaceholder="Search clients by name, email, or phone..."
+                searchValue={searchQuery}
+                onSearchChange={handleSearchChange}
                 showPagination={false}
               />
               
               {/* Server-side Pagination Controls */}
               {pagination && pagination.pages > 1 && (
-                <div className="flex items-center justify-between mt-6 pt-4 border-t">
-                  <div className="text-sm text-gray-700">
+                <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-4 border-t gap-4">
+                  <div className="text-sm text-gray-700 order-2 sm:order-1">
                     Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
                     {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
                     {pagination.total} clients
                   </div>
                   
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 order-1 sm:order-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handlePreviousPage}
                       disabled={!pagination.hasPrev}
+                      className="px-3 py-1.5 text-xs sm:text-sm"
                     >
-                      Previous
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden">Prev</span>
                     </Button>
                     
-                    {/* Page numbers */}
+                    {/* Smart Page numbers with ellipsis */}
                     <div className="flex items-center space-x-1">
-                      {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((pageNum) => (
-                        <Button
-                          key={pageNum}
-                          variant={pageNum === pagination.page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handlePageChange(pageNum)}
-                          className="w-8 h-8 p-0"
-                        >
-                          {pageNum}
-                        </Button>
-                      ))}
+                      {/* First page */}
+                      {pagination.page > 3 && (
+                        <>
+                                                     <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => handlePageChange(1)}
+                             className="w-8 h-8 p-0 text-xs sm:text-sm"
+                           >
+                             1
+                           </Button>
+                          {pagination.page > 4 && (
+                            <span className="px-2 text-gray-400">...</span>
+                          )}
+                        </>
+                      )}
+                      
+                      {/* Pages around current page */}
+                      {Array.from({ length: 5 }, (_, i) => {
+                        const pageNum = pagination.page - 2 + i;
+                        if (pageNum < 1 || pageNum > pagination.pages) return null;
+                        
+                        return (
+                                                     <Button
+                             key={pageNum}
+                             variant={pageNum === pagination.page ? "default" : "outline"}
+                             size="sm"
+                             onClick={() => handlePageChange(pageNum)}
+                             className="w-8 h-8 p-0 text-xs sm:text-sm"
+                           >
+                             {pageNum}
+                           </Button>
+                        );
+                      })}
+                      
+                      {/* Last page */}
+                      {pagination.page < pagination.pages - 2 && (
+                        <>
+                          {pagination.page < pagination.pages - 3 && (
+                            <span className="px-2 text-gray-400">...</span>
+                          )}
+                                                     <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => handlePageChange(pagination.pages)}
+                             className="w-8 h-8 p-0 text-xs sm:text-sm"
+                           >
+                             {pagination.pages}
+                           </Button>
+                        </>
+                      )}
                     </div>
                     
                     <Button
@@ -487,6 +590,7 @@ export default function AllClientsPage() {
                       size="sm"
                       onClick={handleNextPage}
                       disabled={!pagination.hasNext}
+                      className="px-3 py-1.5 text-xs sm:text-sm"
                     >
                       Next
                     </Button>

@@ -5,8 +5,8 @@ export const realClinicsData: Clinic[] = [
   // Currently Active Clinic
   {
     id: 9,
-    name: 'bodyblissphysio',
-    displayName: 'BodyBliss Physio',
+    name: 'bodybliss-physio',
+    displayName: 'BodyBliss Physio', 
     address: '1929 Leslie Street',
     city: 'Toronto',
     province: 'Ontario',
@@ -214,7 +214,7 @@ export const clinicNameMapping: Record<string, string> = {
   'Evergold': 'Evergold',
   
   // Special cases that need mapping
-  'bodyblissphysio': 'BodyBlissPhysio', // Use the larger dataset (4586 vs 120)
+  'bodybliss-physio': 'BodyBlissPhysio', // Use the larger dataset (4586 vs 120)
   'BodyBliss': 'BodyBliss',
   
   // Display name mappings (for when displayName is used)

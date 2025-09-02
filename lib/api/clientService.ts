@@ -143,11 +143,7 @@ interface TransformedClientData extends Omit<CreateClientRequest, 'contact'> {
       apartment?: string;
       city: string;
       province: string;
-      postalCode: {
-        first3: string;
-        last3: string;
-        full?: string;
-      };
+      postalCode: string; // Keep as string to match backend validation
     };
     phones: {
       home?: PhoneStructure;
@@ -248,19 +244,16 @@ export class ClientApiService extends BaseApiService {
       }
     }
 
-    // Transform postal code from string to object format
+    // Keep postal code as string - backend expects string format
     if (clientData.contact?.address?.postalCode && typeof clientData.contact.address.postalCode === 'string') {
-      const postalCode = clientData.contact.address.postalCode.replace(/\s+/g, '');
-      if (postalCode.length >= 6) {
+      // Just normalize the format to ensure proper spacing
+      const postalCode = clientData.contact.address.postalCode.replace(/\s+/g, '').toUpperCase();
+      if (postalCode.length === 6) {
         transformedData.contact = {
           ...transformedData.contact,
           address: {
             ...transformedData.contact.address,
-            postalCode: {
-              first3: postalCode.substring(0, 3).toUpperCase(),
-              last3: postalCode.substring(3, 6).toUpperCase(),
-              full: `${postalCode.substring(0, 3).toUpperCase()} ${postalCode.substring(3, 6).toUpperCase()}`
-            }
+            postalCode: `${postalCode.substring(0, 3)} ${postalCode.substring(3, 6)}`
           }
         };
       }

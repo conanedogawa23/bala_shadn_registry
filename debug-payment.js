@@ -75,7 +75,7 @@ async function testApiConnection() {
   console.log('🌐 Testing API connection...');
   
   try {
-    const response = await fetch(`${PaymentApiService.API_BASE_URL || 'https://4798fad6773c.ngrok-free.app/api/v1'}/payments?limit=1`);
+    const response = await fetch(`${PaymentApiService.API_BASE_URL || 'https://ea380fad3f55.ngrok-free.app/api/v1'}/payments?limit=1`);
     const data = await response.json();
     
     if (response.ok) {

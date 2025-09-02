@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { 
   Card, 
@@ -41,22 +41,42 @@ export default function OrdersPage() {
   const params = useParams();
   const clinic = params.clinic as string;
   
-  // State for search and pagination
+  // State for search and pagination with debouncing
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 10;
+
+  // Debounce search query to prevent excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      // Reset to page 1 when search changes
+      if (searchQuery !== debouncedSearchQuery) {
+        setCurrentPage(1);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, debouncedSearchQuery]);
   
   // Get clinic data for API calls
   const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
   
-  // Fetch orders using real API
+  // Fetch orders using real API with server-side pagination and debounced search
   const { 
     orders, 
     loading: isLoading, 
-    error, 
+    error,
+    pagination,
     refetch 
   } = useOrdersByClinic({
     clinicName: clinicData?.name || "",
+    query: {
+      page: currentPage.toString(),
+      limit: ordersPerPage.toString(),
+      search: debouncedSearchQuery.trim() || undefined
+    },
     autoFetch: !!clinicData?.name
   });
 
@@ -67,33 +87,8 @@ export default function OrdersPage() {
     error: mutationError 
   } = useOrderMutation();
   
-  // Filter orders based on search query
-  const filteredOrders = useMemo(() => {
-    if (!searchQuery.trim()) return orders;
-    
-    const query = searchQuery.toLowerCase();
-    return orders.filter(order => {
-      // Basic string matches
-      const basicMatches = 
-        order.orderNumber.toLowerCase().includes(query) ||
-        order.clientName.toLowerCase().includes(query) ||
-        order.status.toLowerCase().includes(query) ||
-        order.paymentStatus.toLowerCase().includes(query);
-      
-      // Date matches - only if dates are valid
-      const orderDateMatch = isValidDate(order.orderDate) && formatDate(order.orderDate).toLowerCase().includes(query);
-      const serviceDateMatch = isValidDate(order.serviceDate) && formatDate(order.serviceDate).toLowerCase().includes(query);
-      
-      return basicMatches || orderDateMatch || serviceDateMatch;
-    });
-  }, [orders, searchQuery]);
-  
-  // Calculate pagination
-  const totalFilteredOrders = filteredOrders.length;
-  const totalPages = Math.ceil(totalFilteredOrders / ordersPerPage);
-  const indexOfLastOrder = currentPage * ordersPerPage;
-  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
-  const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
+  // Server handles filtering and pagination, so we use orders directly
+  const currentOrders = orders;
   
   // Event handlers
   const handleViewOrder = (order: Order) => {
@@ -131,13 +126,17 @@ export default function OrdersPage() {
     setCurrentPage(page);
   };
   
-  // Pagination navigation handlers
+  // Pagination navigation handlers using server-side pagination
   const handlePreviousPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 1));
+    if (pagination && pagination.page > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
   };
   
   const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, totalPages));
+    if (pagination && pagination.page < pagination.totalPages) {
+      setCurrentPage(prev => prev + 1);
+    }
   };
   
   // Function to render combined status badge (order + payment status)
@@ -243,7 +242,7 @@ export default function OrdersPage() {
           </div>
           <div className="flex items-center justify-end mt-2">
             <span className="text-sm text-gray-500">
-              {filteredOrders.length} orders found
+              {pagination ? pagination.total : orders.length} orders found
             </span>
           </div>
         </CardContent>
@@ -383,40 +382,40 @@ export default function OrdersPage() {
                 </Table>
               </div>
               
-              {/* Pagination */}
-              {totalPages > 1 && (
+              {/* Server-side Pagination */}
+              {pagination && pagination.totalPages > 1 && (
                 <div className="flex items-center justify-between p-6">
                   <div className="text-sm text-gray-500">
-                    Showing {indexOfFirstOrder + 1} to {Math.min(indexOfLastOrder, totalFilteredOrders)} of {totalFilteredOrders} orders
+                    Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} orders
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handlePreviousPage}
-                      disabled={currentPage === 1}
+                      disabled={pagination.page === 1}
                       className="h-8 w-8 p-0"
                     >
                       <ChevronLeft size={16} />
                     </Button>
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                       // Logic to show proper page range centered around current page
                       let pageNum;
-                      if (totalPages <= 5) {
+                      if (pagination.totalPages <= 5) {
                         pageNum = i + 1;
                       } else {
-                        const middlePoint = Math.min(Math.max(currentPage, 3), totalPages - 2);
+                        const middlePoint = Math.min(Math.max(pagination.page, 3), pagination.totalPages - 2);
                         pageNum = middlePoint - 2 + i;
                       }
                       
-                      if (pageNum > 0 && pageNum <= totalPages) {
+                      if (pageNum > 0 && pageNum <= pagination.totalPages) {
                         return (
                           <Button
                             key={pageNum}
-                            variant={currentPage === pageNum ? "default" : "outline"}
+                            variant={pagination.page === pageNum ? "default" : "outline"}
                             size="sm"
                             onClick={() => handlePageChange(pageNum)}
-                            className={`h-8 w-8 p-0 ${currentPage === pageNum ? 'bg-primary text-white' : ''}`}
+                            className={`h-8 w-8 p-0 ${pagination.page === pageNum ? 'bg-primary text-white' : ''}`}
                           >
                             {pageNum}
                           </Button>
@@ -428,7 +427,7 @@ export default function OrdersPage() {
                       variant="outline"
                       size="sm"
                       onClick={handleNextPage}
-                      disabled={currentPage === totalPages}
+                      disabled={pagination.page === pagination.totalPages}
                       className="h-8 w-8 p-0"
                     >
                       <ChevronRight size={16} />

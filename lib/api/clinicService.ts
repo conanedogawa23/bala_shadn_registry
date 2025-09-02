@@ -1,5 +1,5 @@
 // Backend API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://e47b8b3acdac.ngrok-free.app/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ea380fad3f55.ngrok-free.app/api/v1';
 
 export interface RetainedClinic {
   name: string;

@@ -77,6 +77,16 @@ interface DataTableProps<TData, TValue> {
   globalFilterKey?: keyof TData;
   
   /**
+   * External search value for controlled search
+   */
+  searchValue?: string;
+  
+  /**
+   * Callback for search input changes (for server-side search)
+   */
+  onSearchChange?: (value: string) => void;
+  
+  /**
    * The default number of rows per page
    * @default 10
    */
@@ -132,6 +142,8 @@ export function DataTable<TData, TValue>({
   showColumnToggle = true,
   filterPlaceholder = "Filter...",
   globalFilterKey,
+  searchValue,
+  onSearchChange,
   defaultPageSize = 10,
   showPagination = true,
   className,
@@ -140,8 +152,12 @@ export function DataTable<TData, TValue>({
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [globalFilter, setGlobalFilter] = React.useState("");
+  const [internalGlobalFilter, setInternalGlobalFilter] = React.useState("");
   const [rowSelection, setRowSelection] = React.useState({});
+
+  // Use external search value if provided, otherwise use internal state
+  const globalFilter = searchValue !== undefined ? searchValue : internalGlobalFilter;
+  const setGlobalFilter = onSearchChange || setInternalGlobalFilter;
 
   // Create table instance
   const table = useReactTable({

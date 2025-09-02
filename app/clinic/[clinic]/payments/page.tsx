@@ -36,7 +36,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { slugToClinic } from "@/lib/data/clinics";
+import { slugToClinic, getRealDataClinicName } from "@/lib/data/clinics";
 import { generateLink } from "@/lib/route-utils";
 import { 
   PaymentApiService, 
@@ -109,19 +109,19 @@ const PaymentCard = ({ payment, clinic }: { payment: Payment; clinic: string }) 
       <div className="space-y-2">
         <div className="flex justify-between">
           <span className="text-sm text-gray-600">Amount:</span>
-          <span className="font-medium">{PaymentApiService.formatCurrency(payment.total)}</span>
+          <span className="font-medium">{PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-sm text-gray-600">Paid:</span>
-          <span className="font-medium text-green-600">{PaymentApiService.formatCurrency(payment.amountPaid)}</span>
+          <span className="font-medium text-green-600">{PaymentApiService.formatCurrency(payment.amounts.totalPaid)}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-sm text-gray-600">Method:</span>
           <span className="text-sm">{payment.paymentMethod}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-sm text-gray-600">Invoice:</span>
-          <span className="text-sm">{payment.invoiceNumber}</span>
+          <span className="text-sm text-gray-600">Payment ID:</span>
+          <span className="text-sm">{payment.paymentNumber || payment.paymentId}</span>
         </div>
       </div>
       <div className="flex gap-2 mt-4">
@@ -185,7 +185,7 @@ export default function PaymentsPage() {
         status: statusFilter === "all" ? undefined : statusFilter as PaymentStatus,
       };
 
-      const result = await PaymentApiService.getPaymentsByClinic(clinicData.name, filters);
+      const result = await PaymentApiService.getPaymentsByClinic(getRealDataClinicName(clinicData), filters);
       
       if (reset || page === 1) {
         setPayments(result.data);
@@ -334,7 +334,7 @@ export default function PaymentsPage() {
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <Input
-                  placeholder="Search payments by invoice number, client name..."
+                  placeholder="Search payments by payment ID, client name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -393,7 +393,7 @@ export default function PaymentsPage() {
                 <table className="w-full">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="text-left p-4 font-medium">Invoice #</th>
+                      <th className="text-left p-4 font-medium">Payment ID</th>
                       <th className="text-left p-4 font-medium">Client</th>
                       <th className="text-left p-4 font-medium">Date</th>
                       <th className="text-left p-4 font-medium">Amount</th>
@@ -410,12 +410,12 @@ export default function PaymentsPage() {
                             href={generateLink('clinic', `payments/${payment.paymentId}`, clinic)}
                             className="font-medium text-blue-600 hover:text-blue-800"
                           >
-                            {payment.invoiceNumber}
+                            {payment.paymentNumber || payment.paymentId}
                           </Link>
                         </td>
                         <td className="p-4">{payment.clientName}</td>
                         <td className="p-4">{PaymentApiService.formatDate(payment.paymentDate)}</td>
-                        <td className="p-4 font-medium">{PaymentApiService.formatCurrency(payment.total)}</td>
+                        <td className="p-4 font-medium">{PaymentApiService.formatCurrency(payment.amounts.totalPaymentAmount)}</td>
                         <td className="p-4">{payment.paymentMethod}</td>
                         <td className="p-4">
                           <PaymentStatusBadge status={payment.status} />

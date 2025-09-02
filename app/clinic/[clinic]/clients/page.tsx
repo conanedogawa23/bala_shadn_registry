@@ -20,6 +20,7 @@ import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { Plus, UserPlus, Save, FileText, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ClientApiService } from "@/lib/api/clientService";
 
 // Define the client schema using zod for validation
 const clientSchema = z.object({
@@ -66,21 +67,84 @@ export default function ClientsPage() {
   const [activeTab, setActiveTab] = React.useState("info");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [showSuccess, setShowSuccess] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [clientInsurance, setClientInsurance] = React.useState<InsuranceFormValues[]>([]);
 
-  // Handle client info submission
-  const handleClientSubmit = React.useCallback((data: ClientFormValues) => {
+  // Handle client info submission - FIXED VERSION
+  const handleClientSubmit = React.useCallback(async (data: ClientFormValues) => {
     setIsSubmitting(true);
+    setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Client info submitted for clinic:", clinic, data);
+    try {
+      // Transform form data to match backend API expectations
+      const nameParts = data.name.trim().split(/\s+/);
+      const firstName = nameParts[0] || data.name;
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      // Extract postal code from address (basic implementation)
+      const postalCodeMatch = data.address.match(/\b[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d\b/);
+      const extractedPostalCode = postalCodeMatch 
+        ? postalCodeMatch[0].replace(/\s+/g, '').toUpperCase()
+        : 'M5V3L9'; // Default Toronto postal code
+      
+      // Format postal code with space (A1A 1A1)
+      const formattedPostalCode = extractedPostalCode.length === 6 
+        ? `${extractedPostalCode.substring(0, 3)} ${extractedPostalCode.substring(3, 6)}`
+        : 'M5V 3L9';
+
+      const clientData = {
+        personalInfo: {
+          firstName,
+          lastName: lastName || 'Unknown',
+          gender: data.gender === 'male' ? 'Male' : data.gender === 'female' ? 'Female' : 'Other',
+          dateOfBirth: data.dateOfBirth,
+        },
+        contact: {
+          address: {
+            street: data.address,
+            apartment: '',
+            city: 'Toronto', // Could be enhanced to extract from address
+            province: 'Ontario', // Could be enhanced to extract from address
+            postalCode: formattedPostalCode,
+          },
+          phones: {
+            home: data.homePhone || '',
+            cell: data.cellPhone || '',
+            work: data.workPhone ? `${data.workPhone}${data.extension ? ` ext ${data.extension}` : ''}` : '',
+          },
+          email: data.email || '',
+          company: data.companyName || '',
+        },
+        medical: {
+          familyMD: data.familyMD || '',
+          referringMD: data.referringMD || '',
+          csrName: '',
+        },
+        insurance: [],
+        defaultClinic: clinic === 'bodybliss-physio' ? 'BodyBlissPhysio' : clinic.replace('-', ' '),
+      };
+
+      console.log("Creating client for clinic:", clinic, clientData);
+      
+      // Make the actual API call
+      const createdClient = await ClientApiService.createClient(clientData);
+      
+      console.log("Client created successfully:", createdClient);
+      
       setIsSubmitting(false);
       setShowSuccess(true);
       
       // Reset success message after 3 seconds
       setTimeout(() => setShowSuccess(false), 3000);
-    }, 1000);
+      
+      // Optionally redirect to client list or clear form
+      // router.push(`/clinic/${clinic}/clients/all`);
+      
+    } catch (err) {
+      console.error("Failed to create client:", err);
+      setError(err instanceof Error ? err.message : 'Failed to create client');
+      setIsSubmitting(false);
+    }
   }, [clinic]);
 
   // Handle insurance info submission
@@ -301,6 +365,15 @@ export default function ClientsPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                           Client saved successfully!
+                        </div>
+                      )}
+                      
+                      {error && (
+                        <div className="flex items-center gap-2 text-red-600">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          {error}
                         </div>
                       )}
                     </div>

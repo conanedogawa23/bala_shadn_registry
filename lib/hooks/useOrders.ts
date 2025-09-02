@@ -214,6 +214,12 @@ interface UseOrdersByClinicReturn {
   orders: Order[];
   loading: boolean;
   error: string | null;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  } | null;
   refetch: () => Promise<void>;
   clearError: () => void;
 }
@@ -230,6 +236,7 @@ export function useOrdersByClinic({
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<UseOrdersByClinicReturn['pagination']>(null);
 
   const fetchOrders = useCallback(async () => {
     if (!clinicName) return;
@@ -240,9 +247,11 @@ export function useOrdersByClinic({
     try {
       const response = await OrderService.getOrdersByClinic(clinicName, query);
       setOrders(response.data);
+      setPagination(response.pagination);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch clinic orders');
       setOrders([]);
+      setPagination(null);
     } finally {
       setLoading(false);
     }
@@ -262,6 +271,7 @@ export function useOrdersByClinic({
     orders,
     loading,
     error,
+    pagination,
     refetch: fetchOrders,
     clearError
   };
