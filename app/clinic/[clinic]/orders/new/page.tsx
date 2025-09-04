@@ -22,6 +22,7 @@ import {
 import { ArrowLeft, Search, Plus, User, AlertCircle } from "lucide-react";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { slugToClinic } from "@/lib/data/clinics";
+import { getRealDataClinicName } from "@/lib/data/clinics";
 import { generateLink } from "@/lib/route-utils";
 
 // Import real API hooks
@@ -40,37 +41,35 @@ export default function ClinicOrdersNewPage() {
   // Get clinic data for API calls
   const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
   
+  // Get the proper backend clinic name for API calls
+  const backendClinicName = useMemo(() => {
+    return clinicData ? getRealDataClinicName(clinicData) : "";
+  }, [clinicData]);
+  
   // Fetch clients using real API
   const { 
     clients, 
     loading: isLoading, 
     error,
+    pagination,
     refetch 
   } = useClients({
-    clinicName: clinicData?.name || "",
-    autoFetch: !!clinicData?.name
+    clinicName: backendClinicName,
+    page: currentPage,
+    limit: clientsPerPage,
+    search: searchQuery,
+    autoFetch: !!backendClinicName
   });
   
-  // Filter clients based on search query
-  const filteredClients = useMemo(() => {
-    if (!searchQuery.trim()) return clients;
-    
-    const query = searchQuery.toLowerCase();
-    return clients.filter(client => {
-      const clientName = client.firstName && client.lastName 
-        ? `${client.firstName} ${client.lastName}` 
-        : client.name || '';
-      return clientName.toLowerCase().includes(query) ||
-             (client.email && client.email.toLowerCase().includes(query));
-    });
-  }, [clients, searchQuery]);
+  // Use server-side filtering and pagination
+  const filteredClients = clients; // API already handles filtering
+  const totalFilteredClients = pagination?.total || 0;
+  const totalPages = pagination?.pages || 1;
+  const currentClients = filteredClients; // API already handles pagination
   
-  // Calculate pagination
-  const totalFilteredClients = filteredClients.length;
-  const totalPages = Math.ceil(totalFilteredClients / clientsPerPage);
-  const indexOfLastClient = currentPage * clientsPerPage;
-  const indexOfFirstClient = indexOfLastClient - clientsPerPage;
-  const currentClients = filteredClients.slice(indexOfFirstClient, indexOfLastClient);
+  // Calculate display indices for pagination info
+  const indexOfFirstClient = pagination ? (pagination.page - 1) * pagination.limit : 0;
+  const indexOfLastClient = pagination ? Math.min(pagination.page * pagination.limit, pagination.total) : clients.length;
   
   // Navigation handlers
   const handlePageChange = (page: number) => {
@@ -150,7 +149,7 @@ export default function ClinicOrdersNewPage() {
         <CardHeader className="bg-slate-100">
           <CardTitle className="text-lg flex items-center gap-2">
             <User size={20} />
-            Select Client ({clients.length} total)
+            Select Client ({pagination?.total || clients.length} total)
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
@@ -172,7 +171,7 @@ export default function ClinicOrdersNewPage() {
             </div>
             {searchQuery && (
               <p className="text-sm text-gray-500 mt-2">
-                Found {filteredClients.length} client(s) matching "{searchQuery}"
+                Found {totalFilteredClients} client(s) matching "{searchQuery}"
               </p>
             )}
           </div>
@@ -266,14 +265,14 @@ export default function ClinicOrdersNewPage() {
               {totalPages > 1 && (
                 <div className="flex justify-between items-center mt-6">
                   <div className="text-sm text-gray-500">
-                    Showing {indexOfFirstClient + 1} to {Math.min(indexOfLastClient, totalFilteredClients)} of {totalFilteredClients} clients
+                    Showing {indexOfFirstClient + 1} to {indexOfLastClient} of {totalFilteredClients} clients
                   </div>
                   <div className="flex gap-1">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
+                      disabled={!pagination?.hasPrev}
                     >
                       Previous
                     </Button>
@@ -304,7 +303,7 @@ export default function ClinicOrdersNewPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
+                      disabled={!pagination?.hasNext}
                     >
                       Next
                     </Button>
