@@ -7,6 +7,22 @@ export interface RetainedClinic {
   isActive: boolean;
 }
 
+export interface FullClinicData {
+  id: number;
+  name: string;
+  displayName: string;
+  backendName: string;
+  address: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  status: 'active' | 'inactive' | 'historical' | 'no-data';
+  lastActivity?: string;
+  totalAppointments: number;
+  clientCount: number;
+  description: string;
+}
+
 export interface ClinicMapping {
   [frontendSlug: string]: string; // Maps frontend slug to backend clinic name
 }
@@ -15,6 +31,12 @@ export interface ClinicApiResponse {
   clinics: RetainedClinic[];
   mapping: ClinicMapping;
   total: number;
+}
+
+export interface FullClinicsApiResponse {
+  clinics: FullClinicData[];
+  total: number;
+  retainedOnly: boolean;
 }
 
 export interface ClinicValidationResponse {
@@ -27,6 +49,29 @@ import { BaseApiService } from './baseApiService';
 export class ClinicApiService extends BaseApiService {
   private static readonly ENDPOINT = '/clinics';
   private static readonly CACHE_TTL = 300000; // 5 minutes
+
+  /**
+   * Get full clinic data from backend (MongoDB)
+   * Returns complete clinic information for frontend dropdown
+   */
+  static async getFullClinics(): Promise<FullClinicsApiResponse> {
+    const cacheKey = 'full_clinics_data';
+    const cached = this.getCached<FullClinicsApiResponse>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const response = await this.request<FullClinicsApiResponse>(`${this.ENDPOINT}/frontend-compatible`);
+      
+      if (response.success && response.data) {
+        this.setCached(cacheKey, response.data, this.CACHE_TTL);
+        return response.data;
+      }
+      
+      throw new Error('Failed to fetch full clinic data');
+    } catch (error) {
+      throw this.handleError(error, 'getFullClinics');
+    }
+  }
 
   /**
    * Get all available clinics from backend

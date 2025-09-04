@@ -53,7 +53,7 @@ interface ClinicSelectorProps {
 }
 
 export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => {
-  const { selectedClinic, availableClinics, setSelectedClinic } = useClinic();
+  const { selectedClinic, availableClinics, setSelectedClinic, loading, error } = useClinic();
 
   const handleClinicSelect = (clinic: Clinic) => {
     setSelectedClinic(clinic);
@@ -65,11 +65,32 @@ export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => 
   const inactiveClinics = availableClinics.filter(c => c.status === 'inactive');
   const setupClinics = availableClinics.filter(c => c.status === 'no-data');
 
+  // Handle loading state
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Building2 className="h-4 w-4" />
+        <span className="text-sm">Loading clinics...</span>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 text-red-600">
+        <Building2 className="h-4 w-4" />
+        <span className="text-sm">Error loading clinics</span>
+      </div>
+    );
+  }
+
+  // Handle no selected clinic
   if (!selectedClinic) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground">
         <Building2 className="h-4 w-4" />
-        <span className="text-sm">Loading...</span>
+        <span className="text-sm">No clinic selected</span>
       </div>
     );
   }

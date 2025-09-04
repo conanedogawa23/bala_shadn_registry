@@ -21,9 +21,8 @@ import {
 } from "@/components/ui/table/Table";
 import { ArrowLeft, Search, Plus, User, AlertCircle } from "lucide-react";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { slugToClinic } from "@/lib/data/clinics";
-import { getRealDataClinicName } from "@/lib/data/clinics";
 import { generateLink } from "@/lib/route-utils";
+import { useClinic } from "@/lib/contexts/clinic-context";
 
 // Import real API hooks
 import { useClients } from "@/lib/hooks";
@@ -38,12 +37,17 @@ export default function ClinicOrdersNewPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const clientsPerPage = 8;
   
-  // Get clinic data for API calls
-  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+  // Get clinic data from context
+  const { selectedClinic, availableClinics, loading: clinicLoading } = useClinic();
+  
+  // Find the current clinic from URL slug (using API-provided slugs)
+  const clinicData = useMemo(() => {
+    return availableClinics.find(c => c.name === clinic);
+  }, [clinic, availableClinics]);
   
   // Get the proper backend clinic name for API calls
   const backendClinicName = useMemo(() => {
-    return clinicData ? getRealDataClinicName(clinicData) : "";
+    return clinicData?.backendName || clinicData?.displayName || "";
   }, [clinicData]);
   
   // Fetch clients using real API
@@ -83,6 +87,21 @@ export default function ClinicOrdersNewPage() {
   const handleCreateOrderForClient = (clientId: string | number) => {
     router.push(generateLink('clinic', `clients/${clientId}/orders/new`, clinic));
   };
+
+  // Handle clinic loading
+  if (clinicLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Clinics</h2>
+            <p className="text-gray-600">Please wait while we load the clinic information.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Handle clinic not found
   if (!clinicData) {

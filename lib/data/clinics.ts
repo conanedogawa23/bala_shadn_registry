@@ -2,7 +2,7 @@
 import { Clinic } from '@/lib/types/clinic';
 
 export const realClinicsData: Clinic[] = [
-  // Currently Active Clinic
+  // Primary Active Clinic
   {
     id: 9,
     name: 'bodybliss-physio',
@@ -15,10 +15,10 @@ export const realClinicsData: Clinic[] = [
     lastActivity: '2025-06-28',
     totalAppointments: 66528,
     clientCount: 4586,
-    description: 'Active physiotherapy clinic providing comprehensive rehabilitation services'
+    description: 'Primary active physiotherapy clinic providing comprehensive rehabilitation services'
   },
   
-  // Recently Inactive Clinics (Historical)
+  // Other Active Retained Clinics
   {
     id: 20,
     name: 'My Cloud',
@@ -27,11 +27,11 @@ export const realClinicsData: Clinic[] = [
     city: 'Toronto',
     province: 'Ontario',
     postalCode: 'M1T 3K5',
-    status: 'historical',
+    status: 'active',
     lastActivity: '2023-10-28',
     totalAppointments: 1425,
     clientCount: 547,
-    description: 'Cloud-based healthcare services (recently inactive)'
+    description: 'Cloud-based healthcare services (active retained clinic)'
   },
   
   {
@@ -42,11 +42,11 @@ export const realClinicsData: Clinic[] = [
     city: 'Scarborough',
     province: 'Ontario',
     postalCode: 'M1M 1M1',
-    status: 'historical',
+    status: 'active',
     lastActivity: '2023-10-24',
     totalAppointments: 10170,
     clientCount: 1180,
-    description: 'Integrated care services (recently inactive)'
+    description: 'Integrated care services (active retained clinic)'
   },
   
   {
@@ -57,11 +57,11 @@ export const realClinicsData: Clinic[] = [
     city: 'Toronto',
     province: 'Ontario',
     postalCode: 'M3B 2M3',
-    status: 'historical',
+    status: 'active',
     lastActivity: '2023-02-07',
     totalAppointments: 14294,
     clientCount: 11514,
-    description: 'Orthopedic services (highest client volume, inactive since 2023)'
+    description: 'Orthopedic services (active retained clinic with highest client volume)'
   },
   
   {
@@ -102,11 +102,11 @@ export const realClinicsData: Clinic[] = [
     city: 'Toronto',
     province: 'Ontario',
     postalCode: 'M3B 2M3',
-    status: 'inactive',
+    status: 'active',
     lastActivity: '2018-11-14',
     totalAppointments: 2436,
     clientCount: 1433,
-    description: 'Physiotherapy and wellness services (inactive since 2018)'
+    description: 'Physiotherapy and wellness services (active retained clinic)'
   },
   
   {
@@ -190,10 +190,10 @@ export const realClinicsData: Clinic[] = [
     city: '',
     province: '',
     postalCode: '',
-    status: 'no-data',
+    status: 'active',
     totalAppointments: 0,
     clientCount: 614,
-    description: 'Healthcare services (location details pending)'
+    description: 'Healthcare services (active retained clinic, location details pending)'
   }
 ];
 
@@ -248,9 +248,14 @@ export const getClinicType = (clinic: Clinic): 'physiotherapy' | 'orthopedic' | 
   }
 };
 
-// Get active clinic (currently BodyBlissPhysio)
+// Get primary active clinic (BodyBliss Physio - first active clinic in list)
 export const getActiveClinic = (): Clinic => {
   return realClinicsData.find(clinic => clinic.status === 'active') || realClinicsData[0];
+};
+
+// Get all active clinics (retained clinics for API operations)
+export const getActiveClinics = (): Clinic[] => {
+  return realClinicsData.filter(clinic => clinic.status === 'active');
 };
 
 // Get clinics by status

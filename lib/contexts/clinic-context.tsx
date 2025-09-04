@@ -3,14 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Clinic, ClinicContextType, ClinicStats } from '@/lib/types/clinic';
-import { 
-  realClinicsData, 
-  getActiveClinic, 
-  getClinicByName, 
-  getClinicById,
-  clinicToSlug,
-  slugToClinic 
-} from '@/lib/data/clinics';
+import { ClinicApiService, FullClinicData } from '@/lib/api/clinicService';
 import { generateLink } from '@/lib/route-utils';
 
 const ClinicContext = createContext<ClinicContextType | undefined>(undefined);
@@ -29,12 +22,82 @@ interface ClinicProviderProps {
 
 export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
-  const [availableClinics] = useState<Clinic[]>(realClinicsData);
+  const [availableClinics, setAvailableClinics] = useState<Clinic[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
+  // Utility functions to work with clinic data
+  const clinicToSlug = (clinicDisplayName: string): string => {
+    // Find the clinic by displayName and return its API-provided slug (name field)
+    const clinic = availableClinics.find(c => c.displayName === clinicDisplayName);
+    return clinic ? clinic.name : clinicDisplayName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  };
+
+  const slugToClinic = (slug: string): Clinic | undefined => {
+    // Use the slug provided by the API (clinic.name is already the proper slug)
+    return availableClinics.find(clinic => clinic.name === slug);
+  };
+
+  const getActiveClinic = (): Clinic | undefined => {
+    return availableClinics.find(clinic => clinic.status === 'active') || availableClinics[0];
+  };
+
+  const getClinicByName = (name: string): Clinic | undefined => {
+    return availableClinics.find(clinic => 
+      clinic.name === name || 
+      clinic.displayName === name
+    );
+  };
+
+  const getClinicById = (id: number): Clinic | undefined => {
+    return availableClinics.find(clinic => clinic.id === id);
+  };
+
+  // Fetch clinics from API
+  useEffect(() => {
+    const fetchClinics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await ClinicApiService.getFullClinics();
+        const clinicsData: Clinic[] = response.clinics.map((clinic: FullClinicData) => ({
+          id: clinic.id,
+          name: clinic.name,
+          displayName: clinic.displayName,
+          backendName: clinic.backendName,
+          address: clinic.address,
+          city: clinic.city,
+          province: clinic.province,
+          postalCode: clinic.postalCode,
+          status: clinic.status,
+          lastActivity: clinic.lastActivity,
+          totalAppointments: clinic.totalAppointments,
+          clientCount: clinic.clientCount,
+          description: clinic.description
+        }));
+        
+        setAvailableClinics(clinicsData);
+      } catch (err) {
+        console.error('Failed to fetch clinics:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load clinics');
+        // Set empty array as fallback
+        setAvailableClinics([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClinics();
+  }, []);
+
   // Initialize clinic from URL or default to active clinic
   useEffect(() => {
+    // Wait for clinics to be loaded before initializing
+    if (loading || availableClinics.length === 0) return;
+
     const pathSegments = pathname.split('/');
     
     // Check if URL has clinic parameter (e.g., /clinic/bodybliss-physio/dashboard)
@@ -47,16 +110,20 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
       } else {
         // Invalid clinic slug, redirect to active clinic
         const activeClinic = getActiveClinic();
-        const activeSlug = clinicToSlug(activeClinic.displayName);
-        router.replace(`/clinic/${activeSlug}${pathSegments.slice(3).join('/')}`);
-        setSelectedClinic(activeClinic);
+        if (activeClinic) {
+          const activeSlug = clinicToSlug(activeClinic.displayName);
+          router.replace(`/clinic/${activeSlug}${pathSegments.slice(3).join('/')}`);
+          setSelectedClinic(activeClinic);
+        }
       }
     } else {
       // No clinic in URL, set default active clinic
       const activeClinic = getActiveClinic();
-      setSelectedClinic(activeClinic);
+      if (activeClinic) {
+        setSelectedClinic(activeClinic);
+      }
     }
-  }, [pathname, router]);
+  }, [pathname, router, loading, availableClinics]);
 
   const handleSetSelectedClinic = (clinic: Clinic) => {
     setSelectedClinic(clinic);
@@ -106,7 +173,9 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
     setSelectedClinic: handleSetSelectedClinic,
     isClinicActive,
     getClinicStats,
-    switchClinic
+    switchClinic,
+    loading,
+    error
   };
 
   return (

@@ -4,6 +4,7 @@ export interface Clinic {
   id: number;
   name: string;
   displayName: string;
+  backendName?: string;
   address: string;
   city: string;
   province: string;
@@ -30,6 +31,8 @@ export interface ClinicContextType {
   isClinicActive: (clinicName: string) => boolean;
   getClinicStats: (clinicName: string) => ClinicStats | null;
   switchClinic: (clinicId: number) => void;
+  loading: boolean;
+  error: string | null;
 }
 
 export interface ClinicRouteParams {
