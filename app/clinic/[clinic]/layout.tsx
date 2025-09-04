@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ClinicApiService, getFirstAvailableClinicSlug } from '@/lib/api/clinicService';
-import { slugToClinic } from '@/lib/data/clinics';
+import { useClinic } from '@/lib/contexts/clinic-context';
 
 interface ClinicLayoutProps {
   children: React.ReactNode;
@@ -12,6 +12,7 @@ interface ClinicLayoutProps {
 export default function ClinicLayout({ children }: ClinicLayoutProps) {
   const params = useParams();
   const router = useRouter();
+  const { availableClinics, loading: clinicLoading } = useClinic();
   const [isValidating, setIsValidating] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [clinicInfo, setClinicInfo] = useState<{
@@ -47,11 +48,11 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
       } catch (error) {
         console.error('Clinic validation failed:', error);
         
-        // Try fallback validation with local data
-        const localClinic = slugToClinic(clinicSlug);
+        // Try fallback validation with context data
+        const localClinic = availableClinics.find(c => c.name === clinicSlug);
         
         if (localClinic) {
-          // Clinic exists locally but not in backend retained list
+          // Clinic exists in context but backend validation failed
           setValidationError(
             `Clinic "${localClinic.displayName}" is not available in the current system. Please select from available clinics.`
           );
@@ -78,8 +79,11 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
       }
     };
 
-    validateClinic();
-  }, [clinicSlug, router]);
+    // Wait for clinic context to load before validating
+    if (!clinicLoading) {
+      validateClinic();
+    }
+  }, [clinicSlug, router, availableClinics, clinicLoading]);
 
   // Loading state
   if (isValidating) {

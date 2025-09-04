@@ -20,7 +20,6 @@ import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { isAuthenticated, getUser, logout, User } from "@/lib/auth";
 import { ClinicSelector } from "@/components/clinic/clinic-selector";
 import { useClinic } from "@/lib/contexts/clinic-context";
-import { clinicToSlug } from "@/lib/data/clinics";
 import { generateLink } from "@/lib/route-utils";
 
 export default function NavMenu() {
@@ -99,7 +98,8 @@ export default function NavMenu() {
   // Generate clinic-aware navigation items using the route utility
   const getClinicSlug = (): string => {
     if (!selectedClinic) return 'bodybliss-physio';
-    return clinicToSlug(selectedClinic.displayName);
+    // Use the API-provided slug directly instead of converting displayName
+    return selectedClinic.name;
   };
 
   const navItems = [

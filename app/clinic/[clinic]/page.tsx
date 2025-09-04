@@ -15,11 +15,11 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { slugToClinic } from '@/lib/data/clinics';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import InvalidClinicError from '@/components/error/invalid-clinic-error';
 import { generateLink } from '@/lib/route-utils';
+import { useClinic } from '@/lib/contexts/clinic-context';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -61,10 +61,24 @@ const formatNumber = (num: number = 0): string => {
 export default function ClinicPage() {
   const params = useParams();
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
-  const clinic = slugToClinic(clinicSlug);
+  const { availableClinics, loading, error } = useClinic();
+  
+  // Find clinic from dynamic data
+  const clinic = availableClinics.find(c => c.name === clinicSlug);
 
-  if (!clinic) {
-    // Use our new error component for invalid clinics
+  // Handle loading state
+  if (loading) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (error || !clinic) {
     return <InvalidClinicError clinicSlug={clinicSlug} />;
   }
 

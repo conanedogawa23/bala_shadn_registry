@@ -1,7 +1,6 @@
 /**
  * Route utility functions for consistent link generation and route handling
  */
-import { slugToClinic } from '@/lib/data/clinics';
 import { Clinic } from '@/lib/types/clinic';
 
 /**

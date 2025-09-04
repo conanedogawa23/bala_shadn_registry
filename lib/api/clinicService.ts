@@ -16,6 +16,8 @@ export interface FullClinicData {
   city: string;
   province: string;
   postalCode: string;
+  phone?: string;
+  fax?: string;
   status: 'active' | 'inactive' | 'historical' | 'no-data';
   lastActivity?: string;
   totalAppointments: number;

@@ -36,8 +36,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { slugToClinic, getRealDataClinicName } from "@/lib/data/clinics";
 import { generateLink } from "@/lib/route-utils";
+import { useClinic } from "@/lib/contexts/clinic-context";
 import { 
   PaymentApiService, 
   Payment,
@@ -152,6 +152,11 @@ export default function PaymentsPage() {
   const params = useParams();
   const clinic = params.clinic as string;
   
+  // Get clinic data from context
+  const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
+  const clinicData = availableClinics.find(c => c.name === clinic);
+  const backendClinicName = clinicData?.backendName || clinicData?.displayName || "";
+  
   // State management
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -164,14 +169,13 @@ export default function PaymentsPage() {
 
   const ITEMS_PER_PAGE = 10;
 
-  // Get clinic data
-  const clinicData = slugToClinic(clinic);
-
   // Fetch payments data
   const fetchPayments = useCallback(async (page = 1, reset = false) => {
-    if (!clinicData) {
-      setError("Clinic not found");
-      setIsLoading(false);
+    if (!backendClinicName || clinicLoading) {
+      if (!clinicLoading) {
+        setError("Clinic not found");
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -185,7 +189,7 @@ export default function PaymentsPage() {
         status: statusFilter === "all" ? undefined : statusFilter as PaymentStatus,
       };
 
-      const result = await PaymentApiService.getPaymentsByClinic(getRealDataClinicName(clinicData), filters);
+      const result = await PaymentApiService.getPaymentsByClinic(backendClinicName, filters);
       
       if (reset || page === 1) {
         setPayments(result.data);
@@ -202,7 +206,7 @@ export default function PaymentsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [clinicData, statusFilter]);
+  }, [backendClinicName, clinicLoading, statusFilter]);
 
   // Search payments - simplified to just re-fetch with current filters
   const searchPayments = useCallback(async () => {
@@ -238,7 +242,19 @@ export default function PaymentsPage() {
     }
   };
 
-  if (!clinicData) {
+  // Handle clinic loading state
+  if (clinicLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle clinic error or not found
+  if (clinicError || !clinicData) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
         <div className="text-center">

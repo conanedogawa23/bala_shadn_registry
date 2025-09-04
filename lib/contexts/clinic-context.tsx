@@ -25,6 +25,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
   const [availableClinics, setAvailableClinics] = useState<Clinic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastInitializedPath, setLastInitializedPath] = useState<string>('');
   const router = useRouter();
   const pathname = usePathname();
 
@@ -96,7 +97,16 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
   // Initialize clinic from URL or default to active clinic
   useEffect(() => {
     // Wait for clinics to be loaded before initializing
-    if (loading || availableClinics.length === 0) return;
+    if (loading || availableClinics.length === 0) {
+      console.log('⏳ Waiting for clinics to load...', { loading, availableClinicsCount: availableClinics.length });
+      return;
+    }
+
+    // Prevent multiple initializations for the same pathname
+    if (lastInitializedPath === pathname) {
+      console.log('🚫 Already initialized for this pathname:', pathname);
+      return;
+    }
 
     const pathSegments = pathname.split('/');
     
@@ -105,25 +115,45 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
       const clinicSlug = pathSegments[2];
       const clinic = slugToClinic(clinicSlug);
       
+      console.log('🔍 Clinic lookup debug:', {
+        clinicSlug,
+        foundClinic: !!clinic,
+        clinicDisplayName: clinic?.displayName,
+        availableClinicsCount: availableClinics.length,
+        availableClinicNames: availableClinics.map(c => c.name)
+      });
+      
       if (clinic) {
         setSelectedClinic(clinic);
+        setLastInitializedPath(pathname);
       } else {
-        // Invalid clinic slug, redirect to active clinic
-        const activeClinic = getActiveClinic();
-        if (activeClinic) {
-          const activeSlug = clinicToSlug(activeClinic.displayName);
-          router.replace(`/clinic/${activeSlug}${pathSegments.slice(3).join('/')}`);
-          setSelectedClinic(activeClinic);
-        }
+        // Don't redirect immediately - log the issue instead
+        console.warn('⚠️ Clinic not found:', clinicSlug, 'Available:', availableClinics.map(c => c.name));
+        
+        // TEMPORARILY DISABLE REDIRECT - Let pages handle "Clinic Not Found" 
+        console.log('❌ Clinic not found but NOT redirecting - letting page handle the error');
+        
+        // TODO: Re-enable redirect logic after debugging
+        // if (availableClinics.length > 0) {
+        //   const activeClinic = getActiveClinic();
+        //   if (activeClinic) {
+        //     console.log('🔄 Redirecting to active clinic:', activeClinic.displayName, '→', activeClinic.name);
+        //     const activeSlug = activeClinic.name;
+        //     router.replace(`/clinic/${activeSlug}${pathSegments.slice(3).join('/')}`);
+        //     setSelectedClinic(activeClinic);
+        //     setLastInitializedPath(pathname);
+        //   }
+        // }
       }
     } else {
       // No clinic in URL, set default active clinic
       const activeClinic = getActiveClinic();
       if (activeClinic) {
         setSelectedClinic(activeClinic);
+        setLastInitializedPath(pathname);
       }
     }
-  }, [pathname, router, loading, availableClinics]);
+  }, [pathname, router, loading, availableClinics, lastInitializedPath]);
 
   const handleSetSelectedClinic = (clinic: Clinic) => {
     setSelectedClinic(clinic);

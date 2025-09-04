@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { slugToClinic } from '@/lib/data/clinics';
+import { useClinic } from '@/lib/contexts/clinic-context';
 import { 
   usePayment,
   PaymentApiService,
@@ -80,7 +80,9 @@ export default function PaymentDetailsPage() {
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
   const paymentId = Array.isArray(params.id) ? params.id[0] : params.id as string;
   
-  const clinic = slugToClinic(clinicSlug);
+  // Get clinic data from context
+  const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
+  const clinic = availableClinics.find(c => c.name === clinicSlug);
   const { payment, loading, error, refetch } = usePayment(paymentId);
 
   const handleBack = () => {
@@ -98,6 +100,32 @@ export default function PaymentDetailsPage() {
   const handlePrint = () => {
     window.print();
   };
+
+  // Handle clinic loading state
+  if (clinicLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle clinic error or not found
+  if (clinicError || !clinic) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="mx-auto h-12 w-12 text-red-500" />
+            <h3 className="mt-2 text-lg font-medium text-gray-900">Clinic Not Found</h3>
+            <p className="mt-1 text-sm text-gray-500">The requested clinic could not be found.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Loading state
   if (loading) {

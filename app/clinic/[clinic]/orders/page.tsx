@@ -23,8 +23,8 @@ import {
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { Search, Calendar, Plus, ChevronRight, ChevronLeft, Eye, Edit2, Trash2, Printer, FileText, DollarSign, UserCircle, AlertCircle } from "lucide-react";
 import { formatCurrency, formatDate, isValidDate } from "@/lib/utils";
-import { slugToClinic } from "@/lib/data/clinics";
 import { generateLink } from "@/lib/route-utils";
+import { useClinic } from "@/lib/contexts/clinic-context";
 
 // Import real API hooks and utilities
 import { 
@@ -60,8 +60,10 @@ export default function OrdersPage() {
     return () => clearTimeout(timer);
   }, [searchQuery, debouncedSearchQuery]);
   
-  // Get clinic data for API calls
-  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+  // Get clinic data from context
+  const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
+  const clinicData = availableClinics.find(c => c.name === clinic);
+  const backendClinicName = clinicData?.backendName || clinicData?.displayName || "";
   
   // Fetch orders using real API with server-side pagination and debounced search
   const { 
@@ -71,13 +73,13 @@ export default function OrdersPage() {
     pagination,
     refetch 
   } = useOrdersByClinic({
-    clinicName: clinicData?.name || "",
+    clinicName: backendClinicName,
     query: {
       page: currentPage.toString(),
       limit: ordersPerPage.toString(),
       search: debouncedSearchQuery.trim() || undefined
     },
-    autoFetch: !!clinicData?.name
+    autoFetch: !!backendClinicName && !clinicLoading
   });
 
   // Order mutation hook for operations
@@ -165,8 +167,19 @@ export default function OrdersPage() {
     );
   };
 
-  // Handle clinic not found
-  if (!clinicData) {
+  // Handle clinic loading state
+  if (clinicLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle clinic error or not found
+  if (clinicError || !clinicData) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
         <div className="flex items-center justify-center h-64">

@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Plus, Trash2, DollarSign, User, CreditCard, AlertCircle, Clock } from 'lucide-react';
-import { slugToClinic } from '@/lib/data/clinics';
 import { generateLink } from '@/lib/route-utils';
+import { useClinic } from '@/lib/contexts/clinic-context';
 import { 
   PaymentApiService, 
   PaymentMethod, 
@@ -54,31 +54,17 @@ export default function NewPaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
-  const clinic = slugToClinic(clinicSlug);
-
-  // No payment hooks needed - we'll use PaymentApiService directly for create operations
-
-  // Get the real clinic name that matches our MongoDB data (memoized)
-  const realClinicName = useMemo(() => {
-    if (!clinic) return '';
-    // Map the clinic slug to the actual clinic name used in MongoDB
-    const clinicNameMap: Record<string, string> = {
-      'bodybliss-physio': 'BodyBlissPhysio',
-      'physio-bliss': 'Physio Bliss',
-      'ortholine-duncan-mills': 'Ortholine Duncan Mills',
-      'bodyblissoneCare': 'BodyBlissOneCare',
-      'markham-orthopedic': 'Markham Orthopedic',
-      'my-cloud': 'My Cloud',
-      'extremephysio': 'ExtremePhysio'
-    };
-    return clinicNameMap[clinic?.name] || clinic?.displayName || clinic?.name || '';
-  }, [clinic?.name, clinic?.displayName]);
+  
+  // Get clinic data from context
+  const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
+  const clinic = availableClinics.find(c => c.name === clinicSlug);
+  const realClinicName = clinic?.backendName || clinic?.displayName || "";
 
   // Optimized: Use clinic-specific hook to reduce API calls
   const { products: availableProducts, loading: isProductsLoading, error: productsError, refetch: refetchProducts } = useProductsByClinic({
     clinicName: realClinicName,
     status: ProductStatus.ACTIVE,
-    autoFetch: !!realClinicName
+    autoFetch: !!realClinicName && !clinicLoading
   });
 
   // Form state
@@ -311,7 +297,7 @@ export default function NewPaymentPage() {
         orderNumber: formData.orderNumber || undefined,
         clientId: Number(formData.clientId),
         clientName: formData.clientName,
-        clinicName: clinic.name,
+        clinicName: realClinicName,
         paymentMethod: formData.paymentMethod as PaymentMethod,
         paymentType: formData.paymentType as PaymentType,
         amounts,
@@ -332,7 +318,19 @@ export default function NewPaymentPage() {
     }
   };
 
-  if (!clinic) {
+  // Handle clinic loading state
+  if (clinicLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle clinic error or not found
+  if (clinicError || !clinic) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
         <div className="flex items-center justify-center h-64">

@@ -24,8 +24,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { slugToClinic } from '@/lib/data/clinics';
 import { generateLink } from '@/lib/route-utils';
+import { useClinic } from '@/lib/contexts/clinic-context';
 import { useAppointments, useAppointmentStats } from '@/lib/hooks';
 
 // Loading component
@@ -112,8 +112,11 @@ export default function AppointmentsPage() {
   const params = useParams();
   const router = useRouter();
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
-  const clinic = slugToClinic(clinicSlug);
-  const clinicName = clinic?.name || clinicSlug;
+  const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
+  
+  // Find clinic from dynamic data
+  const clinic = availableClinics.find(c => c.name === clinicSlug);
+  const clinicName = clinic?.backendName || clinic?.displayName || clinicSlug;
 
   // State for filtering and pagination
   const [searchQuery, setSearchQuery] = useState('');
@@ -175,6 +178,32 @@ export default function AppointmentsPage() {
   const handleNewAppointment = () => {
     router.push(generateLink('appointment-new', '', clinicSlug));
   };
+
+  // Handle clinic loading state
+  if (clinicLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle clinic error or not found
+  if (clinicError || !clinic) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Clinic Not Found</h2>
+            <p className="text-gray-600">The requested clinic could not be found.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6">

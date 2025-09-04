@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertCircle } from "lucide-react";
-import { slugToClinic } from "@/lib/data/clinics";
+import { useClinic } from "@/lib/contexts/clinic-context";
 import { PaymentApiService, type Payment } from "@/lib/hooks";
 import InvoiceTemplate from "@/components/ui/invoice/InvoiceTemplate";
 
@@ -45,6 +45,10 @@ export default function InvoicePage() {
   const clinic = params.clinic as string;
   const paymentId = params.id as string;
   
+  // Get clinic data from context
+  const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
+  const clinicData = availableClinics.find(c => c.name === clinic);
+  
   // State management
   const [payment, setPayment] = useState<Payment | null>(null);
   const [clinicInfo, setClinicInfo] = useState<Record<string, unknown> | null>(null);
@@ -52,14 +56,13 @@ export default function InvoicePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Get clinic data
-  const clinicData = slugToClinic(clinic);
-
   // Fetch invoice data
   const fetchInvoiceData = useCallback(async () => {
-    if (!clinicData || !paymentId) {
-      setError("Invalid clinic or payment ID");
-      setIsLoading(false);
+    if (!clinicData || !paymentId || clinicLoading) {
+      if (!clinicLoading) {
+        setError("Invalid clinic or payment ID");
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -92,8 +95,8 @@ export default function InvoicePage() {
         city: clinicData.city,
         province: clinicData.province,
         postalCode: clinicData.postalCode,
-        phone: '(416) 555-0123', // Default values for BodyBliss format
-        fax: '(416) 555-0124'
+        phone: clinicData.phone || '(416) 555-0123', // Use clinic data or default
+        fax: clinicData.fax || '(416) 555-0124'
       });
       setClientInfo({
         name: paymentData.clientName || 'Unknown Client',
@@ -118,7 +121,7 @@ export default function InvoicePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [clinicData, paymentId]);
+  }, [clinicData, paymentId, clinicLoading]);
 
   // Handle retry
   const handleRetry = () => {
@@ -141,8 +144,13 @@ export default function InvoicePage() {
     fetchInvoiceData();
   }, [fetchInvoiceData]);
 
-  // Error states
-  if (!clinicData) {
+  // Handle clinic loading state
+  if (clinicLoading) {
+    return <LoadingSpinner />;
+  }
+
+  // Handle clinic error or not found
+  if (clinicError || !clinicData) {
     return (
       <ErrorDisplay 
         error="Clinic not found" 
