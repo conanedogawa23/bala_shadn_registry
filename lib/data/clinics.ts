@@ -200,7 +200,7 @@ export const realClinicsData: Clinic[] = [
 // Comprehensive clinic name mapping for data resolution
 // Maps clinic names from clinics.ts to corresponding names in realData.json
 export const clinicNameMapping: Record<string, string> = {
-  // Direct matches (clinic name → realData.json clientCounts key)
+  // Direct matches (clinic name → exact MongoDB values)
   'My Cloud': 'My Cloud',
   'BodyBlissOneCare': 'BodyBlissOneCare', 
   'Ortholine Duncan Mills': 'Ortholine Duncan Mills',
@@ -214,10 +214,10 @@ export const clinicNameMapping: Record<string, string> = {
   'Evergold': 'Evergold',
   
   // Special cases that need mapping
-  'bodybliss-physio': 'BodyBlissPhysio', // Use the larger dataset (4586 vs 120)
+  'bodybliss-physio': 'BodyBlissPhysio', // Match the MongoDB clinic name (exact case)
   'BodyBliss': 'BodyBliss',
   
-  // Display name mappings (for when displayName is used)
+  // Display name mappings (for when displayName is used)  
   'BodyBliss Physio': 'BodyBlissPhysio',
   'BodyBliss OneCare': 'BodyBlissOneCare',
   'Extreme Physio': 'ExtremePhysio',

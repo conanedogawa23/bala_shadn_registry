@@ -27,6 +27,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { generateLink } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { useAppointments, useAppointmentStats } from '@/lib/hooks';
+import { getRealDataClinicName } from '@/lib/data/clinics';
 
 // Loading component
 const LoadingSpinner = () => (
@@ -116,7 +117,7 @@ export default function AppointmentsPage() {
   
   // Find clinic from dynamic data
   const clinic = availableClinics.find(c => c.name === clinicSlug);
-  const clinicName = clinic?.backendName || clinic?.displayName || clinicSlug;
+  const clinicName = clinic ? getRealDataClinicName(clinic) : clinicSlug;
 
   // State for filtering and pagination
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,6 +153,7 @@ export default function AppointmentsPage() {
 
   // Filter appointments by search query
   const filteredAppointments = useMemo(() => {
+    if (!appointments) return [];
     if (!searchQuery.trim()) return appointments;
     
     const query = searchQuery.toLowerCase();
