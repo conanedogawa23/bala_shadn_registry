@@ -120,7 +120,24 @@ export default function ClientsPage() {
           referringMD: data.referringMD || '',
           csrName: '',
         },
-        insurance: [],
+        insurance: clientInsurance.map(ins => ({
+          type: '1st' as const,
+          policyHolder: ins.policyHolderName,
+          policyHolderName: ins.policyHolderName,
+          birthday: {
+            day: String(ins.policyHolderBirthday.getDate()).padStart(2, '0'),
+            month: String(ins.policyHolderBirthday.getMonth() + 1).padStart(2, '0'),
+            year: String(ins.policyHolderBirthday.getFullYear())
+          },
+          company: ins.insuranceCompany,
+          groupNumber: ins.groupNumber || '',
+          certificateNumber: ins.certificateNumber,
+          coverage: {
+            physiotherapy: 100,
+            massage: 100,
+            other: 100
+          }
+        })),
         defaultClinic: clinic === 'bodybliss-physio' ? 'BodyBlissPhysio' : clinic.replace('-', ' '),
       };
 

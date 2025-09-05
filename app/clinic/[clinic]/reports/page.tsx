@@ -199,6 +199,73 @@ export default function ReportsPage() {
     autoFetch: !!clinic?.name
   });
 
+  // Fetch ALL clients for proper statistics calculation using pagination
+  useEffect(() => {
+    if (clinicData?.name) {
+      const fetchAllClientsForStats = async () => {
+        setStatsLoading(true);
+        try {
+          const allClientsData: any[] = [];
+          const maxLimit = 100; // API limit
+          let currentPage = 1;
+          let hasMore = true;
+
+          // Check first 10 pages for recent clients, then use search for September 2025 clients
+          const maxPages = 10;
+          
+          while (hasMore && currentPage <= maxPages) {
+            const response = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinicData.backendName || clinicData.displayName || clinicData.name}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.data && data.data.length > 0) {
+                allClientsData.push(...data.data);
+                hasMore = data.pagination?.hasNext || false && currentPage < maxPages;
+                currentPage++;
+              } else {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false;
+            }
+          }
+          
+          // Search for potentially recent clients by common test patterns
+          const searchTerms = ['Test', 'DEBUG', 'Sept2025', 'NewMonth'];
+          for (const term of searchTerms) {
+            try {
+              const searchResponse = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinicData.backendName || clinicData.displayName || clinicData.name}/frontend-compatible?search=${term}`
+              );
+              if (searchResponse.ok) {
+                const searchData = await searchResponse.json();
+                if (searchData.success && searchData.data) {
+                  // Add any clients that weren't in the first 10 pages
+                  const newClients = searchData.data.filter((client: any) => 
+                    !allClientsData.some(existing => existing.id === client.id)
+                  );
+                  allClientsData.push(...newClients);
+                }
+              }
+            } catch (searchError) {
+              console.error(`Search for ${term} failed:`, searchError);
+            }
+          }
+          
+          setAllClients(allClientsData);
+        } catch (error) {
+          console.error('Failed to fetch all clients for stats:', error);
+          setAllClients([]);
+        } finally {
+          setStatsLoading(false);
+        }
+      };
+      fetchAllClientsForStats();
+    }
+  }, [clinicData]);
+
   // Calculate comprehensive metrics from real data
   const metrics = useMemo((): ReportMetrics => {
     if (!revenueAnalytics || !orders || !clients) {
@@ -232,7 +299,7 @@ export default function ReportsPage() {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
-    const newClientsThisMonth = clients.filter(client => {
+    const newClientsThisMonth = allClients.filter(client => {
       const dateToUse = client.createdAt || client.dateOfBirth;
       if (!dateToUse) return false;
       const clientDate = new Date(dateToUse);

@@ -4,7 +4,7 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import { PaymentApiService, type Payment, type Order } from "@/lib/hooks";
 import { formatDate } from "@/lib/utils";
 
@@ -31,7 +31,6 @@ interface OrderInvoiceTemplateProps {
     phone?: string;
     email?: string;
   };
-  onDownload?: () => void;
 }
 
 // Order header component
@@ -229,8 +228,7 @@ export default function OrderInvoiceTemplate({
   order, 
   payments,
   clinicInfo, 
-  clientInfo, 
-  onDownload 
+  clientInfo
 }: OrderInvoiceTemplateProps) {
   const orderTotal = order.totalAmount || 0;
 
@@ -248,16 +246,6 @@ export default function OrderInvoiceTemplate({
             Back to Order
           </Button>
           <div className="flex gap-2">
-            {onDownload && (
-              <Button
-                variant="outline"
-                onClick={onDownload}
-                className="flex items-center gap-2"
-              >
-                <Download size={16} />
-                Download PDF
-              </Button>
-            )}
             <Button
               onClick={() => window.print()}
               className="flex items-center gap-2"

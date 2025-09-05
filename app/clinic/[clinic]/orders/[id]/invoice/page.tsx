@@ -101,15 +101,6 @@ export default function OrderInvoicePage() {
     window.location.reload();
   };
 
-  // Handle download PDF (placeholder for future implementation)
-  const handleDownload = async () => {
-    try {
-      // For now, just trigger print
-      window.print();
-    } catch (err) {
-      console.error('Download failed:', err);
-    }
-  };
 
   // Effects
   useEffect(() => {
@@ -175,7 +166,6 @@ export default function OrderInvoicePage() {
       payments={payments}
       clinicInfo={defaultClinicInfo}
       clientInfo={defaultClientInfo}
-      onDownload={handleDownload}
     />
   );
 }

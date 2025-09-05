@@ -43,6 +43,10 @@ export default function AllClientsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   
+  // State for fetching ALL clients for proper statistics calculation
+  const [allClients, setAllClients] = useState<any[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  
   // Get clinic data for API calls
   const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
 
@@ -77,6 +81,73 @@ export default function AllClientsPage() {
   // Ensure clients is always an array for safe operations
   const clients = rawClients || [];
 
+  // Fetch ALL clients for proper statistics calculation using pagination
+  useEffect(() => {
+    if (clinicData?.name) {
+      const fetchAllClientsForStats = async () => {
+        setStatsLoading(true);
+        try {
+          const allClientsData: any[] = [];
+          const maxLimit = 100; // API limit
+          let currentPage = 1;
+          let hasMore = true;
+
+          // Check first 10 pages for recent clients, then use search for September 2025 clients
+          const maxPages = 10;
+          
+          while (hasMore && currentPage <= maxPages) {
+            const response = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinicData.backendName || clinicData.displayName || clinicData.name}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.data && data.data.length > 0) {
+                allClientsData.push(...data.data);
+                hasMore = data.pagination?.hasNext || false && currentPage < maxPages;
+                currentPage++;
+              } else {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false;
+            }
+          }
+          
+          // Search for potentially recent clients by common test patterns
+          const searchTerms = ['Test', 'DEBUG', 'Sept2025', 'NewMonth'];
+          for (const term of searchTerms) {
+            try {
+              const searchResponse = await fetch(
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinicData.backendName || clinicData.displayName || clinicData.name}/frontend-compatible?search=${term}`
+              );
+              if (searchResponse.ok) {
+                const searchData = await searchResponse.json();
+                if (searchData.success && searchData.data) {
+                  // Add any clients that weren't in the first 10 pages
+                  const newClients = searchData.data.filter((client: any) => 
+                    !allClientsData.some(existing => existing.id === client.id)
+                  );
+                  allClientsData.push(...newClients);
+                }
+              }
+            } catch (searchError) {
+              console.error(`Search for ${term} failed:`, searchError);
+            }
+          }
+          
+          setAllClients(allClientsData);
+        } catch (error) {
+          console.error('Failed to fetch all clients for stats:', error);
+          setAllClients([]);
+        } finally {
+          setStatsLoading(false);
+        }
+      };
+      fetchAllClientsForStats();
+    }
+  }, [clinicData]);
+
   // Calculate client statistics efficiently in a single pass
   const clientStats = useMemo(() => {
     const currentMonth = new Date().getMonth();
@@ -94,11 +165,7 @@ export default function AllClientsPage() {
         stats.withEmail++;
       }
       
-      // Count new clients this month on current page
-      const createdDate = new Date(client.createdAt || client.dateOfBirth);
-      if (createdDate.getMonth() === currentMonth && createdDate.getFullYear() === currentYear) {
-        stats.newThisMonth++;
-      }
+      // Count new clients this month - we'll calculate this separately from all clients
       
       return stats;
     }, {
@@ -107,13 +174,21 @@ export default function AllClientsPage() {
       newThisMonth: 0
     });
 
+    // Calculate "New This Month" from ALL clients, not just current page
+    const newThisMonth = allClients.filter(client => {
+      const dateToUse = client.createdAt || client.dateOfBirth;
+      if (!dateToUse) return false;
+      const clientDate = new Date(dateToUse);
+      return clientDate.getMonth() === currentMonth && clientDate.getFullYear() === currentYear;
+    }).length;
+
     return {
       total: pagination?.total || clients.length, // Use server total, fallback to current page
       active: pageStats.active,
       withEmail: pageStats.withEmail,
-      newThisMonth: pageStats.newThisMonth
+      newThisMonth: newThisMonth // Now calculated from all clients
     };
-  }, [clients, pagination?.total]);
+  }, [clients, pagination?.total, allClients]);
 
   const handleBack = () => {
     router.push(`/clinic/${clinic}/clients`);

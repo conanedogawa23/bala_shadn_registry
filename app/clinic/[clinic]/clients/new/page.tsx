@@ -34,14 +34,36 @@ const clientSchema = z.object({
   workPhone: z.string().optional(),
   extension: z.string().optional(),
   
-  // Additional Details
+  // Address Information
   address: z.string().min(5, { message: "Address is required" }),
+  city: z.string().min(2, { message: "City is required" }),
+  province: z.string().min(2, { message: "Province is required" }),
+  postalCode: z.string().regex(/^[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d$/, { message: "Please enter a valid Canadian postal code (A1A 1A1)" }),
+  
+  // Medical Information
   companyName: z.string().optional(),
   referringMD: z.string().optional(),
   familyMD: z.string().optional(),
   
+  // Insurance Information (Optional)
+  hasInsurance: z.union([z.boolean(), z.string()]).transform((val) => val === true || val === "true"),
+  policyHolderName: z.string().optional(),
+  policyHolderBirthday: z.date().optional(),
+  insuranceCompany: z.string().optional(),
+  groupNumber: z.string().optional(),
+  certificateNumber: z.string().optional(),
+  
   // Additional Fields
   heardAboutUs: z.string().optional(),
+}).refine((data) => {
+  // If hasInsurance is true, then insurance fields should be required
+  if (data.hasInsurance) {
+    return data.policyHolderName && data.insuranceCompany && data.certificateNumber;
+  }
+  return true;
+}, {
+  message: "Policy holder name, insurance company, and certificate number are required when insurance is selected",
+  path: ["hasInsurance"]
 });
 
 // Type definitions
@@ -63,6 +85,30 @@ export default function NewClientPage() {
       const [firstName, ...lastNameParts] = data.name.split(' ');
       const lastName = lastNameParts.join(' ') || '';
       
+      // Format postal code properly 
+      const formattedPostalCode = data.postalCode.replace(/\s+/g, '').toUpperCase();
+      const postalCodeFormatted = `${formattedPostalCode.substring(0, 3)} ${formattedPostalCode.substring(3, 6)}`;
+
+      // Create insurance array if hasInsurance is true
+      const insurance = data.hasInsurance && data.policyHolderName && data.insuranceCompany && data.certificateNumber ? [{
+        type: '1st' as const,
+        policyHolder: data.policyHolderName,
+        policyHolderName: data.policyHolderName,
+        birthday: data.policyHolderBirthday ? {
+          day: String(data.policyHolderBirthday.getDate()).padStart(2, '0'),
+          month: String(data.policyHolderBirthday.getMonth() + 1).padStart(2, '0'),
+          year: String(data.policyHolderBirthday.getFullYear())
+        } : undefined,
+        company: data.insuranceCompany,
+        groupNumber: data.groupNumber || '',
+        certificateNumber: data.certificateNumber,
+        coverage: {
+          physiotherapy: 100,
+          massage: 100,
+          other: 100
+        }
+      }] : [];
+
       const clientData = {
         personalInfo: {
           firstName: firstName || '',
@@ -75,14 +121,30 @@ export default function NewClientPage() {
         contact: {
           address: {
             street: data.address,
-            city: '', // You may want to parse this from address
-            province: '', // You may want to parse this from address  
-            postalCode: '' // You may want to add postal code field to form
+            city: data.city,
+            province: data.province,
+            postalCode: postalCodeFormatted
           },
           phones: {
-            cell: data.cellPhone,
-            home: data.homePhone || undefined,
-            work: data.workPhone || undefined
+            cell: {
+              countryCode: "1",
+              areaCode: data.cellPhone.replace(/\D/g, '').substring(0, 3),
+              number: data.cellPhone.replace(/\D/g, '').substring(3),
+              full: data.cellPhone
+            },
+            home: data.homePhone ? {
+              countryCode: "1", 
+              areaCode: data.homePhone.replace(/\D/g, '').substring(0, 3),
+              number: data.homePhone.replace(/\D/g, '').substring(3),
+              full: data.homePhone
+            } : undefined,
+            work: data.workPhone ? {
+              countryCode: "1",
+              areaCode: data.workPhone.replace(/\D/g, '').substring(0, 3), 
+              number: data.workPhone.replace(/\D/g, '').substring(3),
+              extension: data.extension,
+              full: data.workPhone
+            } : undefined
           },
           email: data.email,
           company: data.companyName || undefined
@@ -91,8 +153,8 @@ export default function NewClientPage() {
           familyMD: data.familyMD || undefined,
           referringMD: data.referringMD || undefined
         },
-        insurance: [], // Empty for now - you may want to add insurance fields to form
-        defaultClinic: clinic
+        insurance: insurance,
+        defaultClinic: clinic === 'bodybliss-physio' ? 'BodyBlissPhysio' : clinic.replace('-', ' ')
       };
 
       // Call real API
@@ -162,9 +224,18 @@ export default function NewClientPage() {
             workPhone: "",
             extension: "",
             address: "",
+            city: "Toronto",
+            province: "Ontario", 
+            postalCode: "",
             companyName: "",
             referringMD: "",
             familyMD: "",
+            hasInsurance: false,
+            policyHolderName: "",
+            policyHolderBirthday: new Date(),
+            insuranceCompany: "",
+            groupNumber: "",
+            certificateNumber: "",
             heardAboutUs: "",
           }}
         >
@@ -200,8 +271,26 @@ export default function NewClientPage() {
                     
                     <FormInput
                       name="address"
-                      label="Address"
-                      placeholder="123 Main St, City, State, ZIP"
+                      label="Street Address"
+                      placeholder="123 Main Street"
+                    />
+                    
+                    <FormInput
+                      name="city"
+                      label="City"
+                      placeholder="Toronto"
+                    />
+                    
+                    <FormInput
+                      name="province"
+                      label="Province"
+                      placeholder="Ontario"
+                    />
+                    
+                    <FormInput
+                      name="postalCode"
+                      label="Postal Code"
+                      placeholder="A1A 1A1"
                     />
                   </div>
                   
@@ -271,6 +360,53 @@ export default function NewClientPage() {
                       name="heardAboutUs"
                       label="How did you hear about us?"
                       placeholder="Google, referral, etc."
+                    />
+                  </div>
+                </div>
+                
+                {/* Insurance Section */}
+                <div className="space-y-6">
+                  <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
+                    Insurance Information (Optional)
+                  </h3>
+                  
+                  <FormSelect
+                    name="hasInsurance"
+                    label="Does this client have insurance?"
+                    options={[
+                      { value: "false", label: "No Insurance" },
+                      { value: "true", label: "Has Insurance" },
+                    ]}
+                  />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormInput
+                      name="policyHolderName"
+                      label="Policy Holder Name"
+                      placeholder="John Doe"
+                    />
+                    
+                    <FormDatePicker
+                      name="policyHolderBirthday"
+                      label="Policy Holder Birthday"
+                    />
+                    
+                    <FormInput
+                      name="insuranceCompany"
+                      label="Insurance Company"
+                      placeholder="Blue Cross Blue Shield"
+                    />
+                    
+                    <FormInput
+                      name="groupNumber"
+                      label="Group Number (Optional)"
+                      placeholder="123456"
+                    />
+                    
+                    <FormInput
+                      name="certificateNumber"
+                      label="Certificate Number"
+                      placeholder="CERT123456"
                     />
                   </div>
                 </div>
