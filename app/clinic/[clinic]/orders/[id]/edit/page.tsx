@@ -12,18 +12,18 @@ import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { ArrowLeft, Save, Edit3 } from "lucide-react";
 import { generateLink } from "@/lib/route-utils";
+import { OrderService, Order, OrderStatus, PaymentStatus } from "@/lib/api/orderService";
 
-// Define the order schema using zod for validation
+// Define the order schema using zod for validation - aligned with API
 const orderSchema = z.object({
   clientName: z.string().min(2, { message: "Client name is required" }),
-  serviceType: z.string().min(1, { message: "Service type is required" }),
-  practitioner: z.string().min(1, { message: "Practitioner is required" }),
-  orderDate: z.date({ required_error: "Order date is required" }),
-  priority: z.enum(["low", "medium", "high"], { required_error: "Priority is required" }),
-  status: z.enum(["pending", "in-progress", "completed", "cancelled"], { required_error: "Status is required" }),
-  notes: z.string().optional(),
+  status: z.nativeEnum(OrderStatus, { required_error: "Status is required" }),
+  paymentStatus: z.nativeEnum(PaymentStatus, { required_error: "Payment status is required" }),
+  serviceDate: z.date({ required_error: "Service date is required" }),
+  endDate: z.date().optional(),
+  location: z.string().optional(),
+  description: z.string().optional(),
   totalAmount: z.string().min(1, { message: "Total amount is required" }),
-  paymentStatus: z.enum(["pending", "partial", "paid", "refunded"], { required_error: "Payment status is required" }),
 });
 
 // Type definitions
@@ -38,43 +38,76 @@ export default function EditOrderPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [orderData, setOrderData] = useState<OrderFormValues | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - in real app, this would come from an API
+  // Fetch order data from API
   useEffect(() => {
     const fetchOrder = async () => {
       setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        setOrderData({
-          clientName: "John Doe",
-          serviceType: "Physical Therapy",
-          practitioner: "Dr. Sarah Johnson",
-          orderDate: new Date("2024-01-15"),
-          priority: "medium",
-          status: "in-progress",
-          notes: "Patient requires specialized treatment for lower back pain",
-          totalAmount: "125.00",
-          paymentStatus: "partial",
-        });
+      setError(null);
+      try {
+        const response = await OrderService.getOrderById(orderId);
+        if (response.success && response.data) {
+          const order = response.data;
+          setOrderData({
+            clientName: order.clientName,
+            status: order.status,
+            paymentStatus: order.paymentStatus,
+            serviceDate: new Date(order.serviceDate),
+            endDate: order.endDate ? new Date(order.endDate) : undefined,
+            location: order.location || "",
+            description: order.description || "",
+            totalAmount: order.totalAmount.toString(),
+          });
+        } else {
+          setError("Failed to load order data");
+        }
+             } catch (err) {
+         console.error("Error fetching order:", err);
+         setError("Failed to load order data");
+       } finally {
         setIsLoading(false);
-      }, 1000);
+      }
     };
 
     fetchOrder();
   }, [orderId]);
 
   // Handle order update
-  const handleOrderSubmit = React.useCallback((data: OrderFormValues) => {
+  const handleOrderSubmit = React.useCallback(async (data: OrderFormValues) => {
     setIsSubmitting(true);
+    setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Order updated for clinic:", clinic, "Order ID:", orderId, data);
-      setIsSubmitting(false);
+    try {
+      // Prepare update data
+      const updateData: Partial<Order> = {
+        clientName: data.clientName,
+        status: data.status,
+        paymentStatus: data.paymentStatus,
+        serviceDate: data.serviceDate.toISOString(),
+        endDate: data.endDate ? data.endDate.toISOString() : undefined,
+        location: data.location || undefined,
+        description: data.description || undefined,
+        totalAmount: parseFloat(data.totalAmount),
+      };
+
+      // Make API call to update order
+      const response = await OrderService.updateOrder(orderId, updateData);
       
-      // Navigate back to orders page
-      router.push(generateLink('clinic', 'orders', clinic));
-    }, 1000);
+      if (response.success) {
+        console.log("Order updated successfully");
+        // Navigate back to orders page
+        router.push(generateLink('clinic', 'orders', clinic));
+      } else {
+        throw new Error("Failed to update order");
+      }
+    } catch (err) {
+      console.error("Error updating order:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to update order";
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   }, [clinic, orderId, router]);
 
   // Handle back navigation
@@ -92,13 +125,15 @@ export default function EditOrderPage() {
     );
   }
 
-  if (!orderData) {
+  if (error || !orderData) {
     return (
       <div className="container mx-auto py-8 px-4 sm:px-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive">Order Not Found</h1>
+          <h1 className="text-2xl font-bold text-destructive">
+            {error ? "Error Loading Order" : "Order Not Found"}
+          </h1>
           <p className="text-muted-foreground mt-2">
-            The order you&apos;re looking for doesn&apos;t exist or has been removed.
+            {error || "The order you're looking for doesn't exist or has been removed."}
           </p>
           <Button onClick={handleBack} className="mt-4">
             Back to Orders
@@ -148,6 +183,17 @@ export default function EditOrderPage() {
         >
           {() => (
             <>
+              {error && (
+                <CardContent className="pt-6">
+                  <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                    <div className="flex">
+                      <div className="text-sm text-red-700">
+                        <strong>Error:</strong> {error}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              )}
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-6">
@@ -161,77 +207,52 @@ export default function EditOrderPage() {
                       placeholder="John Doe"
                     />
                     
-                    <FormSelect
-                      name="serviceType"
-                      label="Service Type"
-                      options={[
-                        { value: "Physical Therapy", label: "Physical Therapy" },
-                        { value: "Massage Therapy", label: "Massage Therapy" },
-                        { value: "Wellness Consultation", label: "Wellness Consultation" },
-                        { value: "Sports Medicine", label: "Sports Medicine" },
-                        { value: "Pain Management", label: "Pain Management" },
-                      ]}
-                    />
-                    
-                    <FormSelect
-                      name="practitioner"
-                      label="Practitioner"
-                      options={[
-                        { value: "Dr. Sarah Johnson", label: "Dr. Sarah Johnson" },
-                        { value: "Dr. Michael Chen", label: "Dr. Michael Chen" },
-                        { value: "Dr. Emily Davis", label: "Dr. Emily Davis" },
-                        { value: "Dr. David Wilson", label: "Dr. David Wilson" },
-                      ]}
+                    <FormDatePicker
+                      name="serviceDate"
+                      label="Service Date"
                     />
                     
                     <FormDatePicker
-                      name="orderDate"
-                      label="Order Date"
-                    />
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                      Status & Priority
-                    </h3>
-                    
-                    <FormSelect
-                      name="priority"
-                      label="Priority"
-                      options={[
-                        { value: "low", label: "Low" },
-                        { value: "medium", label: "Medium" },
-                        { value: "high", label: "High" },
-                      ]}
-                    />
-                    
-                    <FormSelect
-                      name="status"
-                      label="Order Status"
-                      options={[
-                        { value: "pending", label: "Pending" },
-                        { value: "in-progress", label: "In Progress" },
-                        { value: "completed", label: "Completed" },
-                        { value: "cancelled", label: "Cancelled" },
-                      ]}
+                      name="endDate"
+                      label="End Date (Optional)"
                     />
                     
                     <FormInput
                       name="totalAmount"
                       label="Total Amount ($)"
                       type="number"
+                      step="0.01"
                       placeholder="125.00"
+                    />
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
+                      Status & Location
+                    </h3>
+                    
+                    <FormSelect
+                      name="status"
+                      label="Order Status"
+                      options={OrderService.getOrderStatusOptions().map(option => ({
+                        value: option.value,
+                        label: option.label
+                      }))}
                     />
                     
                     <FormSelect
                       name="paymentStatus"
                       label="Payment Status"
-                      options={[
-                        { value: "pending", label: "Pending" },
-                        { value: "partial", label: "Partial" },
-                        { value: "paid", label: "Paid" },
-                        { value: "refunded", label: "Refunded" },
-                      ]}
+                      options={OrderService.getPaymentStatusOptions().map(option => ({
+                        value: option.value,
+                        label: option.label
+                      }))}
+                    />
+                    
+                    <FormInput
+                      name="location"
+                      label="Location (Optional)"
+                      placeholder="Room 1, Main Building"
                     />
                   </div>
                 </div>
@@ -242,8 +263,8 @@ export default function EditOrderPage() {
                   </h3>
                   
                   <FormInput
-                    name="notes"
-                    label="Notes"
+                    name="description"
+                    label="Description"
                     placeholder="Additional notes about the order..."
                   />
                 </div>

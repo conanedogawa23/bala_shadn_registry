@@ -1,6 +1,3 @@
-// Backend API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ff5c706e5a2e.ngrok.app/api/v1';
-
 export interface RetainedClinic {
   name: string;
   slug: string;
