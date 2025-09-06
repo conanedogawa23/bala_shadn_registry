@@ -249,11 +249,27 @@ export class ResourceApiService extends BaseApiService {
       const queryString = query ? `?${query}` : '';
       const endpoint = `${this.ENDPOINT}${queryString}`;
       
-      const response = await this.request<PaginatedResourceResponse>(endpoint);
+      const response = await this.request<any>(endpoint);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
+        // Handle actual API structure: response.data is direct array, not nested object
+        const paginatedResponse: PaginatedResourceResponse = {
+          resources: Array.isArray(response.data) ? response.data.map((item: any) => ({
+            ...item,
+            resourceName: item.resourceName || item.name || item.fullName // Handle field name variations
+          })) : [],
+          pagination: response.pagination || {
+            page: 1,
+            limit: 50,
+            total: 0,
+            pages: 0,
+            hasNext: false,
+            hasPrev: false
+          }
+        };
+        
+        this.setCached(cacheKey, paginatedResponse, this.CACHE_TTL);
+        return paginatedResponse;
       }
       
       throw new Error('Invalid response format');

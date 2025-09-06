@@ -142,16 +142,16 @@ export const realClinicsData: Clinic[] = [
   // No-Data Clinics (Setup/Development)
   {
     id: 4,
-    name: 'BodyBliss',
-    displayName: 'BodyBliss',
+    name: 'BodyBliss Physio',
+    displayName: 'BodyBliss Physiotherapy', 
     address: '1933A Leslie Street',
     city: 'Toronto',
     province: 'Ontario',
     postalCode: 'M3B 2M3',
-    status: 'no-data',
-    totalAppointments: 0,
-    clientCount: 0,
-    description: 'Main BodyBliss location (setup in progress)'
+    status: 'active',
+    totalAppointments: 2436,
+    clientCount: 1433,
+    description: 'BodyBliss physiotherapy services (active retained clinic)'
   },
   
   {
@@ -214,11 +214,12 @@ export const clinicNameMapping: Record<string, string> = {
   'Evergold': 'Evergold',
   
   // Special cases that need mapping
-  'bodybliss-physio': 'BodyBlissPhysio', // Match the MongoDB clinic name (exact case)
-  'BodyBliss': 'BodyBliss',
+  'bodybliss-physio': 'bodyblissphysio', // Match the clinics collection name (lowercase)
+  'BodyBliss': 'bodyblissphysio',
+  'BodyBliss Physio': 'bodyblissphysio', // Frontend clinic name → backend clinic name
   
   // Display name mappings (for when displayName is used)  
-  'BodyBliss Physio': 'BodyBlissPhysio',
+  'BodyBliss Physiotherapy': 'bodyblissphysio',
   'BodyBliss OneCare': 'BodyBlissOneCare',
   'Extreme Physio': 'ExtremePhysio',
   'Active Force': 'Active force eh'

@@ -89,7 +89,8 @@ export function useAppointments({
       setAppointments(response.appointments);
       setPagination(response.pagination);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch appointments');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch appointments';
+      setError(errorMessage);
       setAppointments([]);
       setPagination(null);
     } finally {

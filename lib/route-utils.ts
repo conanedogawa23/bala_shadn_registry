@@ -55,6 +55,11 @@ export const CLINIC_ROUTES = [
  * @returns The generated link
  */
 export function generateLink(type: RouteType, path: string, clinicSlug?: string): string {
+  // Handle undefined or null path
+  if (!path) {
+    path = '';
+  }
+  
   // Remove leading slash if present for consistency
   const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
   

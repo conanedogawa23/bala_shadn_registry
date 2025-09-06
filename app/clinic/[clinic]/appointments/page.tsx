@@ -169,16 +169,32 @@ export default function AppointmentsPage() {
     router.push(generateLink('clinic', '', clinicSlug));
   };
 
-  const handleViewAppointment = (appointmentId: string) => {
-    router.push(generateLink('appointment-detail', appointmentId, clinicSlug));
+  // Helper function to get appointment ID with fallback
+  // Use business appointmentId for navigation (backend has business ID endpoint)
+  const getAppointmentId = (appointment: any): string | number | null => {
+    return appointment.appointmentId || appointment._id || appointment.id;
   };
 
-  const handleEditAppointment = (appointmentId: string) => {
-    router.push(generateLink('appointment-edit', appointmentId, clinicSlug));
+  const handleViewAppointment = (appointment: any) => {
+    const appointmentId = getAppointmentId(appointment);
+    if (!appointmentId) {
+      console.warn('Cannot view appointment: ID is missing');
+      return;
+    }
+    router.push(generateLink('clinic', `appointments/${appointmentId}`, clinicSlug));
+  };
+
+  const handleEditAppointment = (appointment: any) => {
+    const appointmentId = getAppointmentId(appointment);
+    if (!appointmentId) {
+      console.warn('Cannot edit appointment: ID is missing');
+      return;
+    }
+    router.push(generateLink('clinic', `appointments/${appointmentId}/edit`, clinicSlug));
   };
 
   const handleNewAppointment = () => {
-    router.push(generateLink('appointment-new', '', clinicSlug));
+    router.push(generateLink('clinic', 'appointments/new', clinicSlug));
   };
 
   // Handle clinic loading state
@@ -347,13 +363,13 @@ export default function AppointmentsPage() {
           
           {!loading && !error && filteredAppointments.length > 0 && (
             <div className="space-y-4">
-              {filteredAppointments.map((appointment) => {
+              {filteredAppointments.map((appointment, index) => {
                 const { date, time } = formatDateTime(appointment.startDate);
                 const endTime = formatDateTime(appointment.endDate).time;
                 
                 return (
                   <div
-                    key={appointment.id}
+                    key={getAppointmentId(appointment) || `appointment-${index}-${appointment.startDate}`}
                     className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -408,27 +424,37 @@ export default function AppointmentsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleViewAppointment(appointment.id)}
+                          onClick={() => handleViewAppointment(appointment)}
+                          disabled={!getAppointmentId(appointment)}
+                          title={!getAppointmentId(appointment) ? "Appointment ID is missing" : "View appointment details"}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              disabled={!getAppointmentId(appointment)}
+                              title={!getAppointmentId(appointment) ? "Appointment ID is missing" : "Appointment actions"}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => handleEditAppointment(appointment.id)}>
+                            <DropdownMenuItem 
+                              key={`edit-${getAppointmentId(appointment) || index}`}
+                              onClick={() => handleEditAppointment(appointment)}
+                            >
                               Edit Appointment
                             </DropdownMenuItem>
                             {appointment.status === 0 && (
-                              <DropdownMenuItem>
+                              <DropdownMenuItem key={`complete-${getAppointmentId(appointment) || index}`}>
                                 Complete Appointment
                               </DropdownMenuItem>
                             )}
                             {appointment.status === 0 && (
-                              <DropdownMenuItem>
+                              <DropdownMenuItem key={`cancel-${getAppointmentId(appointment) || index}`}>
                                 Cancel Appointment
                               </DropdownMenuItem>
                             )}

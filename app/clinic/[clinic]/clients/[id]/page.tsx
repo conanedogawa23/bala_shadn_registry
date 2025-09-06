@@ -39,11 +39,13 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { generateLink } from '@/lib/route-utils';
+import { getRealDataClinicName } from '@/lib/data/clinics';
 
 // Import real API hooks and utilities
 import { 
   useClient, 
   useOrdersByClient,
+  useAppointments,
   OrderUtils,
   OrderStatus,
   PaymentStatus,
@@ -76,8 +78,10 @@ export default function ClientDetailPage() {
     autoFetch: !!clientId
   });
 
-  // State to control when to load orders
+  // State to control when to load orders and appointments
   const [shouldLoadOrders, setShouldLoadOrders] = useState(false);
+  // Auto-load appointments on client detail page to show accurate statistics
+  const [shouldLoadAppointments, setShouldLoadAppointments] = useState(true);
 
   // Fetch client's order history only when needed
   const { 
@@ -88,6 +92,21 @@ export default function ClientDetailPage() {
   } = useOrdersByClient({
     clientId: parseInt(clientId),
     autoFetch: shouldLoadOrders && !!clientId && !isNaN(parseInt(clientId))
+  });
+
+  // Get real clinic name for API calls (maps slug to backend clinic name)
+  const clinicName = clinicData ? getRealDataClinicName(clinicData) : clinic;
+
+  // Fetch client's appointments automatically to show accurate statistics
+  const {
+    appointments,
+    loading: appointmentsLoading,
+    error: appointmentsError,
+    refetch: refetchAppointments
+  } = useAppointments({
+    clinicName,
+    clientId,
+    autoFetch: shouldLoadAppointments && !!clientId && !!clinicName
   });
 
   const handleBack = () => {
@@ -108,6 +127,19 @@ export default function ClientDetailPage() {
 
   const handleEditOrder = (orderId: string) => {
     router.push(generateLink('clinic', `clients/${clientId}/orders/${orderId}/edit`, clinic));
+  };
+
+  // Appointment handlers
+  const handleNewAppointment = () => {
+    router.push(generateLink('clinic', 'appointments/new', clinic) + `?clientId=${clientId}`);
+  };
+
+  const handleViewAppointment = (appointmentId: string | number) => {
+    router.push(generateLink('clinic', `appointments/${appointmentId}`, clinic));
+  };
+
+  const handleEditAppointment = (appointmentId: string | number) => {
+    router.push(generateLink('clinic', `appointments/${appointmentId}/edit`, clinic));
   };
 
   // Filter orders based on search and status
@@ -153,6 +185,34 @@ export default function ClientDetailPage() {
     
     return { totalOrders, completedOrders, totalSpent, avgOrderValue };
   }, [orders]);
+
+  // Calculate client appointment statistics
+  const appointmentStats = useMemo(() => {
+    if (!appointments || appointments.length === 0) {
+      return {
+        totalAppointments: 0,
+        completedAppointments: 0,
+        upcomingAppointments: 0,
+        cancelledAppointments: 0
+      };
+    }
+
+    const completed = appointments.filter(apt => apt.status === 1); // Completed status
+    const upcoming = appointments.filter(apt => apt.status === 0 && new Date(apt.startDate) > new Date()); // Scheduled and future
+    const cancelled = appointments.filter(apt => apt.status === 2); // Cancelled status
+
+    return {
+      totalAppointments: appointments.length,
+      completedAppointments: completed.length,
+      upcomingAppointments: upcoming.length,
+      cancelledAppointments: cancelled.length
+    };
+  }, [appointments]);
+
+  // Get appointment ID helper
+  const getAppointmentId = (appointment: any): string | number => {
+    return appointment.appointmentId || appointment._id || appointment.id;
+  };
 
   // Get status icon and color
   const getStatusIcon = (status: OrderStatus) => {
@@ -202,7 +262,7 @@ export default function ClientDetailPage() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Clients
               </Button>
-              <Button onClick={() => { refetchClient(); refetchOrders(); }}>
+              <Button onClick={() => { refetchClient(); refetchOrders(); refetchAppointments(); }}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Try Again
               </Button>
@@ -258,7 +318,7 @@ export default function ClientDetailPage() {
           </div>
         </div>
         
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
@@ -267,6 +327,15 @@ export default function ClientDetailPage() {
           >
             <Edit size={16} />
             Edit Client
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNewAppointment}
+            className="flex items-center gap-2 flex-1 sm:flex-none"
+          >
+            <Calendar size={16} />
+            New Appointment
           </Button>
           <Button
             size="sm"
@@ -283,7 +352,8 @@ export default function ClientDetailPage() {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Client Statistics */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-6">
+            {/* Order Stats */}
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
@@ -302,7 +372,32 @@ export default function ClientDetailPage() {
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <div>
                     <p className="text-2xl font-bold text-gray-900">{clientStats.completedOrders}</p>
-                    <p className="text-xs text-gray-600">Completed</p>
+                    <p className="text-xs text-gray-600">Completed Orders</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Appointment Stats */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-5 w-5 text-purple-600" />
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900">{appointmentStats.totalAppointments}</p>
+                    <p className="text-xs text-gray-600">Total Appointments</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="text-2xl font-bold text-gray-900">{appointmentStats.upcomingAppointments}</p>
+                    <p className="text-xs text-gray-600">Upcoming</p>
                   </div>
                 </div>
               </CardContent>
@@ -336,6 +431,147 @@ export default function ClientDetailPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Appointments */}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar size={20} />
+                  Appointments ({appointmentsLoading ? '...' : appointments?.length || 0})
+                </CardTitle>
+                
+                <Button
+                  onClick={handleNewAppointment}
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  New Appointment
+                </Button>
+              </div>
+            </CardHeader>
+            
+            <CardContent>
+              {appointmentsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="flex items-center space-x-2">
+                    <RefreshCw className="h-5 w-5 animate-spin" />
+                    <span className="text-gray-600">Loading appointments...</span>
+                  </div>
+                </div>
+              ) : appointmentsError ? (
+                <div className="text-center py-8 text-red-500">
+                  <AlertCircle className="mx-auto h-12 w-12 text-red-300" />
+                  <p className="mt-2">Error loading appointments: {appointmentsError}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refetchAppointments}
+                    className="mt-4"
+                  >
+                    <RefreshCw size={16} className="mr-2" />
+                    Try Again
+                  </Button>
+                </div>
+              ) : !appointments || appointments.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar className="mx-auto h-12 w-12 text-gray-300" />
+                  <p className="mt-2">No appointments found</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNewAppointment}
+                    className="mt-4"
+                  >
+                    <Plus size={16} className="mr-2" />
+                    Schedule First Appointment
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {appointments.map((appointment) => {
+                    const appointmentId = getAppointmentId(appointment);
+                    const isUpcoming = new Date(appointment.startDate) > new Date();
+                    const isCompleted = appointment.status === 1;
+                    
+                    return (
+                      <div key={appointment.id || appointmentId} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="font-medium text-gray-900">
+                                {appointment.subject || 'Appointment'}
+                              </h4>
+                              <Badge className={`${
+                                isCompleted ? 'bg-green-100 text-green-800' : 
+                                isUpcoming ? 'bg-blue-100 text-blue-800' : 
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {isCompleted ? 'Completed' : isUpcoming ? 'Upcoming' : 'Past'}
+                              </Badge>
+                            </div>
+                            
+                            <div className="grid gap-2 sm:grid-cols-3 text-sm text-gray-600 mb-3">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4" />
+                                {new Date(appointment.startDate).toLocaleDateString()}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                {new Date(appointment.startDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - 
+                                {new Date(appointment.endDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                {appointment.resourceName || 'Resource'}
+                              </div>
+                            </div>
+                            
+                            {appointment.location && (
+                              <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                                <MapPin className="h-4 w-4" />
+                                {appointment.location}
+                              </div>
+                            )}
+                            
+                            {appointment.description && (
+                              <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                                {appointment.description}
+                              </p>
+                            )}
+                          </div>
+                          
+                          <div className="ml-4">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewAppointment(appointmentId)}
+                                className="flex items-center gap-1"
+                              >
+                                <Eye className="h-3 w-3" />
+                                View
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditAppointment(appointmentId)}
+                                className="flex items-center gap-1"
+                              >
+                                <Edit className="h-3 w-3" />
+                                Edit
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Order History */}
           <Card>

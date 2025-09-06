@@ -172,7 +172,10 @@ export class AppointmentApiService extends BaseApiService {
     options: AppointmentQueryOptions = {}
   ): Promise<PaginatedAppointmentResponse> {
     const cacheKey = `appointments_${clinicName}_${JSON.stringify(options)}`;
-    const cached = this.getCached<PaginatedAppointmentResponse>(cacheKey);
+    
+    // Bypass cache for client-specific queries to ensure accurate real-time data
+    const bypassCache = !!options.clientId;
+    const cached = bypassCache ? null : this.getCached<PaginatedAppointmentResponse>(cacheKey);
     if (cached) return cached;
 
     try {
@@ -189,11 +192,17 @@ export class AppointmentApiService extends BaseApiService {
       const queryString = query ? `?${query}` : '';
       const endpoint = `${this.ENDPOINT}/clinic/${encodeURIComponent(clinicName)}${queryString}`;
       
-      const response = await this.request<PaginatedAppointmentResponse>(endpoint);
+      const response = await this.request<any>(endpoint);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
+        const formattedResponse: PaginatedAppointmentResponse = {
+          appointments: response.data,
+          pagination: response.pagination
+        };
+        if (!bypassCache) {
+          this.setCached(cacheKey, formattedResponse, this.CACHE_TTL);
+        }
+        return formattedResponse;
       }
       
       throw new Error('Invalid response format');
@@ -211,7 +220,12 @@ export class AppointmentApiService extends BaseApiService {
     if (cached) return cached;
 
     try {
-      const endpoint = `${this.ENDPOINT}/${encodeURIComponent(appointmentId)}`;
+      // Use business ID endpoint if appointmentId is a number, otherwise use ObjectId endpoint
+      const isBusinessId = /^\d+$/.test(appointmentId);
+      const endpoint = isBusinessId 
+        ? `${this.ENDPOINT}/business/${encodeURIComponent(appointmentId)}`
+        : `${this.ENDPOINT}/${encodeURIComponent(appointmentId)}`;
+      
       const response = await this.request<Appointment>(endpoint);
       
       if (response.success && response.data) {
@@ -440,11 +454,23 @@ export class AppointmentApiService extends BaseApiService {
       const queryString = query ? `?${query}` : '';
       const endpoint = `${this.ENDPOINT}/clinic/${encodeURIComponent(clinicName)}/stats${queryString}`;
       
-      const response = await this.request<AppointmentStatsResponse>(endpoint);
+      const response = await this.request<any>(endpoint);
       
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
+      if (response.success && response.data && response.data.statistics) {
+        const stats = response.data.statistics;
+        const formattedStats: AppointmentStatsResponse = {
+          totalAppointments: stats.totalAppointments,
+          completedAppointments: stats.completedAppointments,
+          cancelledAppointments: stats.cancelledAppointments,
+          pendingAppointments: stats.pendingAppointments,
+          completionRate: stats.completionRate,
+          cancellationRate: stats.cancellationRate,
+          averageDuration: stats.averageDuration,
+          upcomingCount: stats.pendingAppointments, // Use pending as upcoming for now
+          overdueCount: 0   // Would need additional backend calculation
+        };
+        this.setCached(cacheKey, formattedStats, this.CACHE_TTL);
+        return formattedStats;
       }
       
       throw new Error('Failed to fetch appointment statistics');
