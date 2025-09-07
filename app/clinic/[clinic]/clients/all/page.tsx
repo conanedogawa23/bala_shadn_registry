@@ -13,7 +13,7 @@ import {
   Plus,
   AlertCircle
 } from 'lucide-react';
-import { slugToClinic } from '@/lib/data/clinics';
+import { slugToClinic, getRealDataClinicName } from '@/lib/data/clinics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -71,11 +71,11 @@ export default function AllClientsPage() {
     pagination,
     refetch 
   } = useClients({
-    clinicName: clinicData?.name || "",
+    clinicName: clinicData ? getRealDataClinicName(clinicData) : "",
     page: currentPage,
     limit: pageSize,
     search: debouncedSearchQuery || undefined, // Pass search query to API
-    autoFetch: !!clinicData?.name
+    autoFetch: !!clinicData
   });
 
   // Ensure clients is always an array for safe operations
@@ -96,8 +96,9 @@ export default function AllClientsPage() {
           const maxPages = 10;
           
           while (hasMore && currentPage <= maxPages) {
+            const backendClinicName = getRealDataClinicName(clinicData);
             const response = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinicData.backendName || clinicData.displayName || clinicData.name}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${backendClinicName}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`
             );
             
             if (response.ok) {
@@ -118,8 +119,9 @@ export default function AllClientsPage() {
           const searchTerms = ['Test', 'DEBUG', 'Sept2025', 'NewMonth'];
           for (const term of searchTerms) {
             try {
+              const backendClinicName = getRealDataClinicName(clinicData);
               const searchResponse = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinicData.backendName || clinicData.displayName || clinicData.name}/frontend-compatible?search=${term}`
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${backendClinicName}/frontend-compatible?search=${term}`
               );
               if (searchResponse.ok) {
                 const searchData = await searchResponse.json();
@@ -132,13 +134,12 @@ export default function AllClientsPage() {
                 }
               }
             } catch (searchError) {
-              console.error(`Search for ${term} failed:`, searchError);
+              // Search failed, continue with other terms
             }
           }
           
           setAllClients(allClientsData);
         } catch (error) {
-          console.error('Failed to fetch all clients for stats:', error);
           setAllClients([]);
         } finally {
           setStatsLoading(false);

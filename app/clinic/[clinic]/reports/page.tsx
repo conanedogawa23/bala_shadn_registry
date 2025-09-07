@@ -79,6 +79,8 @@ export default function ReportsPage() {
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   const [dateRangeValid, setDateRangeValid] = useState(true);
   const [selectedQuickPreset, setSelectedQuickPreset] = useState<string | null>(null);
+  const [allClients, setAllClients] = useState<any[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Calculate date ranges based on selected period or custom dates
   const dateRange = useMemo(() => {
@@ -201,7 +203,7 @@ export default function ReportsPage() {
 
   // Fetch ALL clients for proper statistics calculation using pagination
   useEffect(() => {
-    if (clinicData?.name) {
+    if (clinic?.name) {
       const fetchAllClientsForStats = async () => {
         setStatsLoading(true);
         try {
@@ -215,7 +217,7 @@ export default function ReportsPage() {
           
           while (hasMore && currentPage <= maxPages) {
             const response = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinicData.backendName || clinicData.displayName || clinicData.name}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinic.displayName || clinic.name}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`
             );
             
             if (response.ok) {
@@ -237,7 +239,7 @@ export default function ReportsPage() {
           for (const term of searchTerms) {
             try {
               const searchResponse = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinicData.backendName || clinicData.displayName || clinicData.name}/frontend-compatible?search=${term}`
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinic.displayName || clinic.name}/frontend-compatible?search=${term}`
               );
               if (searchResponse.ok) {
                 const searchData = await searchResponse.json();
@@ -250,13 +252,12 @@ export default function ReportsPage() {
                 }
               }
             } catch (searchError) {
-              console.error(`Search for ${term} failed:`, searchError);
+              // Remove console.error in production
             }
           }
           
           setAllClients(allClientsData);
         } catch (error) {
-          console.error('Failed to fetch all clients for stats:', error);
           setAllClients([]);
         } finally {
           setStatsLoading(false);
@@ -264,7 +265,7 @@ export default function ReportsPage() {
       };
       fetchAllClientsForStats();
     }
-  }, [clinicData]);
+  }, [clinic]);
 
   // Calculate comprehensive metrics from real data
   const metrics = useMemo((): ReportMetrics => {
@@ -294,12 +295,14 @@ export default function ReportsPage() {
       o.paymentStatus === PaymentStatus.OVERDUE
     ).length;
 
-    // Calculate client metrics
-          const totalClients = clients.length;
+    // Calculate client metrics  
+    const totalClients = clients.length;
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
-    const newClientsThisMonth = allClients.filter(client => {
+    // Use allClients if available, otherwise fall back to regular clients
+    const clientsForStats = allClients.length > 0 ? allClients : clients;
+    const newClientsThisMonth = clientsForStats.filter(client => {
       const dateToUse = client.createdAt || client.dateOfBirth;
       if (!dateToUse) return false;
       const clientDate = new Date(dateToUse);
@@ -309,7 +312,7 @@ export default function ReportsPage() {
     // Assume 85% of clients are active (those with orders in last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-          const activeClients = Math.floor(totalClients * 0.85);
+    const activeClients = Math.floor(totalClients * 0.85);
 
     // Calculate growth rates from analytics data with safe array operations
     const isValidAnalytics = Array.isArray(revenueAnalytics) && revenueAnalytics.length > 0;
@@ -341,7 +344,7 @@ export default function ReportsPage() {
             orderCompletionRate,
             revenueGrowthRate
     };
-  }, [revenueAnalytics, orders, clients, totalRevenue, avgOrderValue]);
+  }, [revenueAnalytics, orders, clients, totalRevenue, avgOrderValue, allClients]);
 
   // Generate chart data from real analytics
   const chartData = useMemo((): ChartData[] => {
@@ -416,11 +419,11 @@ export default function ReportsPage() {
       // Clear cache when date range changes to ensure fresh data
       if (typeof window !== 'undefined') {
         const cacheKeys = Object.keys(localStorage);
-        for (const key of cacheKeys) {
+        cacheKeys.forEach(key => {
           if (key.includes('revenue_analytics') || key.includes('product_performance')) {
             localStorage.removeItem(key);
           }
-        }
+        });
       }
       // Force hooks to refetch with new date range
       const timeoutId = setTimeout(() => {
@@ -453,9 +456,8 @@ export default function ReportsPage() {
       );
       
       await Promise.all(exportPromises);
-      console.log(`✅ All ${reportTypes.length} reports exported successfully`);
+      // All reports exported successfully
     } catch (error) {
-      console.error('Bulk export failed:', error);
       alert(`Bulk export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsExporting(false);
@@ -464,8 +466,8 @@ export default function ReportsPage() {
 
   // Loading state
   const isLoading = useMemo(() => 
-    revenueLoading || performanceLoading || ordersLoading || clientsLoading,
-    [revenueLoading, performanceLoading, ordersLoading, clientsLoading]
+    revenueLoading || performanceLoading || ordersLoading || clientsLoading || statsLoading,
+    [revenueLoading, performanceLoading, ordersLoading, clientsLoading, statsLoading]
   );
 
   // Error state

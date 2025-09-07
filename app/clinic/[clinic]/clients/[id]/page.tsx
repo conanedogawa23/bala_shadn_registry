@@ -64,6 +64,10 @@ export default function ClientDetailPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 10;
 
+  // State for appointment pagination
+  const [appointmentPage, setAppointmentPage] = useState(1);
+  const appointmentsPerPage = 10;
+
   // Get clinic data for context
   const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
   
@@ -102,10 +106,13 @@ export default function ClientDetailPage() {
     appointments,
     loading: appointmentsLoading,
     error: appointmentsError,
+    pagination: appointmentPagination,
     refetch: refetchAppointments
   } = useAppointments({
     clinicName,
     clientId,
+    page: appointmentPage,
+    limit: appointmentsPerPage,
     autoFetch: shouldLoadAppointments && !!clientId && !!clinicName
   });
 
@@ -188,9 +195,12 @@ export default function ClientDetailPage() {
 
   // Calculate client appointment statistics
   const appointmentStats = useMemo(() => {
+    // Use total from pagination for accurate count, current page data for other stats
+    const totalAppointments = appointmentPagination?.total || appointments?.length || 0;
+    
     if (!appointments || appointments.length === 0) {
       return {
-        totalAppointments: 0,
+        totalAppointments,
         completedAppointments: 0,
         upcomingAppointments: 0,
         cancelledAppointments: 0
@@ -202,12 +212,12 @@ export default function ClientDetailPage() {
     const cancelled = appointments.filter(apt => apt.status === 2); // Cancelled status
 
     return {
-      totalAppointments: appointments.length,
+      totalAppointments,
       completedAppointments: completed.length,
       upcomingAppointments: upcoming.length,
       cancelledAppointments: cancelled.length
     };
-  }, [appointments]);
+  }, [appointments, appointmentPagination]);
 
   // Get appointment ID helper
   const getAppointmentId = (appointment: any): string | number => {
@@ -438,7 +448,7 @@ export default function ClientDetailPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <CardTitle className="flex items-center gap-2">
                   <Calendar size={20} />
-                  Appointments ({appointmentsLoading ? '...' : appointments?.length || 0})
+                  Appointments ({appointmentsLoading ? '...' : appointmentPagination?.total || appointments?.length || 0})
                 </CardTitle>
                 
                 <Button
@@ -568,6 +578,31 @@ export default function ClientDetailPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+              
+              {/* Appointments Pagination */}
+              {appointmentPagination && appointmentPagination.pages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-6">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAppointmentPage(prev => Math.max(1, prev - 1))}
+                    disabled={appointmentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    Page {appointmentPage} of {appointmentPagination.pages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAppointmentPage(prev => Math.min(appointmentPagination.pages, prev + 1))}
+                    disabled={appointmentPage === appointmentPagination.pages}
+                  >
+                    Next
+                  </Button>
                 </div>
               )}
             </CardContent>

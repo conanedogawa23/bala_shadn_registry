@@ -2,11 +2,26 @@
 import { Clinic } from '@/lib/types/clinic';
 
 export const realClinicsData: Clinic[] = [
-  // Primary Active Clinic
+  // Primary Active Clinics
+  {
+    id: 4,
+    name: 'BodyBliss',
+    displayName: 'BodyBliss',
+    address: '1933A Leslie Street',
+    city: 'Toronto',
+    province: 'Ontario',
+    postalCode: 'M3B 2M3',
+    status: 'active',
+    lastActivity: '2025-06-28',
+    totalAppointments: 35000,
+    clientCount: 2500,
+    description: 'BodyBliss wellness and rehabilitation center'
+  },
+  
   {
     id: 9,
     name: 'bodybliss-physio',
-    displayName: 'BodyBliss Physio', 
+    displayName: 'BodyBliss Physiotherapy', 
     address: '1929 Leslie Street',
     city: 'Toronto',
     province: 'Ontario',
@@ -214,12 +229,12 @@ export const clinicNameMapping: Record<string, string> = {
   'Evergold': 'Evergold',
   
   // Special cases that need mapping
-  'bodybliss-physio': 'bodyblissphysio', // Match the clinics collection name (lowercase)
-  'BodyBliss': 'bodyblissphysio',
-  'BodyBliss Physio': 'bodyblissphysio', // Frontend clinic name → backend clinic name
+  'bodybliss-physio': 'BodyBlissPhysio', // Physiotherapy clinic appointments collection name
+  'BodyBliss Physiotherapy': 'BodyBlissPhysio', // Physiotherapy clinic mapping
+  'BodyBliss Physio': 'BodyBlissPhysio', // Physiotherapy clinic mapping
   
-  // Display name mappings (for when displayName is used)  
-  'BodyBliss Physiotherapy': 'bodyblissphysio',
+  // Separate BodyBliss clinic (no appointments in current dataset)
+  'BodyBliss': 'BodyBliss',
   'BodyBliss OneCare': 'BodyBlissOneCare',
   'Extreme Physio': 'ExtremePhysio',
   'Active Force': 'Active force eh'
@@ -282,10 +297,31 @@ export const clinicToSlug = (clinicName: string): string => {
   return clinicName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 };
 
+// Slug aliases for common short forms
+const slugAliases: Record<string, string> = {
+  'extreme': 'extremephysio',
+  'markham': 'markham-orthopedic',
+  'ortholine': 'ortholine-duncan-mills',
+  'onecare': 'bodyblissonecare',
+  'cloud': 'my-cloud'
+};
+
 // Convert URL slug to clinic name
 export const slugToClinic = (slug: string): Clinic | undefined => {
-  return realClinicsData.find(clinic => 
+  // First try direct slug match
+  let foundClinic = realClinicsData.find(clinic => 
     clinicToSlug(clinic.name) === slug || 
     clinicToSlug(clinic.displayName) === slug
   );
+  
+  // If not found, try slug aliases
+  if (!foundClinic && slugAliases[slug]) {
+    const aliasSlug = slugAliases[slug];
+    foundClinic = realClinicsData.find(clinic => 
+      clinicToSlug(clinic.name) === aliasSlug || 
+      clinicToSlug(clinic.displayName) === aliasSlug
+    );
+  }
+  
+  return foundClinic;
 }; 
