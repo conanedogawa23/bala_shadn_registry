@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
-    NEXT_PUBLIC_API_URL: 'https://665ac05b2282.ngrok.app/api/v1',
+    NEXT_PUBLIC_API_URL: 'http://localhost:5001/api/v1',
     NEXT_PUBLIC_DEBUG: process.env.NEXT_PUBLIC_DEBUG || 'true',
   },
   experimental: {

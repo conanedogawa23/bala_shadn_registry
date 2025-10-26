@@ -28,8 +28,8 @@ export default function SettingsPage() {
 
   // Get clinic slug for generating links
   const getClinicSlug = (): string => {
-    if (!selectedClinic) return 'bodybliss-physio';
-    return clinicToSlug(selectedClinic.displayName);
+    if (!selectedClinic) return 'bodyblissphysio';
+    return selectedClinic.name;
   };
 
   // Settings categories

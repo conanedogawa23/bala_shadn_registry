@@ -97,8 +97,8 @@ export default function NavMenu() {
   
   // Generate clinic-aware navigation items using the route utility
   const getClinicSlug = (): string => {
-    if (!selectedClinic) return 'bodybliss-physio';
-    // Use the API-provided slug directly instead of converting displayName
+    if (!selectedClinic) return 'bodyblissphysio';
+    // Use the clinic name directly to match MongoDB
     return selectedClinic.name;
   };
 

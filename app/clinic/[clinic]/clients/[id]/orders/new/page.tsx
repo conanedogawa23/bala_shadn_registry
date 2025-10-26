@@ -55,9 +55,9 @@ export default function ClientOrderNewPage() {
   // Get the real clinic name that matches our MongoDB data
   const realClinicName = useMemo(() => {
     if (!clinicData) return '';
-    // Map the clinic slug to the actual clinic name used in MongoDB
+    // Use clinic name directly from MongoDB without mapping
     const clinicNameMap: Record<string, string> = {
-      'bodybliss-physio': 'BodyBlissPhysio',
+      'bodyblissphysio': 'bodyblissphysio',
       'physio-bliss': 'Physio Bliss',
       'ortholine-duncan-mills': 'Ortholine Duncan Mills',
       'bodyblissoneCare': 'BodyBlissOneCare',

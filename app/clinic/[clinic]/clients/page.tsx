@@ -33,17 +33,11 @@ const clientSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   cellPhone: z.string().min(10, { message: "Please enter a valid phone number" }),
   homePhone: z.string().optional(),
-  workPhone: z.string().optional(),
-  extension: z.string().optional(),
   
   // Additional Details
   address: z.string().min(5, { message: "Address is required" }),
   companyName: z.string().optional(),
   referringMD: z.string().optional(),
-  familyMD: z.string().optional(),
-  
-  // Additional Fields
-  heardAboutUs: z.string().optional(),
 });
 
 // Define insurance schema
@@ -110,13 +104,13 @@ export default function ClientsPage() {
           phones: {
             home: data.homePhone || '',
             cell: data.cellPhone || '',
-            work: data.workPhone ? `${data.workPhone}${data.extension ? ` ext ${data.extension}` : ''}` : '',
+            work: '', // Removed workPhone and extension
           },
           email: data.email || '',
           company: data.companyName || '',
         },
         medical: {
-          familyMD: data.familyMD || '',
+          familyMD: '', // Removed familyMD
           referringMD: data.referringMD || '',
           csrName: '',
         },
@@ -138,7 +132,7 @@ export default function ClientsPage() {
             other: 100
           }
         })),
-        defaultClinic: clinic === 'bodybliss-physio' ? 'BodyBlissPhysio' : clinic.replace('-', ' '),
+        defaultClinic: clinic === 'bodyblissphysio' ? 'bodyblissphysio' : clinic,
       };
 
       console.log("Creating client for clinic:", clinic, clientData);
@@ -235,13 +229,9 @@ export default function ClientsPage() {
                 email: "",
                 cellPhone: "",
                 homePhone: "",
-                workPhone: "",
-                extension: "",
                 address: "",
                 companyName: "",
                 referringMD: "",
-                familyMD: "",
-                heardAboutUs: "",
               }}
             >
               {() => (
@@ -304,18 +294,6 @@ export default function ClientsPage() {
                           label="Home Phone"
                           placeholder="(123) 456-7890"
                         />
-                        
-                        <FormInput
-                          name="workPhone"
-                          label="Work Phone"
-                          placeholder="(123) 456-7890"
-                        />
-                        
-                        <FormInput
-                          name="extension"
-                          label="Extension"
-                          placeholder="1234"
-                        />
                       </div>
                     </div>
                     
@@ -335,18 +313,6 @@ export default function ClientsPage() {
                           name="referringMD"
                           label="Referring MD"
                           placeholder="Dr. Smith"
-                        />
-                        
-                        <FormInput
-                          name="familyMD"
-                          label="Family MD"
-                          placeholder="Dr. Johnson"
-                        />
-                        
-                        <FormInput
-                          name="heardAboutUs"
-                          label="How did you hear about us?"
-                          placeholder="Google, referral, etc."
                         />
                       </div>
                     </div>

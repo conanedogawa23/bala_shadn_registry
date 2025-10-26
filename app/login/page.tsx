@@ -36,12 +36,32 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-// Mock user database for demo purposes
-const MOCK_USERS = [
-  { email: "demo@example.com", password: "password123", name: "Demo User" },
-  { email: "test@example.com", password: "test1234", name: "Test User" },
-  { email: "admin@bodybliss.com", password: "admin123", name: "Admin User" },
-];
+// API URL - use environment variable or fallback to localhost with /api/v1 path
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
+
+// Login API call
+async function loginAPI(email: string, password: string, rememberMe: boolean) {
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      rememberMe,
+      deviceId: crypto.randomUUID()
+    }),
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'Login failed');
+  }
+  
+  return data;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -68,45 +88,47 @@ export default function LoginPage() {
     setAuthError(null);
     
     try {
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      
-      // Find user with matching email (case insensitive)
-      const user = MOCK_USERS.find(
-        u => u.email.toLowerCase() === values.identifier.toLowerCase()
+      // Call the backend API to login
+      const response = await loginAPI(
+        values.identifier, 
+        values.password, 
+        values.rememberMe
       );
       
-      // Check if user exists and password matches
-      if (!user) {
-        setAuthError("No account found with this email address.");
-        return;
-      }
-      
-      if (user.password !== values.password) {
-        setAuthError("Invalid password. Please try again.");
-        return;
-      }
-      
-      // Login successful - set authenticated in localStorage
-      localStorage.setItem("isAuthenticated", "true");
-      localStorage.setItem("user", JSON.stringify({ 
-        email: user.email,
-        name: user.name 
-      }));
-      
-      // Set remember me preference if checked
-      if (values.rememberMe) {
-        localStorage.setItem("rememberMe", "true");
+      if (response.success && response.data) {
+        const { user, accessToken, refreshToken } = response.data;
+        
+        // Store authentication data in localStorage
+        localStorage.setItem("isAuthenticated", "true");
+        localStorage.setItem("authToken", accessToken); // Store the real access token
+        localStorage.setItem("refreshToken", refreshToken); // Store refresh token
+        localStorage.setItem("user", JSON.stringify({ 
+          id: user._id || user.id,
+          email: user.email,
+          name: user.name || `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim(),
+          role: user.role,
+          clinics: user.permissions?.allowedClinics || [],
+          token: accessToken
+        }));
+        
+        // Set remember me preference if checked
+        if (values.rememberMe) {
+          localStorage.setItem("rememberMe", "true");
+        } else {
+          localStorage.removeItem("rememberMe");
+        }
+        
+        console.log("Login successful, access token:", accessToken.substring(0, 20) + "...");
+        
+        // Reset form and navigate to dashboard
+        form.reset();
+        router.push("/");
       } else {
-        localStorage.removeItem("rememberMe");
+        setAuthError(response.error?.message || "Login failed. Please try again.");
       }
-      
-      // Reset form and navigate to dashboard
-      form.reset();
-      router.push("/");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed:", error);
-      setAuthError("An unexpected error occurred. Please try again.");
+      setAuthError(error.message || "An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -331,7 +353,7 @@ export default function LoginPage() {
                 </Button>
                 
                 <div className="text-sm text-center text-gray-600">
-                  Demo credentials: <span className="font-medium">demo@example.com / password123</span>
+                  Demo credentials: <span className="font-medium">superadmin@visio.com / Admin123!</span>
                 </div>
               </form>
             </Form>

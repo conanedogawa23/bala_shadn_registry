@@ -22,7 +22,7 @@ export function middleware(request: NextRequest) {
 
   // Redirect root path to active clinic (BodyBliss Physio)
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/clinic/bodybliss-physio', request.url));
+    return NextResponse.redirect(new URL('/clinic/bodyblissphysio', request.url));
   }
 
   // Handle /clinics routes (these should not be redirected)
@@ -35,7 +35,7 @@ export function middleware(request: NextRequest) {
   
   for (const route of clinicRoutes) {
     if (pathname === route || pathname.startsWith(`${route}/`)) {
-      return NextResponse.redirect(new URL(`/clinic/bodybliss-physio${pathname}`, request.url));
+      return NextResponse.redirect(new URL(`/clinic/bodyblissphysio${pathname}`, request.url));
     }
   }
 

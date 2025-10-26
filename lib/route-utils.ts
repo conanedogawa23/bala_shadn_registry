@@ -20,7 +20,7 @@ export interface RouteParams {
 /**
  * Default clinic slug used for redirects when no clinic is specified
  */
-export const DEFAULT_CLINIC = 'bodybliss-physio';
+export const DEFAULT_CLINIC = 'bodyblissphysio';
 
 /**
  * Global routes that should not be redirected to clinic-specific routes

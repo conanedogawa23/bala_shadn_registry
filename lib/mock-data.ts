@@ -733,25 +733,22 @@ export const paymentsData = [
   }
 ];
 
-// Filter payments by clinic 
+// Filter payments by clinic (using exact MongoDB clinic names)
 export const getPaymentsByClinic = (clinicName: string) => {
   const clinicMappings: Record<string, string[]> = {
     'bodyblissphysio': ['BodyBliss Physio', 'BodyBliss'],
-    'bodybliss-physio': ['BodyBliss Physio', 'BodyBliss'], // Handle URL slug format
-    'bioform-health': ['Bioform Health'],
-    'ortholine-duncan-mills': ['Ortholine Duncan Mills'],
-    'markham-orthopedic': ['Markham Orthopedic'],
-    'extremephysio': ['ExtremePhysio', 'Extreme Physio'],
-    'extreme-physio': ['ExtremePhysio', 'Extreme Physio'], // Handle URL slug format  
-    'physio-bliss': ['Physio Bliss'],
-    'orthopedic-orthotic-appliances': ['Orthopedic Orthotic Appliances'],
-    'bodyblissonecare': ['BodyBliss OneCare'],
-    'bodybliss-onecare': ['BodyBliss OneCare'], // Handle URL slug format
-    'my-cloud': ['My Cloud'],
-    'century-care': ['Century Care'],
-    'active-force-eh': ['Active force eh', 'Active Force'],
-    'evergold': ['Evergold'],
-    'bodybliss': ['BodyBliss']
+    'Bioform Health': ['Bioform Health'],
+    'Ortholine Duncan Mills': ['Ortholine Duncan Mills'],
+    'Markham Orthopedic': ['Markham Orthopedic'],
+    'ExtremePhysio': ['ExtremePhysio', 'Extreme Physio'],
+    'Physio Bliss': ['Physio Bliss'],
+    'Orthopedic Orthotic Appliances': ['Orthopedic Orthotic Appliances'],
+    'BodyBlissOneCare': ['BodyBliss OneCare'],
+    'My Cloud': ['My Cloud'],
+    'Century Care': ['Century Care'],
+    'Active force eh': ['Active force eh', 'Active Force'],
+    'Evergold': ['Evergold'],
+    'BodyBliss': ['BodyBliss']
   };
 
   const clinicNames = clinicMappings[clinicName] || [clinicName];

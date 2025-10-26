@@ -121,7 +121,7 @@ export default function AllClientsPage() {
             try {
               const backendClinicName = getRealDataClinicName(clinicData);
               const searchResponse = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${backendClinicName}/frontend-compatible?search=${term}`
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1'}/clients/clinic/${backendClinicName}/frontend-compatible?search=${term}`
               );
               if (searchResponse.ok) {
                 const searchData = await searchResponse.json();

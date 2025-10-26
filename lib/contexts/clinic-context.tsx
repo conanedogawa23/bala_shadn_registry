@@ -64,21 +64,50 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
         setError(null);
         
         const response = await ClinicApiService.getFullClinics();
-        const clinicsData: Clinic[] = response.clinics.map((clinic: FullClinicData) => ({
-          id: clinic.id,
-          name: clinic.name,
-          displayName: clinic.displayName,
-          backendName: clinic.backendName,
-          address: clinic.address,
-          city: clinic.city,
-          province: clinic.province,
-          postalCode: clinic.postalCode,
-          status: clinic.status,
-          lastActivity: clinic.lastActivity,
-          totalAppointments: clinic.totalAppointments,
-          clientCount: clinic.clientCount,
-          description: clinic.description
-        }));
+        
+        // DEBUG: Log raw API response
+        console.log('=== CLINIC API DEBUG ===');
+        console.log('📡 Raw API Response:', response);
+        console.log('Total clinics from API:', response.clinics?.length);
+        
+        // Log each clinic's location data
+        response.clinics?.forEach((clinic: FullClinicData, index: number) => {
+          console.log(`Clinic ${index + 1} (${clinic.displayName}):`, {
+            id: clinic.id,
+            name: clinic.name,
+            displayName: clinic.displayName,
+            city: clinic.city,
+            province: clinic.province,
+            address: clinic.address,
+            postalCode: clinic.postalCode,
+            status: clinic.status
+          });
+        });
+        
+        const clinicsData: Clinic[] = response.clinics.map((clinic: FullClinicData) => {
+          // Ensure name is properly set - use API name or derive from displayName
+          const clinicName = clinic.name || clinic.displayName.toLowerCase().replace(/\s+/g, '');
+          
+          return {
+            id: clinic.id,
+            name: clinicName,
+            displayName: clinic.displayName,
+            backendName: clinic.backendName,
+            address: clinic.address,
+            city: clinic.city,
+            province: clinic.province,
+            postalCode: clinic.postalCode,
+            status: clinic.status,
+            lastActivity: clinic.lastActivity,
+            totalAppointments: clinic.totalAppointments,
+            clientCount: clinic.clientCount,
+            description: clinic.description
+          };
+        });
+        
+        // DEBUG: Log transformed data
+        console.log('✅ Transformed clinics data:', clinicsData);
+        console.log('📋 Clinic names available:', clinicsData.map(c => ({ name: c.name, displayName: c.displayName })));
         
         setAvailableClinics(clinicsData);
       } catch (err) {
@@ -110,7 +139,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
 
     const pathSegments = pathname.split('/');
     
-    // Check if URL has clinic parameter (e.g., /clinic/bodybliss-physio/dashboard)
+    // Check if URL has clinic parameter (e.g., /clinic/bodyblissphysio/dashboard)
     if (pathSegments[1] === 'clinic' && pathSegments[2]) {
       const clinicSlug = pathSegments[2];
       const clinic = slugToClinic(clinicSlug);

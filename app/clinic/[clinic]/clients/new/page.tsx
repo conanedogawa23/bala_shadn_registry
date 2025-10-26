@@ -154,7 +154,7 @@ export default function NewClientPage() {
           referringMD: data.referringMD || undefined
         },
         insurance: insurance,
-        defaultClinic: clinic === 'bodybliss-physio' ? 'BodyBlissPhysio' : clinic.replace('-', ' ')
+        defaultClinic: clinic
       };
 
       // Call real API

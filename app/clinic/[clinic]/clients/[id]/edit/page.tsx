@@ -33,14 +33,11 @@ const clientSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   cellPhone: z.string().min(10, { message: "Please enter a valid phone number" }),
   homePhone: z.string().optional(),
-  workPhone: z.string().optional(),
-  extension: z.string().optional(),
   
   // Additional Details
   address: z.string().min(5, { message: "Address is required" }),
   companyName: z.string().optional(),
   referringMD: z.string().optional(),
-  familyMD: z.string().optional(),
   
   // Additional Fields
   heardAboutUs: z.string().optional(),
@@ -88,14 +85,9 @@ export default function EditClientPage() {
           homePhone: typeof client.contact?.phones?.home === 'string' 
             ? client.contact.phones.home 
             : client.contact?.phones?.home?.full || "",
-          workPhone: typeof client.contact?.phones?.work === 'string' 
-            ? client.contact.phones.work 
-            : client.contact?.phones?.work?.full || "",
-          extension: typeof client.contact?.phones?.work === 'object' && client.contact?.phones?.work?.extension || "",
           address: client.contact?.address?.street || "",
           companyName: client.contact?.company || "",
           referringMD: client.medical?.referringMD || "",
-          familyMD: client.medical?.familyMD || "",
           heardAboutUs: "", // This field might not exist in API data
         });
       } catch (err) {
@@ -137,13 +129,12 @@ export default function EditClientPage() {
           phones: {
             cell: data.cellPhone,
             home: data.homePhone || undefined,
-            work: data.workPhone || undefined
           },
           email: data.email,
           company: data.companyName || undefined
         },
         medical: {
-          familyMD: data.familyMD || undefined,
+          familyMD: undefined, // Removed as per edit hint
           referringMD: data.referringMD || undefined
         }
       };
@@ -310,18 +301,6 @@ export default function EditClientPage() {
                       label="Home Phone"
                       placeholder="(123) 456-7890"
                     />
-                    
-                    <FormInput
-                      name="workPhone"
-                      label="Work Phone"
-                      placeholder="(123) 456-7890"
-                    />
-                    
-                    <FormInput
-                      name="extension"
-                      label="Extension"
-                      placeholder="1234"
-                    />
                   </div>
                 </div>
                 
@@ -341,12 +320,6 @@ export default function EditClientPage() {
                       name="referringMD"
                       label="Referring MD"
                       placeholder="Dr. Smith"
-                    />
-                    
-                    <FormInput
-                      name="familyMD"
-                      label="Family MD"
-                      placeholder="Dr. Johnson"
                     />
                     
                     <FormInput
