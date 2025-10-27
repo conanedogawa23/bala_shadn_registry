@@ -1,513 +1,657 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { useRouter, useParams } from "next/navigation";
-import { z } from "zod";
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { 
-  Card, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardContent,
-  CardFooter
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FormWrapper } from "@/components/ui/form/FormWrapper";
-import { FormInput } from "@/components/ui/form/FormInput";
-import { FormSelect } from "@/components/ui/form/FormSelect";
-import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
-import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { Plus, UserPlus, Save, FileText, Users } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { ClientApiService } from "@/lib/api/clientService";
+  User, 
+  Phone, 
+  Mail, 
+  Calendar,
+  Edit,
+  Eye,
+  Plus,
+  AlertCircle
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { DataTable } from '@/components/ui/table/DataTable';
+import { ColumnDef } from '@tanstack/react-table';
+import { useClinic } from '@/lib/contexts/clinic-context';
 
-// Define the client schema using zod for validation
-const clientSchema = z.object({
-  // Personal Information
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  dateOfBirth: z.date({ required_error: "Date of birth is required" }),
-  gender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
-  
-  // Contact Information
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  cellPhone: z.string().min(10, { message: "Please enter a valid phone number" }),
-  homePhone: z.string().optional(),
-  
-  // Additional Details
-  address: z.string().min(5, { message: "Address is required" }),
-  companyName: z.string().optional(),
-  referringMD: z.string().optional(),
-});
+// Import real API hooks
+import { useClients, Client } from '@/lib/hooks';
 
-// Define insurance schema
-const insuranceSchema = z.object({
-  policyHolderName: z.string().min(2, { message: "Policy holder name is required" }),
-  policyHolderBirthday: z.date({ required_error: "Policy holder birthday is required" }),
-  insuranceCompany: z.string().min(2, { message: "Insurance company is required" }),
-  groupNumber: z.string().optional(),
-  certificateNumber: z.string().min(1, { message: "Certificate number is required" }),
-});
-
-// Type definitions
-type ClientFormValues = z.infer<typeof clientSchema>;
-type InsuranceFormValues = z.infer<typeof insuranceSchema>;
+const themeColors = {
+  primary: '#6366f1',
+  secondary: '#8b5cf6',
+  accent: '#06b6d4',
+  success: '#10b981',
+  warning: '#f59e0b',
+  error: '#ef4444',
+};
 
 export default function ClientsPage() {
   const router = useRouter();
   const params = useParams();
   const clinic = params.clinic as string;
   
-  const [activeTab, setActiveTab] = React.useState("info");
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [showSuccess, setShowSuccess] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [clientInsurance, setClientInsurance] = React.useState<InsuranceFormValues[]>([]);
+  // Pagination and search state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  
+  // State for fetching ALL clients for proper statistics calculation
+  const [allClients, setAllClients] = useState<any[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
+  
+  // Get clinic data from context (API-provided with correct backendName)
+  const { availableClinics } = useClinic();
+  const clinicData = useMemo(() => {
+    return availableClinics.find(c => c.name === clinic);
+  }, [clinic, availableClinics]);
+  
+  // Get the proper backend clinic name for API calls
+  // MongoDB expects lowercase names (e.g., 'bodyblissphysio' not 'BodyBlissPhysio')
+  const backendClinicName = useMemo(() => {
+    const name = clinicData?.backendName || clinicData?.name || "";
+    return name.toLowerCase().replace(/\s+/g, '');
+  }, [clinicData]);
 
-  // Handle client info submission - FIXED VERSION
-  const handleClientSubmit = React.useCallback(async (data: ClientFormValues) => {
-    setIsSubmitting(true);
-    setError(null);
-    
-    try {
-      // Transform form data to match backend API expectations
-      const nameParts = data.name.trim().split(/\s+/);
-      const firstName = nameParts[0] || data.name;
-      const lastName = nameParts.slice(1).join(' ') || '';
-      
-      // Extract postal code from address (basic implementation)
-      const postalCodeMatch = data.address.match(/\b[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d\b/);
-      const extractedPostalCode = postalCodeMatch 
-        ? postalCodeMatch[0].replace(/\s+/g, '').toUpperCase()
-        : 'M5V3L9'; // Default Toronto postal code
-      
-      // Format postal code with space (A1A 1A1)
-      const formattedPostalCode = extractedPostalCode.length === 6 
-        ? `${extractedPostalCode.substring(0, 3)} ${extractedPostalCode.substring(3, 6)}`
-        : 'M5V 3L9';
+  // Debounce search query for server-side search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      // Reset to page 1 when search changes to avoid empty results
+      if (searchQuery !== debouncedSearchQuery) {
+        setCurrentPage(1);
+      }
+    }, 500); // 500ms debounce for server calls
 
-      const clientData = {
-        personalInfo: {
-          firstName,
-          lastName: lastName || 'Unknown',
-          gender: data.gender === 'male' ? 'Male' : data.gender === 'female' ? 'Female' : 'Other',
-          dateOfBirth: data.dateOfBirth,
-        },
-        contact: {
-          address: {
-            street: data.address,
-            apartment: '',
-            city: 'Toronto', // Could be enhanced to extract from address
-            province: 'Ontario', // Could be enhanced to extract from address
-            postalCode: formattedPostalCode,
-          },
-          phones: {
-            home: data.homePhone || '',
-            cell: data.cellPhone || '',
-            work: '', // Removed workPhone and extension
-          },
-          email: data.email || '',
-          company: data.companyName || '',
-        },
-        medical: {
-          familyMD: '', // Removed familyMD
-          referringMD: data.referringMD || '',
-          csrName: '',
-        },
-        insurance: clientInsurance.map(ins => ({
-          type: '1st' as const,
-          policyHolder: ins.policyHolderName,
-          policyHolderName: ins.policyHolderName,
-          birthday: {
-            day: String(ins.policyHolderBirthday.getDate()).padStart(2, '0'),
-            month: String(ins.policyHolderBirthday.getMonth() + 1).padStart(2, '0'),
-            year: String(ins.policyHolderBirthday.getFullYear())
-          },
-          company: ins.insuranceCompany,
-          groupNumber: ins.groupNumber || '',
-          certificateNumber: ins.certificateNumber,
-          coverage: {
-            physiotherapy: 100,
-            massage: 100,
-            other: 100
+    return () => clearTimeout(timer);
+  }, [searchQuery, debouncedSearchQuery]);
+  
+  // Fetch clients using real API with pagination and server-side search
+  const { 
+    clients: rawClients, 
+    loading: isLoading, 
+    error,
+    pagination,
+    refetch 
+  } = useClients({
+    clinicName: backendClinicName,
+    page: currentPage,
+    limit: pageSize,
+    search: debouncedSearchQuery || undefined, // Pass search query to API
+    autoFetch: !!backendClinicName
+  });
+
+  // Ensure clients is always an array for safe operations
+  const clients = rawClients || [];
+
+  // Fetch ALL clients for proper statistics calculation using pagination
+  useEffect(() => {
+    if (backendClinicName) {
+      const fetchAllClientsForStats = async () => {
+        setStatsLoading(true);
+        try {
+          const allClientsData: any[] = [];
+          const maxLimit = 100; // API limit
+          let currentPage = 1;
+          let hasMore = true;
+
+          // Check first 10 pages for recent clients
+          const maxPages = 10;
+          
+          while (hasMore && currentPage <= maxPages) {
+            const authToken = localStorage.getItem('authToken');
+            const response = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${backendClinicName}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`,
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.data && data.data.length > 0) {
+                allClientsData.push(...data.data);
+                hasMore = data.pagination?.hasNext || false && currentPage < maxPages;
+                currentPage++;
+              } else {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false;
+            }
           }
-        })),
-        defaultClinic: clinic === 'bodyblissphysio' ? 'bodyblissphysio' : clinic,
+          
+          setAllClients(allClientsData);
+        } catch (error) {
+          setAllClients([]);
+        } finally {
+          setStatsLoading(false);
+        }
       };
-
-      console.log("Creating client for clinic:", clinic, clientData);
-      
-      // Make the actual API call
-      const createdClient = await ClientApiService.createClient(clientData);
-      
-      console.log("Client created successfully:", createdClient);
-      
-      setIsSubmitting(false);
-      setShowSuccess(true);
-      
-      // Reset success message after 3 seconds
-      setTimeout(() => setShowSuccess(false), 3000);
-      
-      // Optionally redirect to client list or clear form
-      // router.push(`/clinic/${clinic}/clients/all`);
-      
-    } catch (err) {
-      console.error("Failed to create client:", err);
-      setError(err instanceof Error ? err.message : 'Failed to create client');
-      setIsSubmitting(false);
+      fetchAllClientsForStats();
     }
-  }, [clinic]);
+  }, [backendClinicName]);
 
-  // Handle insurance info submission
-  const handleInsuranceSubmit = React.useCallback((data: InsuranceFormValues) => {
-    setIsSubmitting(true);
+  // Calculate client statistics efficiently in a single pass
+  const clientStats = useMemo(() => {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Insurance info submitted for clinic:", clinic, data);
-      setClientInsurance(prev => [...prev, data]);
-      setIsSubmitting(false);
-    }, 1000);
-  }, [clinic]);
+    // Use pagination total for the overall count, calculate others from current page
+    const pageStats = clients.reduce((stats, client) => {
+      // Count active clients on current page
+      if ((client.status || 'active') === 'active') {
+        stats.active++;
+      }
+      
+      // Count clients with email on current page
+      if (client.email && client.email.trim()) {
+        stats.withEmail++;
+      }
+      
+      return stats;
+    }, {
+      active: 0,
+      withEmail: 0,
+      newThisMonth: 0
+    });
 
-  // Handle viewing all clients
-  const handleViewAllClients = () => {
-    router.push(`/clinic/${clinic}/clients/all`);
+    // Calculate "New This Month" from ALL clients, not just current page
+    const newThisMonth = allClients.filter(client => {
+      const dateToUse = client.createdAt || client.dateOfBirth;
+      if (!dateToUse) return false;
+      const clientDate = new Date(dateToUse);
+      return clientDate.getMonth() === currentMonth && clientDate.getFullYear() === currentYear;
+    }).length;
+
+    return {
+      total: pagination?.total || clients.length, // Use server total, fallback to current page
+      active: pageStats.active,
+      withEmail: pageStats.withEmail,
+      newThisMonth: newThisMonth // Now calculated from all clients
+    };
+  }, [clients, pagination?.total, allClients]);
+
+  const handleViewClient = useCallback((clientId: string | number) => {
+    router.push(`/clinic/${clinic}/clients/${clientId}`);
+  }, [router, clinic]);
+
+  const handleEditClient = useCallback((clientId: string | number) => {
+    router.push(`/clinic/${clinic}/clients/${clientId}/edit`);
+  }, [router, clinic]);
+
+  const handleAddClient = () => {
+    router.push(`/clinic/${clinic}/clients/new`);
   };
+
+  // Pagination handlers
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+
+  const handlePreviousPage = useCallback(() => {
+    if (pagination?.hasPrev) {
+      setCurrentPage(prev => prev - 1);
+    }
+  }, [pagination?.hasPrev]);
+
+  const handleNextPage = useCallback(() => {
+    if (pagination?.hasNext) {
+      setCurrentPage(prev => prev + 1);
+    }
+  }, [pagination?.hasNext]);
+
+  // Search handler for server-side search
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+  }, []);
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'inactive':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'archived':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-blue-100 text-blue-800';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const calculateAge = (birthDate: string) => {
+    if (!birthDate) return 'N/A';
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  // Define columns for DataTable
+  const columns: ColumnDef<Client>[] = useMemo(() => [
+    {
+      accessorKey: "name",
+      header: "Client",
+      cell: ({ row }) => {
+        const client = row.original;
+        const clientName = client.firstName && client.lastName 
+          ? `${client.firstName} ${client.lastName}` 
+          : client.name || 'Unknown';
+        const firstLetter = clientName.charAt(0).toUpperCase();
+        
+        return (
+          <div className="flex items-center gap-3">
+            <div 
+              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
+              style={{ backgroundColor: themeColors.primary }}
+            >
+              {firstLetter}
+            </div>
+            <div>
+              <div className="font-medium">{clientName}</div>
+              <div className="text-sm text-gray-600">
+                Age {calculateAge(client.dateOfBirth)} • {client.gender || 'N/A'}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "email",
+      header: "Contact",
+      cell: ({ row }) => {
+        const client = row.original;
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm">
+              <Mail className="h-4 w-4 text-gray-400" />
+              {client.email || 'Not provided'}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="h-4 w-4 text-gray-400" />
+              {client.phone || 'Not provided'}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const client = row.original;
+        // Use client status if available, otherwise default to 'active'
+        const status = client.status || 'active';
+        return (
+          <Badge variant="secondary" className={getStatusColor(status)}>
+            {status}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "lastVisit",
+      header: "Last Visit",
+      cell: ({ row }) => {
+        const client = row.original;
+        // Use updatedAt or createdAt as last visit date
+        const lastVisit = client.updatedAt || client.createdAt;
+        return (
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-gray-400" />
+            {formatDate(lastVisit)}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "nextAppointment",
+      header: "Next Appointment",
+      cell: () => {
+        // This would need to be fetched from appointments data
+        // For now, we'll show placeholder
+        return (
+          <span className="text-sm text-gray-400">Check appointments</span>
+        );
+      },
+    },
+    {
+      accessorKey: "totalOrders",
+      header: "Orders",
+      cell: () => {
+        // This would need to be calculated from orders data
+        // For now, show placeholder
+        return <span className="text-sm font-medium">-</span>;
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const client = row.original;
+        return (
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleViewClient(client.id)}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => handleEditClient(client.id)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+    },
+  ], [handleEditClient, handleViewClient]);
+
+  // Handle clinic not found
+  if (!clinicData) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Clinic Not Found</h2>
+            <p className="text-gray-600">The requested clinic could not be found.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Clients</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <Button onClick={() => refetch()}>Try Again</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex items-center justify-center min-h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: themeColors.primary }}>
-            Client Management - {clinic.replace('-', ' ')}
+            Clients - {clinicData.displayName || clinicData.name}
           </h1>
-          <p className="text-gray-600 mt-1">Manage client information and records for {clinic.replace('-', ' ')} clinic</p>
+          <p className="text-gray-600 mt-1">
+            Manage all clients for this clinic
+          </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-3 self-start">
-          <Button variant="outline" className="flex items-center gap-2" onClick={handleViewAllClients}>
-            <Users size={16} />
-            View All Clients
-          </Button>
-          <Button 
-            className="flex items-center gap-2"
-            style={{ 
-              background: themeColors.gradient.primary,
-              boxShadow: themeColors.shadow.button
-            }}
-          >
-            <UserPlus size={16} />
-            New Client
-          </Button>
-        </div>
+        <Button 
+          onClick={handleAddClient}
+          className="flex items-center gap-2"
+        >
+          <Plus size={16} />
+          Add New Client
+        </Button>
       </div>
 
-      <Tabs defaultValue="info" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-8">
-          <TabsTrigger value="info">Client Information</TabsTrigger>
-          <TabsTrigger value="insurance">Insurance Details</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-        </TabsList>
+      {/* Statistics Cards */}
+      <div className="grid gap-6 md:grid-cols-4 mb-8">
+        <Card>
+          <CardContent className="flex items-center p-6">
+            <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mr-4">
+              <User className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Clients</p>
+              <p className="text-2xl font-bold">{clientStats.total}</p>
+            </div>
+          </CardContent>
+        </Card>
         
-        <TabsContent value="info" className="mt-0">
-          <Card className="shadow-sm border border-gray-200" style={{ boxShadow: themeColors.shadow.large }}>
-            <CardHeader className="bg-slate-50 pb-3 pt-4">
-              <CardTitle className="text-base font-medium">Client Information</CardTitle>
-              <CardDescription>
-                Enter the client&apos;s personal information and contact details
-              </CardDescription>
-            </CardHeader>
-            
-            <FormWrapper
-              schema={clientSchema}
-              onSubmit={handleClientSubmit}
-              defaultValues={{
-                name: "",
-                dateOfBirth: new Date(),
-                gender: "male",
-                email: "",
-                cellPhone: "",
-                homePhone: "",
-                address: "",
-                companyName: "",
-                referringMD: "",
-              }}
-            >
-              {() => (
-                <>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-6">
-                        <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                          Personal Information
-                        </h3>
-                        
-                        <FormInput
-                          name="name"
-                          label="Full Name"
-                          placeholder="John Doe"
-                        />
-                        
-                        <FormDatePicker
-                          name="dateOfBirth"
-                          label="Date of Birth"
-                        />
-                        
-                        <FormSelect
-                          name="gender"
-                          label="Gender"
-                          options={[
-                            { value: "male", label: "Male" },
-                            { value: "female", label: "Female" },
-                            { value: "other", label: "Other" },
-                          ]}
-                        />
-                        
-                        <FormInput
-                          name="address"
-                          label="Address"
-                          placeholder="123 Main St, City, State, ZIP"
-                        />
-                      </div>
-                      
-                      <div className="space-y-6">
-                        <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                          Contact Information
-                        </h3>
-                        
-                        <FormInput
-                          name="email"
-                          label="Email Address"
-                          type="email"
-                          placeholder="john@example.com"
-                        />
-                        
-                        <FormInput
-                          name="cellPhone"
-                          label="Cell Phone"
-                          placeholder="(123) 456-7890"
-                        />
-                        
-                        <FormInput
-                          name="homePhone"
-                          label="Home Phone"
-                          placeholder="(123) 456-7890"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-6">
-                      <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                        Additional Information
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormInput
-                          name="companyName"
-                          label="Company Name"
-                          placeholder="ABC Company"
-                        />
-                        
-                        <FormInput
-                          name="referringMD"
-                          label="Referring MD"
-                          placeholder="Dr. Smith"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                  
-                  <CardFooter className="bg-slate-50 mt-6">
-                    <div className="flex flex-col sm:flex-row gap-3 w-full">
-                      <Button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="flex items-center gap-2"
-                        style={{ 
-                          background: themeColors.gradient.primary,
-                          boxShadow: themeColors.shadow.button
-                        }}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save size={16} />
-                            Save Client
-                          </>
-                        )}
-                      </Button>
-                      
-                      {showSuccess && (
-                        <div className="flex items-center gap-2 text-green-600">
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Client saved successfully!
-                        </div>
-                      )}
-                      
-                      {error && (
-                        <div className="flex items-center gap-2 text-red-600">
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                          {error}
-                        </div>
-                      )}
-                    </div>
-                  </CardFooter>
-                </>
-              )}
-            </FormWrapper>
-          </Card>
-        </TabsContent>
+        <Card>
+          <CardContent className="flex items-center p-6">
+            <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mr-4">
+              <User className="h-6 w-6 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Active Clients</p>
+              <p className="text-2xl font-bold">{clientStats.active}</p>
+            </div>
+          </CardContent>
+        </Card>
         
-        <TabsContent value="insurance" className="mt-0">
-          <Card className="shadow-sm border border-gray-200" style={{ boxShadow: themeColors.shadow.large }}>
-            <CardHeader className="bg-slate-50 pb-3 pt-4">
-              <CardTitle className="text-base font-medium">Insurance Information</CardTitle>
-              <CardDescription>
-                Add insurance details for the client
-              </CardDescription>
-            </CardHeader>
-            
-            <FormWrapper
-              schema={insuranceSchema}
-              onSubmit={handleInsuranceSubmit}
-              defaultValues={{
-                policyHolderName: "",
-                policyHolderBirthday: new Date(),
-                insuranceCompany: "",
-                groupNumber: "",
-                certificateNumber: "",
-              }}
-            >
-                             {() => (
+        <Card>
+          <CardContent className="flex items-center p-6">
+            <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-lg mr-4">
+              <Calendar className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">New This Month</p>
+              <p className="text-2xl font-bold">{clientStats.newThisMonth}</p>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="flex items-center p-6">
+            <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-lg mr-4">
+              <Mail className="h-6 w-6 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">With Email</p>
+              <p className="text-2xl font-bold">{clientStats.withEmail}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Clients Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            {debouncedSearchQuery ? (
+              <>Search Results ({clientStats.total})</>
+            ) : (
+              <>All Clients ({clientStats.total})</>
+            )}
+            {isLoading && (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary ml-2"></div>
+            )}
+            {searchQuery !== debouncedSearchQuery && searchQuery && (
+              <div className="text-sm text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+                Searching...
+              </div>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {clientStats.total === 0 ? (
+            <div className="text-center py-8">
+              <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              {debouncedSearchQuery ? (
                 <>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormInput
-                        name="policyHolderName"
-                        label="Policy Holder Name"
-                        placeholder="John Doe"
-                      />
-                      
-                      <FormDatePicker
-                        name="policyHolderBirthday"
-                        label="Policy Holder Birthday"
-                      />
-                      
-                      <FormInput
-                        name="insuranceCompany"
-                        label="Insurance Company"
-                        placeholder="Blue Cross Blue Shield"
-                      />
-                      
-                      <FormInput
-                        name="groupNumber"
-                        label="Group Number"
-                        placeholder="123456"
-                      />
-                      
-                      <FormInput
-                        name="certificateNumber"
-                        label="Certificate Number"
-                        placeholder="CERT123456"
-                      />
-                    </div>
-                  </CardContent>
-                  
-                  <CardFooter className="bg-slate-50 mt-6">
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="flex items-center gap-2"
-                      style={{ 
-                        background: themeColors.gradient.primary,
-                        boxShadow: themeColors.shadow.button
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No clients found</h3>
+                  <p className="text-gray-600 mb-4">
+                    No clients match your search for "{debouncedSearchQuery}". Try adjusting your search terms.
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setSearchQuery('');
+                        setDebouncedSearchQuery('');
                       }}
                     >
-                      {isSubmitting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Adding...
-                        </>
-                      ) : (
-                        <>
-                          <Plus size={16} />
-                          Add Insurance
-                        </>
-                      )}
+                      Clear Search
                     </Button>
-                  </CardFooter>
+                    <Button onClick={handleAddClient}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add New Client
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No clients found</h3>
+                  <p className="text-gray-600 mb-4">
+                    Get started by adding your first client to this clinic.
+                  </p>
+                  <Button onClick={handleAddClient}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Client
+                  </Button>
                 </>
               )}
-            </FormWrapper>
-            
-            {/* Display added insurance records */}
-            {clientInsurance.length > 0 && (
-              <CardContent className="pt-6">
-                <h4 className="font-medium mb-4">Insurance Records</h4>
-                <div className="space-y-3">
-                  {clientInsurance.map((insurance, index) => (
-                    <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h5 className="font-medium">{insurance.insuranceCompany}</h5>
-                          <p className="text-sm text-gray-600">Policy Holder: {insurance.policyHolderName}</p>
-                          <p className="text-sm text-gray-600">Certificate: {insurance.certificateNumber}</p>
-                        </div>
-                        <Badge>Active</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            )}
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="documents" className="mt-0">
-          <Card className="shadow-sm border border-gray-200" style={{ boxShadow: themeColors.shadow.large }}>
-            <CardHeader className="bg-slate-50 pb-3 pt-4">
-              <CardTitle className="text-base font-medium">Client Documents</CardTitle>
-              <CardDescription>
-                Upload and manage client documents
-              </CardDescription>
-            </CardHeader>
-            
-            <CardContent className="space-y-6">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">Upload Documents</h3>
-                <p className="text-gray-600 mb-4">
-                  Drag and drop files here, or click to select files
-                </p>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Plus size={16} />
-                  Select Files
-                </Button>
-              </div>
+            </div>
+          ) : (
+            <>
+              <DataTable 
+                columns={columns} 
+                data={clients}
+                filterPlaceholder="Search clients by name, email, or phone..."
+                searchValue={searchQuery}
+                onSearchChange={handleSearchChange}
+                showPagination={false}
+              />
               
-              <div className="space-y-3">
-                <h4 className="font-medium">Document Types</h4>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• Insurance cards</li>
-                  <li>• Medical records</li>
-                  <li>• Consent forms</li>
-                  <li>• Referral letters</li>
-                  <li>• Lab results</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              {/* Server-side Pagination Controls */}
+              {pagination && pagination.pages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between mt-6 pt-4 border-t gap-4">
+                  <div className="text-sm text-gray-700 order-2 sm:order-1">
+                    Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                    {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                    {pagination.total} clients
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 order-1 sm:order-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePreviousPage}
+                      disabled={!pagination.hasPrev}
+                      className="px-3 py-1.5 text-xs sm:text-sm"
+                    >
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden">Prev</span>
+                    </Button>
+                    
+                    {/* Smart Page numbers with ellipsis */}
+                    <div className="flex items-center space-x-1">
+                      {/* First page */}
+                      {pagination.page > 3 && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(1)}
+                            className="w-8 h-8 p-0 text-xs sm:text-sm"
+                          >
+                            1
+                          </Button>
+                          {pagination.page > 4 && (
+                            <span className="px-2 text-gray-400">...</span>
+                          )}
+                        </>
+                      )}
+                      
+                      {/* Pages around current page */}
+                      {Array.from({ length: 5 }, (_, i) => {
+                        const pageNum = pagination.page - 2 + i;
+                        if (pageNum < 1 || pageNum > pagination.pages) return null;
+                        
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={pageNum === pagination.page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(pageNum)}
+                            className="w-8 h-8 p-0 text-xs sm:text-sm"
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                      
+                      {/* Last page */}
+                      {pagination.page < pagination.pages - 2 && (
+                        <>
+                          {pagination.page < pagination.pages - 3 && (
+                            <span className="px-2 text-gray-400">...</span>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(pagination.pages)}
+                            className="w-8 h-8 p-0 text-xs sm:text-sm"
+                          >
+                            {pagination.pages}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNextPage}
+                      disabled={!pagination.hasNext}
+                      className="px-3 py-1.5 text-xs sm:text-sm"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-} 
+}

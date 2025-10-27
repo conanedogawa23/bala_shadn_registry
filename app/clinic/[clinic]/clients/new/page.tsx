@@ -19,51 +19,46 @@ import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { ArrowLeft, Save, UserPlus } from "lucide-react";
 import { ClientApiService } from "@/lib/api/clientService";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Define the client schema using zod for validation
+// COMPLIANT CLIENT SCHEMA - Per visio_req.md with Insurance
 const clientSchema = z.object({
   // Personal Information
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   dateOfBirth: z.date({ required_error: "Date of birth is required" }),
   gender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
   
-  // Contact Information
+  // Contact Information - RETAINED FIELDS ONLY
   email: z.string().email({ message: "Please enter a valid email address" }),
   cellPhone: z.string().min(10, { message: "Please enter a valid phone number" }),
   homePhone: z.string().optional(),
-  workPhone: z.string().optional(),
-  extension: z.string().optional(),
   
   // Address Information
   address: z.string().min(5, { message: "Address is required" }),
+  apartment: z.string().optional(),
   city: z.string().min(2, { message: "City is required" }),
   province: z.string().min(2, { message: "Province is required" }),
   postalCode: z.string().regex(/^[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d$/, { message: "Please enter a valid Canadian postal code (A1A 1A1)" }),
   
-  // Medical Information
+  // Additional Information - RETAINED FIELDS ONLY
   companyName: z.string().optional(),
   referringMD: z.string().optional(),
-  familyMD: z.string().optional(),
   
-  // Insurance Information (Optional)
-  hasInsurance: z.union([z.boolean(), z.string()]).transform((val) => val === true || val === "true"),
-  policyHolderName: z.string().optional(),
-  policyHolderBirthday: z.date().optional(),
-  insuranceCompany: z.string().optional(),
-  groupNumber: z.string().optional(),
-  certificateNumber: z.string().optional(),
+  // 1st Insurance (Optional)
+  has1stInsurance: z.boolean().default(false),
+  insurance1PolicyHolderName: z.string().optional(),
+  insurance1PolicyHolderBirthday: z.date().optional(),
+  insurance1Company: z.string().optional(),
+  insurance1GroupNumber: z.string().optional(),
+  insurance1CertificateNumber: z.string().optional(),
   
-  // Additional Fields
-  heardAboutUs: z.string().optional(),
-}).refine((data) => {
-  // If hasInsurance is true, then insurance fields should be required
-  if (data.hasInsurance) {
-    return data.policyHolderName && data.insuranceCompany && data.certificateNumber;
-  }
-  return true;
-}, {
-  message: "Policy holder name, insurance company, and certificate number are required when insurance is selected",
-  path: ["hasInsurance"]
+  // 2nd Insurance (Optional)
+  has2ndInsurance: z.boolean().default(false),
+  insurance2PolicyHolderName: z.string().optional(),
+  insurance2PolicyHolderBirthday: z.date().optional(),
+  insurance2Company: z.string().optional(),
+  insurance2GroupNumber: z.string().optional(),
+  insurance2CertificateNumber: z.string().optional(),
 });
 
 // Type definitions
@@ -89,25 +84,52 @@ export default function NewClientPage() {
       const formattedPostalCode = data.postalCode.replace(/\s+/g, '').toUpperCase();
       const postalCodeFormatted = `${formattedPostalCode.substring(0, 3)} ${formattedPostalCode.substring(3, 6)}`;
 
-      // Create insurance array if hasInsurance is true
-      const insurance = data.hasInsurance && data.policyHolderName && data.insuranceCompany && data.certificateNumber ? [{
-        type: '1st' as const,
-        policyHolder: data.policyHolderName,
-        policyHolderName: data.policyHolderName,
-        birthday: data.policyHolderBirthday ? {
-          day: String(data.policyHolderBirthday.getDate()).padStart(2, '0'),
-          month: String(data.policyHolderBirthday.getMonth() + 1).padStart(2, '0'),
-          year: String(data.policyHolderBirthday.getFullYear())
-        } : undefined,
-        company: data.insuranceCompany,
-        groupNumber: data.groupNumber || '',
-        certificateNumber: data.certificateNumber,
-        coverage: {
-          physiotherapy: 100,
-          massage: 100,
-          other: 100
-        }
-      }] : [];
+      // Build insurance array
+      const insurance = [];
+      
+      // Add 1st Insurance if provided
+      if (data.has1stInsurance && data.insurance1PolicyHolderName && data.insurance1Company && data.insurance1CertificateNumber) {
+        insurance.push({
+          type: '1st' as const,
+          policyHolder: data.insurance1PolicyHolderName,
+          policyHolderName: data.insurance1PolicyHolderName,
+          birthday: data.insurance1PolicyHolderBirthday ? {
+            day: String(data.insurance1PolicyHolderBirthday.getDate()).padStart(2, '0'),
+            month: String(data.insurance1PolicyHolderBirthday.getMonth() + 1).padStart(2, '0'),
+            year: String(data.insurance1PolicyHolderBirthday.getFullYear())
+          } : undefined,
+          company: data.insurance1Company,
+          groupNumber: data.insurance1GroupNumber || '',
+          certificateNumber: data.insurance1CertificateNumber,
+          coverage: {
+            physiotherapy: 100,
+            massage: 100,
+            other: 100
+          }
+        });
+      }
+      
+      // Add 2nd Insurance if provided
+      if (data.has2ndInsurance && data.insurance2PolicyHolderName && data.insurance2Company && data.insurance2CertificateNumber) {
+        insurance.push({
+          type: '2nd' as const,
+          policyHolder: data.insurance2PolicyHolderName,
+          policyHolderName: data.insurance2PolicyHolderName,
+          birthday: data.insurance2PolicyHolderBirthday ? {
+            day: String(data.insurance2PolicyHolderBirthday.getDate()).padStart(2, '0'),
+            month: String(data.insurance2PolicyHolderBirthday.getMonth() + 1).padStart(2, '0'),
+            year: String(data.insurance2PolicyHolderBirthday.getFullYear())
+          } : undefined,
+          company: data.insurance2Company,
+          groupNumber: data.insurance2GroupNumber || '',
+          certificateNumber: data.insurance2CertificateNumber,
+          coverage: {
+            physiotherapy: 100,
+            massage: 100,
+            other: 100
+          }
+        });
+      }
 
       const clientData = {
         personalInfo: {
@@ -121,6 +143,7 @@ export default function NewClientPage() {
         contact: {
           address: {
             street: data.address,
+            apartment: data.apartment || undefined,
             city: data.city,
             province: data.province,
             postalCode: postalCodeFormatted
@@ -137,20 +160,12 @@ export default function NewClientPage() {
               areaCode: data.homePhone.replace(/\D/g, '').substring(0, 3),
               number: data.homePhone.replace(/\D/g, '').substring(3),
               full: data.homePhone
-            } : undefined,
-            work: data.workPhone ? {
-              countryCode: "1",
-              areaCode: data.workPhone.replace(/\D/g, '').substring(0, 3), 
-              number: data.workPhone.replace(/\D/g, '').substring(3),
-              extension: data.extension,
-              full: data.workPhone
             } : undefined
           },
           email: data.email,
           company: data.companyName || undefined
         },
         medical: {
-          familyMD: data.familyMD || undefined,
           referringMD: data.referringMD || undefined
         },
         insurance: insurance,
@@ -166,7 +181,6 @@ export default function NewClientPage() {
       router.push(`/clinic/${clinic}/clients`);
     } catch (error) {
       console.error("❌ Failed to create client:", error);
-      // You may want to show an error message to the user
       alert(`Failed to create client: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
@@ -193,9 +207,9 @@ export default function NewClientPage() {
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: themeColors.primary }}>
-              New Client - {clinic.replace('-', ' ')}
+              New Client
             </h1>
-            <p className="text-gray-600 mt-1">Add a new client to {clinic.replace('-', ' ')} clinic</p>
+            <p className="text-gray-600 mt-1">Add a new client to this clinic</p>
           </div>
         </div>
       </div>
@@ -207,7 +221,7 @@ export default function NewClientPage() {
             Client Information
           </CardTitle>
           <CardDescription>
-            Enter the new client&apos;s personal information and contact details
+            Enter the new client&apos;s personal information, contact details, and insurance
           </CardDescription>
         </CardHeader>
         
@@ -221,234 +235,278 @@ export default function NewClientPage() {
             email: "",
             cellPhone: "",
             homePhone: "",
-            workPhone: "",
-            extension: "",
             address: "",
+            apartment: "",
             city: "Toronto",
             province: "Ontario", 
             postalCode: "",
             companyName: "",
             referringMD: "",
-            familyMD: "",
-            hasInsurance: false,
-            policyHolderName: "",
-            policyHolderBirthday: new Date(),
-            insuranceCompany: "",
-            groupNumber: "",
-            certificateNumber: "",
-            heardAboutUs: "",
+            has1stInsurance: false,
+            insurance1PolicyHolderName: "",
+            insurance1PolicyHolderBirthday: new Date(),
+            insurance1Company: "",
+            insurance1GroupNumber: "",
+            insurance1CertificateNumber: "",
+            has2ndInsurance: false,
+            insurance2PolicyHolderName: "",
+            insurance2PolicyHolderBirthday: new Date(),
+            insurance2Company: "",
+            insurance2GroupNumber: "",
+            insurance2CertificateNumber: "",
           }}
         >
-          {() => (
-            <>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-6">
-                    <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                      Personal Information
-                    </h3>
+          {({ watch }) => {
+            const has1stInsurance = watch('has1stInsurance');
+            const has2ndInsurance = watch('has2ndInsurance');
+            
+            return (
+              <>
+                <CardContent className="space-y-6">
+                  <Tabs defaultValue="personal" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="personal">Personal Info</TabsTrigger>
+                      <TabsTrigger value="insurance1">1st Insurance</TabsTrigger>
+                      <TabsTrigger value="insurance2">2nd Insurance</TabsTrigger>
+                    </TabsList>
                     
-                    <FormInput
-                      name="name"
-                      label="Full Name"
-                      placeholder="John Doe"
-                    />
+                    {/* Personal Information Tab */}
+                    <TabsContent value="personal" className="space-y-6 mt-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-6">
+                          <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
+                            Personal Information
+                          </h3>
+                          
+                          <FormInput
+                            name="name"
+                            label="Full Name"
+                            placeholder="John Doe"
+                          />
+                          
+                          <FormDatePicker
+                            name="dateOfBirth"
+                            label="Date of Birth"
+                          />
+                          
+                          <FormSelect
+                            name="gender"
+                            label="Gender"
+                            options={[
+                              { value: "male", label: "Male" },
+                              { value: "female", label: "Female" },
+                              { value: "other", label: "Other" },
+                            ]}
+                          />
+                          
+                          <FormInput
+                            name="address"
+                            label="Street Address"
+                            placeholder="123 Main Street"
+                          />
+                          
+                          <FormInput
+                            name="apartment"
+                            label="Apartment/Unit (Optional)"
+                            placeholder="Unit 101"
+                          />
+                          
+                          <FormInput
+                            name="city"
+                            label="City"
+                            placeholder="Toronto"
+                          />
+                          
+                          <FormInput
+                            name="province"
+                            label="Province"
+                            placeholder="Ontario"
+                          />
+                          
+                          <FormInput
+                            name="postalCode"
+                            label="Postal Code"
+                            placeholder="A1A 1A1"
+                          />
+                        </div>
+                        
+                        <div className="space-y-6">
+                          <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
+                            Contact Information
+                          </h3>
+                          
+                          <FormInput
+                            name="email"
+                            label="Email Address"
+                            type="email"
+                            placeholder="john@example.com"
+                          />
+                          
+                          <FormInput
+                            name="cellPhone"
+                            label="Cell Phone"
+                            placeholder="(123) 456-7890"
+                          />
+                          
+                          <FormInput
+                            name="homePhone"
+                            label="Home Phone (Optional)"
+                            placeholder="(123) 456-7890"
+                          />
+                          
+                          <FormInput
+                            name="companyName"
+                            label="Company Name (Optional)"
+                            placeholder="ABC Company"
+                          />
+                          
+                          <FormInput
+                            name="referringMD"
+                            label="Referring MD (Optional)"
+                            placeholder="Dr. Smith"
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
                     
-                    <FormDatePicker
-                      name="dateOfBirth"
-                      label="Date of Birth"
-                    />
+                    {/* 1st Insurance Tab */}
+                    <TabsContent value="insurance1" className="space-y-6 mt-6">
+                      <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
+                        1st Insurance (Optional)
+                      </h3>
+                      
+                      <FormSelect
+                        name="has1stInsurance"
+                        label="Does this client have 1st insurance?"
+                        options={[
+                          { value: "false", label: "No" },
+                          { value: "true", label: "Yes" },
+                        ]}
+                      />
+                      
+                      {has1stInsurance && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormInput
+                            name="insurance1PolicyHolderName"
+                            label="Policy Holder Name"
+                            placeholder="John Doe"
+                          />
+                          
+                          <FormDatePicker
+                            name="insurance1PolicyHolderBirthday"
+                            label="Policy Holder Birthday"
+                          />
+                          
+                          <FormInput
+                            name="insurance1Company"
+                            label="Insurance Company Name"
+                            placeholder="Blue Cross"
+                          />
+                          
+                          <FormInput
+                            name="insurance1GroupNumber"
+                            label="Group No. (Optional)"
+                            placeholder="12345"
+                          />
+                          
+                          <FormInput
+                            name="insurance1CertificateNumber"
+                            label="Certificate No."
+                            placeholder="CERT123456"
+                          />
+                        </div>
+                      )}
+                    </TabsContent>
                     
-                    <FormSelect
-                      name="gender"
-                      label="Gender"
-                      options={[
-                        { value: "male", label: "Male" },
-                        { value: "female", label: "Female" },
-                        { value: "other", label: "Other" },
-                      ]}
-                    />
-                    
-                    <FormInput
-                      name="address"
-                      label="Street Address"
-                      placeholder="123 Main Street"
-                    />
-                    
-                    <FormInput
-                      name="city"
-                      label="City"
-                      placeholder="Toronto"
-                    />
-                    
-                    <FormInput
-                      name="province"
-                      label="Province"
-                      placeholder="Ontario"
-                    />
-                    
-                    <FormInput
-                      name="postalCode"
-                      label="Postal Code"
-                      placeholder="A1A 1A1"
-                    />
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                      Contact Information
-                    </h3>
-                    
-                    <FormInput
-                      name="email"
-                      label="Email Address"
-                      type="email"
-                      placeholder="john@example.com"
-                    />
-                    
-                    <FormInput
-                      name="cellPhone"
-                      label="Cell Phone"
-                      placeholder="(123) 456-7890"
-                    />
-                    
-                    <FormInput
-                      name="homePhone"
-                      label="Home Phone"
-                      placeholder="(123) 456-7890"
-                    />
-                    
-                    <FormInput
-                      name="workPhone"
-                      label="Work Phone"
-                      placeholder="(123) 456-7890"
-                    />
-                    
-                    <FormInput
-                      name="extension"
-                      label="Extension"
-                      placeholder="1234"
-                    />
-                  </div>
-                </div>
+                    {/* 2nd Insurance Tab */}
+                    <TabsContent value="insurance2" className="space-y-6 mt-6">
+                      <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
+                        2nd Insurance (Optional)
+                      </h3>
+                      
+                      <FormSelect
+                        name="has2ndInsurance"
+                        label="Does this client have 2nd insurance?"
+                        options={[
+                          { value: "false", label: "No" },
+                          { value: "true", label: "Yes" },
+                        ]}
+                      />
+                      
+                      {has2ndInsurance && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormInput
+                            name="insurance2PolicyHolderName"
+                            label="Policy Holder Name"
+                            placeholder="John Doe"
+                          />
+                          
+                          <FormDatePicker
+                            name="insurance2PolicyHolderBirthday"
+                            label="Policy Holder Birthday"
+                          />
+                          
+                          <FormInput
+                            name="insurance2Company"
+                            label="Insurance Company Name"
+                            placeholder="Manulife"
+                          />
+                          
+                          <FormInput
+                            name="insurance2GroupNumber"
+                            label="Group No. (Optional)"
+                            placeholder="67890"
+                          />
+                          
+                          <FormInput
+                            name="insurance2CertificateNumber"
+                            label="Certificate No."
+                            placeholder="CERT789012"
+                          />
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
                 
-                <div className="space-y-6">
-                  <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                    Additional Information
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormInput
-                      name="companyName"
-                      label="Company Name"
-                      placeholder="ABC Company"
-                    />
-                    
-                    <FormInput
-                      name="referringMD"
-                      label="Referring MD"
-                      placeholder="Dr. Smith"
-                    />
-                    
-                    <FormInput
-                      name="familyMD"
-                      label="Family MD"
-                      placeholder="Dr. Johnson"
-                    />
-                    
-                    <FormInput
-                      name="heardAboutUs"
-                      label="How did you hear about us?"
-                      placeholder="Google, referral, etc."
-                    />
+                <CardFooter className="bg-slate-50 mt-6">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBack}
+                      className="flex items-center gap-2"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex items-center gap-2"
+                      style={{ 
+                        background: themeColors.gradient.primary,
+                        boxShadow: themeColors.shadow.button
+                      }}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          Create Client
+                        </>
+                      )}
+                    </Button>
                   </div>
-                </div>
-                
-                {/* Insurance Section */}
-                <div className="space-y-6">
-                  <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                    Insurance Information (Optional)
-                  </h3>
-                  
-                  <FormSelect
-                    name="hasInsurance"
-                    label="Does this client have insurance?"
-                    options={[
-                      { value: "false", label: "No Insurance" },
-                      { value: "true", label: "Has Insurance" },
-                    ]}
-                  />
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormInput
-                      name="policyHolderName"
-                      label="Policy Holder Name"
-                      placeholder="John Doe"
-                    />
-                    
-                    <FormDatePicker
-                      name="policyHolderBirthday"
-                      label="Policy Holder Birthday"
-                    />
-                    
-                    <FormInput
-                      name="insuranceCompany"
-                      label="Insurance Company"
-                      placeholder="Blue Cross Blue Shield"
-                    />
-                    
-                    <FormInput
-                      name="groupNumber"
-                      label="Group Number (Optional)"
-                      placeholder="123456"
-                    />
-                    
-                    <FormInput
-                      name="certificateNumber"
-                      label="Certificate Number"
-                      placeholder="CERT123456"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-              
-              <CardFooter className="bg-slate-50 mt-6">
-                <div className="flex flex-col sm:flex-row gap-3 w-full">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleBack}
-                    className="flex items-center gap-2"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex items-center gap-2"
-                    style={{ 
-                      background: themeColors.gradient.primary,
-                      boxShadow: themeColors.shadow.button
-                    }}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Creating...
-                      </>
-                    ) : (
-                      <>
-                        <Save size={16} />
-                        Create Client
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardFooter>
-            </>
-          )}
+                </CardFooter>
+              </>
+            );
+          }}
         </FormWrapper>
       </Card>
     </div>
   );
-} 
+}

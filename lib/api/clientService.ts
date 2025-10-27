@@ -185,10 +185,20 @@ export class ClientApiService extends BaseApiService {
       
       const response = await this.request<Client[]>(endpoint);
       
-      if (response.success && response.data && response.pagination) {
+      if (response.success && response.data !== undefined) {
+        // Handle empty results gracefully - provide default pagination if missing
+        const pagination = response.pagination || {
+          page: options.page || 1,
+          limit: options.limit || 20,
+          total: 0,
+          pages: 0,
+          hasNext: false,
+          hasPrev: false
+        };
+        
         const paginatedResponse: PaginatedClientResponse = {
-          clients: response.data,
-          pagination: response.pagination
+          clients: Array.isArray(response.data) ? response.data : [],
+          pagination: pagination
         };
         this.setCached(cacheKey, paginatedResponse, this.CACHE_TTL);
         return paginatedResponse;

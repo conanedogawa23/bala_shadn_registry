@@ -23,7 +23,8 @@ import {
   Search,
   Filter,
   Download,
-  Eye
+  Eye,
+  Shield
 } from 'lucide-react';
 import { slugToClinic } from '@/lib/data/clinics';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ import {
 } from '@/components/ui/select';
 import { generateLink } from '@/lib/route-utils';
 import { getRealDataClinicName } from '@/lib/data/clinics';
+import { InsuranceSummaryCard } from '@/components/ui/client/InsuranceSection';
 
 // Import real API hooks and utilities
 import { 
@@ -854,6 +856,42 @@ export default function ClientDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Insurance Information */}
+          {client.insurance && client.insurance.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield size={20} />
+                  Insurance Coverage
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {client.insurance.map((insurance: any, index: number) => (
+                  <InsuranceSummaryCard 
+                    key={index}
+                    insurance={{
+                      type: insurance.type,
+                      company: insurance.company,
+                      certificateNumber: insurance.certificateNumber,
+                      policyHolder: insurance.policyHolder,
+                      policyHolderName: insurance.policyHolderName,
+                      groupNumber: insurance.groupNumber,
+                      dpa: insurance.dpa,
+                      cob: insurance.cob,
+                      coverage: {
+                        physiotherapy: insurance.coverage?.physiotherapy,
+                        massage: insurance.coverage?.massage,
+                        orthopedicShoes: insurance.coverage?.orthopedicShoes,
+                        compressionStockings: insurance.coverage?.compressionStockings,
+                        other: insurance.coverage?.other,
+                      }
+                    }}
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Recent Activity */}
           <Card>

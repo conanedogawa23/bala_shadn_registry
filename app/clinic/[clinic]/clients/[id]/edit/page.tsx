@@ -16,13 +16,15 @@ import { FormWrapper } from "@/components/ui/form/FormWrapper";
 import { FormInput } from "@/components/ui/form/FormInput";
 import { FormSelect } from "@/components/ui/form/FormSelect";
 import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InsuranceSection } from "@/components/ui/client/InsuranceSection";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { ArrowLeft, Save, Edit3 } from "lucide-react";
+import { ArrowLeft, Save, Edit3, Shield } from "lucide-react";
 import { generateLink } from "@/lib/route-utils";
 import { ClientApiService } from "@/lib/api/clientService";
 import type { Client } from "@/lib/data/mockDataService";
 
-// Define the client schema using zod for validation
+// Define the client schema using zod for validation with insurance
 const clientSchema = z.object({
   // Personal Information
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -34,13 +36,63 @@ const clientSchema = z.object({
   cellPhone: z.string().min(10, { message: "Please enter a valid phone number" }),
   homePhone: z.string().optional(),
   
-  // Additional Details
+  // Address Information
   address: z.string().min(5, { message: "Address is required" }),
+  apartment: z.string().optional(),
+  city: z.string().min(2, { message: "City is required" }),
+  province: z.string().min(2, { message: "Province is required" }),
+  postalCode: z.string().regex(/^[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d$/, { 
+    message: "Please enter a valid Canadian postal code (A1A 1A1)" 
+  }),
+  
+  // Additional Details
   companyName: z.string().optional(),
   referringMD: z.string().optional(),
   
-  // Additional Fields
-  heardAboutUs: z.string().optional(),
+  // 1st Insurance (Optional)
+  has1stInsurance: z.boolean().default(false),
+  insurance1PolicyHolder: z.string().optional(),
+  insurance1PolicyHolderName: z.string().optional(),
+  insurance1PolicyHolderBirthday: z.date().optional(),
+  insurance1Company: z.string().optional(),
+  insurance1GroupNumber: z.string().optional(),
+  insurance1CertificateNumber: z.string().optional(),
+  insurance1COB: z.string().optional(),
+  insurance1DPA: z.boolean().optional(),
+  insurance1CompanyAddress: z.string().optional(),
+  insurance1City: z.string().optional(),
+  insurance1Province: z.string().optional(),
+  insurance1PostalCode: z.string().optional(),
+  insurance1CoveragePhysiotherapy: z.number().optional(),
+  insurance1CoverageMassage: z.number().optional(),
+  insurance1CoverageOrthopedicShoes: z.number().optional(),
+  insurance1CoverageCompressionStockings: z.number().optional(),
+  insurance1CoverageOther: z.number().optional(),
+  insurance1CoverageFrequency: z.string().optional(),
+  insurance1CoverageTotalAmountPerYear: z.number().optional(),
+  
+  // 2nd Insurance (Optional)
+  has2ndInsurance: z.boolean().default(false),
+  insurance2PolicyHolder: z.string().optional(),
+  insurance2PolicyHolderName: z.string().optional(),
+  insurance2PolicyHolderBirthday: z.date().optional(),
+  insurance2Company: z.string().optional(),
+  insurance2GroupNumber: z.string().optional(),
+  insurance2CertificateNumber: z.string().optional(),
+  insurance2COB: z.string().optional(),
+  insurance2DPA: z.boolean().optional(),
+  insurance2CompanyAddress: z.string().optional(),
+  insurance2City: z.string().optional(),
+  insurance2Province: z.string().optional(),
+  insurance2PostalCode: z.string().optional(),
+  insurance2CoveragePhysiotherapy: z.number().optional(),
+  insurance2CoverageMassage: z.number().optional(),
+  insurance2CoverageOrthopedicShoes: z.number().optional(),
+  insurance2CoverageCompressionStockings: z.number().optional(),
+  insurance2CoverageOther: z.number().optional(),
+  insurance2CoverageFrequency: z.string().optional(),
+  insurance2CoverageTotalAmountPerYear: z.number().optional(),
+  
 });
 
 // Type definitions
@@ -73,7 +125,20 @@ export default function EditClientPage() {
           : client.personalInfo?.dateOfBirth 
             ? new Date(client.personalInfo.dateOfBirth)
             : new Date();
-            
+        
+        // Extract insurance data (up to 2 insurance plans per visio_req.md)
+        const insurance1 = client.insurance?.find((ins: any) => ins.type === '1st');
+        const insurance2 = client.insurance?.find((ins: any) => ins.type === '2nd');
+        
+        // Helper to parse birthday string to date
+        const parseBirthday = (birthday: any) => {
+          if (!birthday) return undefined;
+          if (birthday.year && birthday.month && birthday.day) {
+            return new Date(`${birthday.year}-${birthday.month}-${birthday.day}`);
+          }
+          return undefined;
+        };
+        
         setClientData({
           name: fullName,
           dateOfBirth,
@@ -86,9 +151,62 @@ export default function EditClientPage() {
             ? client.contact.phones.home 
             : client.contact?.phones?.home?.full || "",
           address: client.contact?.address?.street || "",
+          apartment: client.contact?.address?.apartment || "",
+          city: client.contact?.address?.city || "",
+          province: client.contact?.address?.province || "",
+          postalCode: typeof client.contact?.address?.postalCode === 'string'
+            ? client.contact.address.postalCode
+            : client.contact?.address?.postalCode?.full || "",
           companyName: client.contact?.company || "",
           referringMD: client.medical?.referringMD || "",
-          heardAboutUs: "", // This field might not exist in API data
+          
+          // 1st Insurance
+          has1stInsurance: !!insurance1,
+          insurance1PolicyHolder: insurance1?.policyHolder || "Self",
+          insurance1PolicyHolderName: insurance1?.policyHolderName || "",
+          insurance1PolicyHolderBirthday: parseBirthday(insurance1?.birthday),
+          insurance1Company: insurance1?.company || "",
+          insurance1GroupNumber: insurance1?.groupNumber || "",
+          insurance1CertificateNumber: insurance1?.certificateNumber || "",
+          insurance1COB: insurance1?.cob || "NO",
+          insurance1DPA: insurance1?.dpa || false,
+          insurance1CompanyAddress: insurance1?.companyAddress || "",
+          insurance1City: insurance1?.city || "",
+          insurance1Province: insurance1?.province || "",
+          insurance1PostalCode: insurance1?.postalCode 
+            ? `${insurance1.postalCode.first3} ${insurance1.postalCode.last3}`.trim() 
+            : "",
+          insurance1CoveragePhysiotherapy: insurance1?.coverage?.physiotherapy || 0,
+          insurance1CoverageMassage: insurance1?.coverage?.massage || 0,
+          insurance1CoverageOrthopedicShoes: insurance1?.coverage?.orthopedicShoes || 0,
+          insurance1CoverageCompressionStockings: insurance1?.coverage?.compressionStockings || 0,
+          insurance1CoverageOther: insurance1?.coverage?.other || 0,
+          insurance1CoverageFrequency: insurance1?.coverage?.frequency || "",
+          insurance1CoverageTotalAmountPerYear: insurance1?.coverage?.totalAmountPerYear || 0,
+          
+          // 2nd Insurance
+          has2ndInsurance: !!insurance2,
+          insurance2PolicyHolder: insurance2?.policyHolder || "Self",
+          insurance2PolicyHolderName: insurance2?.policyHolderName || "",
+          insurance2PolicyHolderBirthday: parseBirthday(insurance2?.birthday),
+          insurance2Company: insurance2?.company || "",
+          insurance2GroupNumber: insurance2?.groupNumber || "",
+          insurance2CertificateNumber: insurance2?.certificateNumber || "",
+          insurance2COB: insurance2?.cob || "NO",
+          insurance2DPA: insurance2?.dpa || false,
+          insurance2CompanyAddress: insurance2?.companyAddress || "",
+          insurance2City: insurance2?.city || "",
+          insurance2Province: insurance2?.province || "",
+          insurance2PostalCode: insurance2?.postalCode 
+            ? `${insurance2.postalCode.first3} ${insurance2.postalCode.last3}`.trim() 
+            : "",
+          insurance2CoveragePhysiotherapy: insurance2?.coverage?.physiotherapy || 0,
+          insurance2CoverageMassage: insurance2?.coverage?.massage || 0,
+          insurance2CoverageOrthopedicShoes: insurance2?.coverage?.orthopedicShoes || 0,
+          insurance2CoverageCompressionStockings: insurance2?.coverage?.compressionStockings || 0,
+          insurance2CoverageOther: insurance2?.coverage?.other || 0,
+          insurance2CoverageFrequency: insurance2?.coverage?.frequency || "",
+          insurance2CoverageTotalAmountPerYear: insurance2?.coverage?.totalAmountPerYear || 0,
         });
       } catch (err) {
         console.error("❌ Failed to fetch client:", err);
@@ -110,6 +228,83 @@ export default function EditClientPage() {
       const [firstName, ...lastNameParts] = data.name.split(' ');
       const lastName = lastNameParts.join(' ') || '';
       
+      // Format postal code properly
+      const formattedPostalCode = data.postalCode.replace(/\s+/g, '').toUpperCase();
+      const postalCodeFormatted = `${formattedPostalCode.substring(0, 3)} ${formattedPostalCode.substring(3, 6)}`;
+
+      // Build insurance array - only include insurance with required fields
+      const insurance = [];
+      
+      // Add 1st Insurance if enabled and has required fields
+      if (data.has1stInsurance && data.insurance1Company && data.insurance1CertificateNumber && data.insurance1PolicyHolder) {
+        insurance.push({
+          type: '1st' as const,
+          policyHolder: data.insurance1PolicyHolder,
+          policyHolderName: data.insurance1PolicyHolderName || '',
+          birthday: data.insurance1PolicyHolderBirthday ? {
+            day: String(data.insurance1PolicyHolderBirthday.getDate()).padStart(2, '0'),
+            month: String(data.insurance1PolicyHolderBirthday.getMonth() + 1).padStart(2, '0'),
+            year: String(data.insurance1PolicyHolderBirthday.getFullYear())
+          } : undefined,
+          company: data.insurance1Company,
+          companyAddress: data.insurance1CompanyAddress || '',
+          city: data.insurance1City || '',
+          province: data.insurance1Province || '',
+          postalCode: data.insurance1PostalCode ? {
+            first3: data.insurance1PostalCode.replace(/\s+/g, '').substring(0, 3),
+            last3: data.insurance1PostalCode.replace(/\s+/g, '').substring(3, 6)
+          } : undefined,
+          groupNumber: data.insurance1GroupNumber || '',
+          certificateNumber: data.insurance1CertificateNumber,
+          cob: data.insurance1COB || 'NO',
+          dpa: data.insurance1DPA || false,
+          coverage: {
+            physiotherapy: data.insurance1CoveragePhysiotherapy || 0,
+            massage: data.insurance1CoverageMassage || 0,
+            orthopedicShoes: data.insurance1CoverageOrthopedicShoes || 0,
+            compressionStockings: data.insurance1CoverageCompressionStockings || 0,
+            other: data.insurance1CoverageOther || 0,
+            frequency: data.insurance1CoverageFrequency || '',
+            totalAmountPerYear: data.insurance1CoverageTotalAmountPerYear || 0,
+          }
+        });
+      }
+      
+      // Add 2nd Insurance if enabled and has required fields
+      if (data.has2ndInsurance && data.insurance2Company && data.insurance2CertificateNumber && data.insurance2PolicyHolder) {
+        insurance.push({
+          type: '2nd' as const,
+          policyHolder: data.insurance2PolicyHolder,
+          policyHolderName: data.insurance2PolicyHolderName || '',
+          birthday: data.insurance2PolicyHolderBirthday ? {
+            day: String(data.insurance2PolicyHolderBirthday.getDate()).padStart(2, '0'),
+            month: String(data.insurance2PolicyHolderBirthday.getMonth() + 1).padStart(2, '0'),
+            year: String(data.insurance2PolicyHolderBirthday.getFullYear())
+          } : undefined,
+          company: data.insurance2Company,
+          companyAddress: data.insurance2CompanyAddress || '',
+          city: data.insurance2City || '',
+          province: data.insurance2Province || '',
+          postalCode: data.insurance2PostalCode ? {
+            first3: data.insurance2PostalCode.replace(/\s+/g, '').substring(0, 3),
+            last3: data.insurance2PostalCode.replace(/\s+/g, '').substring(3, 6)
+          } : undefined,
+          groupNumber: data.insurance2GroupNumber || '',
+          certificateNumber: data.insurance2CertificateNumber,
+          cob: data.insurance2COB || 'NO',
+          dpa: data.insurance2DPA || false,
+          coverage: {
+            physiotherapy: data.insurance2CoveragePhysiotherapy || 0,
+            massage: data.insurance2CoverageMassage || 0,
+            orthopedicShoes: data.insurance2CoverageOrthopedicShoes || 0,
+            compressionStockings: data.insurance2CoverageCompressionStockings || 0,
+            other: data.insurance2CoverageOther || 0,
+            frequency: data.insurance2CoverageFrequency || '',
+            totalAmountPerYear: data.insurance2CoverageTotalAmountPerYear || 0,
+          }
+        });
+      }
+      
       const updateData = {
         personalInfo: {
           firstName: firstName || '',
@@ -122,9 +317,10 @@ export default function EditClientPage() {
         contact: {
           address: {
             street: data.address,
-            city: '', // You may want to parse this from address
-            province: '', // You may want to parse this from address  
-            postalCode: '' // You may want to add postal code field to form
+            apartment: data.apartment || undefined,
+            city: data.city,
+            province: data.province,
+            postalCode: postalCodeFormatted
           },
           phones: {
             cell: data.cellPhone,
@@ -134,9 +330,9 @@ export default function EditClientPage() {
           company: data.companyName || undefined
         },
         medical: {
-          familyMD: undefined, // Removed as per edit hint
           referringMD: data.referringMD || undefined
-        }
+        },
+        insurance: insurance
       };
 
       // Call real API
@@ -144,11 +340,10 @@ export default function EditClientPage() {
       
       console.log("✅ Client updated successfully for clinic:", clinic, "Client ID:", clientId);
       
-      // Navigate back to clients page
-      router.push(generateLink('clinic', 'clients', clinic));
+      // Navigate back to client detail page
+      router.push(generateLink('clinic', `clients/${clientId}`, clinic));
     } catch (error) {
       console.error("❌ Failed to update client:", error);
-      // You may want to show an error message to the user
       alert(`Failed to update client: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
@@ -241,131 +436,223 @@ export default function EditClientPage() {
           onSubmit={handleClientSubmit}
           defaultValues={clientData}
         >
-          {() => (
-            <>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-6">
-                    <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                      Personal Information
-                    </h3>
+          {({ watch }) => {
+            const has1stInsurance = watch('has1stInsurance');
+            const has2ndInsurance = watch('has2ndInsurance');
+            
+            return (
+              <>
+                <CardContent className="space-y-6">
+                  <Tabs defaultValue="personal" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="personal">Personal Info</TabsTrigger>
+                      <TabsTrigger value="insurance1">
+                        <Shield className="h-4 w-4 mr-2" />
+                        1st Insurance
+                      </TabsTrigger>
+                      <TabsTrigger value="insurance2">
+                        <Shield className="h-4 w-4 mr-2" />
+                        2nd Insurance
+                      </TabsTrigger>
+                    </TabsList>
                     
-                    <FormInput
-                      name="name"
-                      label="Full Name"
-                      placeholder="John Doe"
-                    />
+                    {/* Personal Information Tab */}
+                    <TabsContent value="personal" className="space-y-6 mt-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-6">
+                          <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
+                            Personal Information
+                          </h3>
+                          
+                          <FormInput
+                            name="name"
+                            label="Full Name"
+                            placeholder="John Doe"
+                          />
+                          
+                          <FormDatePicker
+                            name="dateOfBirth"
+                            label="Date of Birth"
+                          />
+                          
+                          <FormSelect
+                            name="gender"
+                            label="Gender"
+                            options={[
+                              { value: "male", label: "Male" },
+                              { value: "female", label: "Female" },
+                              { value: "other", label: "Other" },
+                            ]}
+                          />
+                          
+                          <FormInput
+                            name="address"
+                            label="Street Address"
+                            placeholder="123 Main Street"
+                          />
+                          
+                          <FormInput
+                            name="apartment"
+                            label="Apartment/Unit (Optional)"
+                            placeholder="Unit 101"
+                          />
+                          
+                          <FormInput
+                            name="city"
+                            label="City"
+                            placeholder="Toronto"
+                          />
+                          
+                          <FormInput
+                            name="province"
+                            label="Province"
+                            placeholder="Ontario"
+                          />
+                          
+                          <FormInput
+                            name="postalCode"
+                            label="Postal Code"
+                            placeholder="A1A 1A1"
+                          />
+                        </div>
+                        
+                        <div className="space-y-6">
+                          <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
+                            Contact Information
+                          </h3>
+                          
+                          <FormInput
+                            name="email"
+                            label="Email Address"
+                            type="email"
+                            placeholder="john@example.com"
+                          />
+                          
+                          <FormInput
+                            name="cellPhone"
+                            label="Cell Phone"
+                            placeholder="(123) 456-7890"
+                          />
+                          
+                          <FormInput
+                            name="homePhone"
+                            label="Home Phone (Optional)"
+                            placeholder="(123) 456-7890"
+                          />
+                          
+                          <FormInput
+                            name="companyName"
+                            label="Company Name (Optional)"
+                            placeholder="ABC Company"
+                          />
+                          
+                          <FormInput
+                            name="referringMD"
+                            label="Referring MD (Optional)"
+                            placeholder="Dr. Smith"
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
                     
-                    <FormDatePicker
-                      name="dateOfBirth"
-                      label="Date of Birth"
-                    />
+                    {/* 1st Insurance Tab */}
+                    <TabsContent value="insurance1" className="space-y-6 mt-6">
+                      <div className="mb-4">
+                        <FormSelect
+                          name="has1stInsurance"
+                          label="Does this client have 1st insurance?"
+                          options={[
+                            { value: "false", label: "No" },
+                            { value: "true", label: "Yes" },
+                          ]}
+                        />
+                      </div>
+                      
+                      <InsuranceSection
+                        config={{
+                          type: '1st',
+                          prefix: 'insurance1',
+                          title: '1st Insurance (Primary)',
+                          description: 'Primary insurance coverage'
+                        }}
+                        watch={watch}
+                        isEnabled={has1stInsurance}
+                        showCoverage={true}
+                        showDPA={true}
+                        showCOB={true}
+                        showAddress={true}
+                        mode="edit"
+                      />
+                    </TabsContent>
                     
-                    <FormSelect
-                      name="gender"
-                      label="Gender"
-                      options={[
-                        { value: "male", label: "Male" },
-                        { value: "female", label: "Female" },
-                        { value: "other", label: "Other" },
-                      ]}
-                    />
-                    
-                    <FormInput
-                      name="address"
-                      label="Address"
-                      placeholder="123 Main St, City, State, ZIP"
-                    />
-                  </div>
-                  
-                  <div className="space-y-6">
-                    <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                      Contact Information
-                    </h3>
-                    
-                    <FormInput
-                      name="email"
-                      label="Email Address"
-                      type="email"
-                      placeholder="john@example.com"
-                    />
-                    
-                    <FormInput
-                      name="cellPhone"
-                      label="Cell Phone"
-                      placeholder="(123) 456-7890"
-                    />
-                    
-                    <FormInput
-                      name="homePhone"
-                      label="Home Phone"
-                      placeholder="(123) 456-7890"
-                    />
-                  </div>
-                </div>
+                    {/* 2nd Insurance Tab */}
+                    <TabsContent value="insurance2" className="space-y-6 mt-6">
+                      <div className="mb-4">
+                        <FormSelect
+                          name="has2ndInsurance"
+                          label="Does this client have 2nd insurance?"
+                          options={[
+                            { value: "false", label: "No" },
+                            { value: "true", label: "Yes" },
+                          ]}
+                        />
+                      </div>
+                      
+                      <InsuranceSection
+                        config={{
+                          type: '2nd',
+                          prefix: 'insurance2',
+                          title: '2nd Insurance (Secondary)',
+                          description: 'Secondary insurance coverage'
+                        }}
+                        watch={watch}
+                        isEnabled={has2ndInsurance}
+                        showCoverage={true}
+                        showDPA={true}
+                        showCOB={true}
+                        showAddress={true}
+                        mode="edit"
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
                 
-                <div className="space-y-6">
-                  <h3 className="text-md font-semibold border-b pb-2" style={{ color: themeColors.primaryDark }}>
-                    Additional Information
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormInput
-                      name="companyName"
-                      label="Company Name"
-                      placeholder="ABC Company"
-                    />
-                    
-                    <FormInput
-                      name="referringMD"
-                      label="Referring MD"
-                      placeholder="Dr. Smith"
-                    />
-                    
-                    <FormInput
-                      name="heardAboutUs"
-                      label="How did you hear about us?"
-                      placeholder="Google, referral, etc."
-                    />
+                <CardFooter className="bg-slate-50 mt-6">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBack}
+                      className="flex items-center gap-2"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex items-center gap-2"
+                      style={{ 
+                        background: themeColors.gradient.primary,
+                        boxShadow: themeColors.shadow.button
+                      }}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          Update Client
+                        </>
+                      )}
+                    </Button>
                   </div>
-                </div>
-              </CardContent>
-              
-              <CardFooter className="bg-slate-50 mt-6">
-                <div className="flex flex-col sm:flex-row gap-3 w-full">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleBack}
-                    className="flex items-center gap-2"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex items-center gap-2"
-                    style={{ 
-                      background: themeColors.gradient.primary,
-                      boxShadow: themeColors.shadow.button
-                    }}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        <Save size={16} />
-                        Update Client
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardFooter>
-            </>
-          )}
+                </CardFooter>
+              </>
+            );
+          }}
         </FormWrapper>
       </Card>
     </div>

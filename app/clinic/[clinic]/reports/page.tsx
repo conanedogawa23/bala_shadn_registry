@@ -24,7 +24,7 @@ import {
   CalendarDays,
 
 } from 'lucide-react';
-import { slugToClinic } from '@/lib/data/clinics';
+import { useClinic } from '@/lib/contexts/clinic-context';
 import { generateLink } from '@/lib/route-utils';
 import { StatsCard } from '@/components/ui/cards/StatsCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -67,7 +67,19 @@ export default function ReportsPage() {
   const params = useParams();
   const router = useRouter();
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
-  const clinic = useMemo(() => slugToClinic(clinicSlug), [clinicSlug]);
+  
+  // Get clinic data from context (API-provided with correct backendName)
+  const { availableClinics } = useClinic();
+  const clinic = useMemo(() => {
+    return availableClinics.find(c => c.name === clinicSlug);
+  }, [clinicSlug, availableClinics]);
+  
+  // Get the proper backend clinic name for API calls
+  // MongoDB expects lowercase names (e.g., 'bodyblissphysio' not 'BodyBlissPhysio')
+  const backendClinicName = useMemo(() => {
+    const name = clinic?.backendName || clinic?.name || "";
+    return name.toLowerCase().replace(/\s+/g, '');
+  }, [clinic]);
 
   const [selectedPeriod, setSelectedPeriod] = useState('last6months');
   const [isExporting, setIsExporting] = useState(false);
@@ -197,13 +209,13 @@ export default function ReportsPage() {
     loading: clientsLoading, 
     error: clientsError 
   } = useClients({
-    clinicName: clinic?.name || "",
-    autoFetch: !!clinic?.name
+    clinicName: backendClinicName,
+    autoFetch: !!backendClinicName
   });
 
   // Fetch ALL clients for proper statistics calculation using pagination
   useEffect(() => {
-    if (clinic?.name) {
+    if (backendClinicName) {
       const fetchAllClientsForStats = async () => {
         setStatsLoading(true);
         try {
@@ -216,8 +228,15 @@ export default function ReportsPage() {
           const maxPages = 10;
           
           while (hasMore && currentPage <= maxPages) {
+            const authToken = localStorage.getItem('authToken');
             const response = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinic.displayName || clinic.name}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${backendClinicName}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`,
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
+                }
+              }
             );
             
             if (response.ok) {
@@ -234,28 +253,6 @@ export default function ReportsPage() {
             }
           }
           
-          // Search for potentially recent clients by common test patterns
-          const searchTerms = ['Test', 'DEBUG', 'Sept2025', 'NewMonth'];
-          for (const term of searchTerms) {
-            try {
-              const searchResponse = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${clinic.displayName || clinic.name}/frontend-compatible?search=${term}`
-              );
-              if (searchResponse.ok) {
-                const searchData = await searchResponse.json();
-                if (searchData.success && searchData.data) {
-                  // Add any clients that weren't in the first 10 pages
-                  const newClients = searchData.data.filter((client: any) => 
-                    !allClientsData.some(existing => existing.id === client.id)
-                  );
-                  allClientsData.push(...newClients);
-                }
-              }
-            } catch (searchError) {
-              // Remove console.error in production
-            }
-          }
-          
           setAllClients(allClientsData);
         } catch (error) {
           setAllClients([]);
@@ -265,7 +262,7 @@ export default function ReportsPage() {
       };
       fetchAllClientsForStats();
     }
-  }, [clinic]);
+  }, [backendClinicName]);
 
   // Calculate comprehensive metrics from real data
   const metrics = useMemo((): ReportMetrics => {
