@@ -16,6 +16,7 @@ import { FormWrapper } from "@/components/ui/form/FormWrapper";
 import { FormInput } from "@/components/ui/form/FormInput";
 import { FormSelect } from "@/components/ui/form/FormSelect";
 import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
+import { FormCheckbox } from "@/components/ui/form/FormCheckbox";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { ArrowLeft, Save, UserPlus } from "lucide-react";
 import { ClientApiService } from "@/lib/api/clientService";
@@ -375,13 +376,9 @@ export default function NewClientPage() {
                         1st Insurance (Optional)
                       </h3>
                       
-                      <FormSelect
+                      <FormCheckbox
                         name="has1stInsurance"
-                        label="Does this client have 1st insurance?"
-                        options={[
-                          { value: "false", label: "No" },
-                          { value: "true", label: "Yes" },
-                        ]}
+                        label="This client has 1st insurance"
                       />
                       
                       {has1stInsurance && (
@@ -424,13 +421,9 @@ export default function NewClientPage() {
                         2nd Insurance (Optional)
                       </h3>
                       
-                      <FormSelect
+                      <FormCheckbox
                         name="has2ndInsurance"
-                        label="Does this client have 2nd insurance?"
-                        options={[
-                          { value: "false", label: "No" },
-                          { value: "true", label: "Yes" },
-                        ]}
+                        label="This client has 2nd insurance"
                       />
                       
                       {has2ndInsurance && (
