@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -33,192 +34,131 @@ interface OrderInvoiceTemplateProps {
   };
 }
 
-// Order header component
-const OrderHeader = ({ order, clinicInfo }: { order: Order; clinicInfo: OrderInvoiceTemplateProps['clinicInfo'] }) => (
-  <div className="mb-8">
-    <div className="flex justify-between items-start mb-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">ORDER INVOICE</h1>
-        <p className="text-lg text-gray-600">Order #{order.orderNumber}</p>
-      </div>
-      <div className="text-right">
-        <h2 className="text-xl font-bold text-primary mb-2">{clinicInfo.displayName || clinicInfo.name}</h2>
-        <div className="text-sm text-gray-600">
-          <p>{clinicInfo.address}</p>
-          <p>{clinicInfo.city}, {clinicInfo.province} {clinicInfo.postalCode}</p>
-          {clinicInfo.phone && <p>Phone: {clinicInfo.phone}</p>}
-          {clinicInfo.fax && <p>Fax: {clinicInfo.fax}</p>}
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-// Order and client information component
-const OrderClientInfo = ({ order, clientInfo }: { order: Order; clientInfo: OrderInvoiceTemplateProps['clientInfo'] }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-    <div>
-      <h3 className="font-semibold mb-2">Order Information</h3>
-      <div className="text-sm space-y-1">
-        <p><span className="font-medium">Order Number:</span> {order.orderNumber}</p>
-        <p><span className="font-medium">Order Date:</span> {formatDate(order.orderDate)}</p>
-        <p><span className="font-medium">Service Date:</span> {formatDate(order.serviceDate)}</p>
-        <p><span className="font-medium">Status:</span> {order.status}</p>
-        <p><span className="font-medium">Payment Status:</span> {order.paymentStatus}</p>
-      </div>
-    </div>
-    <div>
-      <h3 className="font-semibold mb-2">Client Information</h3>
-      <div className="text-sm space-y-1">
-        <p><span className="font-medium">Name:</span> {clientInfo.name}</p>
-        <p><span className="font-medium">Client ID:</span> {order.clientId}</p>
-        {clientInfo.email && <p><span className="font-medium">Email:</span> {clientInfo.email}</p>}
-        {clientInfo.phone && <p><span className="font-medium">Phone:</span> {clientInfo.phone}</p>}
-      </div>
-    </div>
-  </div>
-);
-
-// Order line items component
-const OrderLineItems = ({ order }: { order: Order }) => {
-  const calculateTotals = () => {
-    const total = order.items.reduce((sum, item) => sum + (item.amount || item.subtotal || 0), 0);
-    
-    return { subtotal: total, total: order.totalAmount || total };
-  };
-
-  const totals = calculateTotals();
+// Invoice header component - Exact BodyBliss PDF format
+const InvoiceHeader = ({ order, clinicInfo, clientInfo }: { 
+  order: Order; 
+  clinicInfo: OrderInvoiceTemplateProps['clinicInfo']; 
+  clientInfo: OrderInvoiceTemplateProps['clientInfo'];
+}) => {
+  const isBodyBliss = clinicInfo.name.toLowerCase().includes('bodybliss');
 
   return (
-    <div className="mb-6">
-      <h3 className="font-semibold mb-4">Order Details</h3>
-      <table className="w-full border-collapse border border-gray-900">
-        <thead>
-          <tr className="bg-gray-50">
-            <th className="border border-gray-900 px-3 py-2 text-left font-bold">DESCRIPTION</th>
-            <th className="border border-gray-900 px-3 py-2 text-center font-bold">QTY</th>
-            <th className="border border-gray-900 px-3 py-2 text-right font-bold">UNIT PRICE</th>
-            <th className="border border-gray-900 px-3 py-2 text-right font-bold">AMOUNT</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.items.map((item, index) => (
-            <tr key={index}>
-              <td className="border border-gray-900 px-3 py-2">
-                {item.description || item.productName || 'Service'}
-                {item.duration && (
-                  <div className="text-xs text-gray-600 mt-1">
-                    Duration: {item.duration} minutes
-                  </div>
-                )}
-              </td>
-              <td className="border border-gray-900 px-3 py-2 text-center">{item.quantity || 1}</td>
-              <td className="border border-gray-900 px-3 py-2 text-right">
-                {PaymentApiService.formatCurrency(item.unitPrice || 0)}
-              </td>
-              <td className="border border-gray-900 px-3 py-2 text-right">
-                {PaymentApiService.formatCurrency(item.amount || item.subtotal || 0)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="mb-8">
+      {/* Logo with outlined "one care" text */}
+      {isBodyBliss ? (
+        <div className="mb-4">
+          <div className="text-xl font-normal text-black">bodybliss</div>
+          <div className="text-xl outlined-text font-light tracking-wide">one care</div>
+        </div>
+      ) : (
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold">{clinicInfo.displayName || clinicInfo.name}</h1>
+        </div>
+      )}
       
-      {/* Order totals */}
-      <div className="mt-4 flex justify-end">
-        <div className="w-64">
-          <div className="flex justify-between py-1 font-bold text-lg">
-            <span>Total:</span>
-            <span>{PaymentApiService.formatCurrency(totals.total)}</span>
-          </div>
+      {/* Company Information */}
+      <div className="text-sm mb-6">
+        <p>{clinicInfo.displayName || clinicInfo.name}</p>
+        <p>{clinicInfo.address}</p>
+        <p>{clinicInfo.city}, {clinicInfo.province} {clinicInfo.postalCode}</p>
+        {clinicInfo.phone && <p>T: {clinicInfo.phone}</p>}
+        {clinicInfo.fax && <p>F: {clinicInfo.fax}</p>}
+      </div>
+
+      {/* INVOICE Title */}
+      <h2 className="text-2xl font-bold mb-6">INVOICE</h2>
+
+      {/* Metadata - 3 Row Layout */}
+      <div className="text-sm space-y-1 mb-6">
+        <div className="flex justify-between">
+          <span>Invoice No. {order.orderNumber}</span>
+          <span>Date: {formatDate(order.orderDate)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Customer Name: {clientInfo.name}</span>
+          <span>Referring MD: N/A</span>
+        </div>
+        <div>
+          Address: {clientInfo.address || `${clinicInfo.city}, ${clinicInfo.province}`}
         </div>
       </div>
     </div>
   );
 };
 
-// Payment breakdown component
-const PaymentBreakdown = ({ payments, orderTotal }: { payments: Payment[] | undefined; orderTotal: number }) => {
-  // Ensure payments is always an array
+// Service details table - Exact PDF format with dotted borders
+const ServiceDetailsTable = ({ order }: { order: Order }) => {
+  const total = order.items.reduce((sum, item) => sum + (item.amount || item.subtotal || 0), 0);
+
+  return (
+    <div className="mb-6">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            <th className="border-dotted border border-black px-3 py-2 text-left font-bold uppercase text-sm">Item Description</th>
+            <th className="border-dotted border border-black px-3 py-2 text-center font-bold uppercase text-sm">QTY</th>
+            <th className="border-dotted border border-black px-3 py-2 text-right font-bold uppercase text-sm">Price</th>
+            <th className="border-dotted border border-black px-3 py-2 text-right font-bold uppercase text-sm">Amount</th>
+            <th className="border-dotted border border-black px-3 py-2 text-center font-bold uppercase text-sm">Service Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {order.items.map((item, index) => (
+            <tr key={index}>
+              <td className="border-dotted border border-black px-3 py-2">
+                {item.description || item.productName || 'Service'}
+              </td>
+              <td className="border-dotted border border-black px-3 py-2 text-center">{item.quantity || 1}</td>
+              <td className="border-dotted border border-black px-3 py-2 text-right">
+                {PaymentApiService.formatCurrency(item.unitPrice || 0)}
+              </td>
+              <td className="border-dotted border border-black px-3 py-2 text-right">
+                {PaymentApiService.formatCurrency(item.amount || item.subtotal || 0)}
+              </td>
+              <td className="border-dotted border border-black px-3 py-2 text-center text-sm">
+                {formatDate(order.serviceDate)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      
+      {/* Total - Right aligned, no tax breakdown */}
+      <div className="text-right mt-4">
+        <span className="text-lg font-bold">Total: {PaymentApiService.formatCurrency(total)}</span>
+      </div>
+    </div>
+  );
+};
+
+// Payment information - Simple list format from PDF
+const PaymentInformation = ({ payments, orderTotal }: { payments: Payment[] | undefined; orderTotal: number }) => {
   const safePayments = payments || [];
   
   const totalPaid = safePayments.reduce((sum, payment) => {
     return sum + (payment.amounts?.totalPaymentAmount || payment.total || 0);
   }, 0);
   
-  const outstandingBalance = orderTotal - totalPaid;
-
+  const amountDue = orderTotal - totalPaid;
+  const latestPayment = safePayments.length > 0 ? safePayments[0] : null;
+  
   return (
-    <div className="mb-6">
-      <h3 className="font-semibold mb-4">Payment History ({safePayments.length} payment{safePayments.length !== 1 ? 's' : ''})</h3>
-      
-      {safePayments.length === 0 ? (
-        <div className="text-center py-8 bg-gray-50 rounded border">
-          <p className="text-gray-600">No payments recorded for this order</p>
-        </div>
-      ) : (
+    <div className="text-sm space-y-1 mt-8">
+      <p>Amount: {PaymentApiService.formatCurrency(orderTotal)}</p>
+      <p>Amount Due: {PaymentApiService.formatCurrency(amountDue)}</p>
+      {latestPayment && (
         <>
-          <table className="w-full border-collapse border border-gray-900">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="border border-gray-900 px-3 py-2 text-left font-bold">PAYMENT ID</th>
-                <th className="border border-gray-900 px-3 py-2 text-center font-bold">DATE</th>
-                <th className="border border-gray-900 px-3 py-2 text-center font-bold">METHOD</th>
-                <th className="border border-gray-900 px-3 py-2 text-right font-bold">AMOUNT</th>
-                <th className="border border-gray-900 px-3 py-2 text-center font-bold">STATUS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {safePayments.map((payment, index) => (
-                <tr key={index}>
-                  <td className="border border-gray-900 px-3 py-2 text-sm">
-                    {payment.paymentId || payment.paymentNumber}
-                  </td>
-                  <td className="border border-gray-900 px-3 py-2 text-center text-sm">
-                    {formatDate(payment.paymentDate)}
-                  </td>
-                  <td className="border border-gray-900 px-3 py-2 text-center text-sm">
-                    {payment.paymentMethod?.toUpperCase() || 'N/A'}
-                  </td>
-                  <td className="border border-gray-900 px-3 py-2 text-right">
-                    {PaymentApiService.formatCurrency(payment.amounts?.totalPaymentAmount || payment.total || 0)}
-                  </td>
-                  <td className="border border-gray-900 px-3 py-2 text-center text-sm">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      payment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {payment.status?.toUpperCase() || 'COMPLETED'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Payment summary */}
-          <div className="mt-4 flex justify-end">
-            <div className="w-64">
-              <div className="flex justify-between py-1">
-                <span>Order Total:</span>
-                <span>{PaymentApiService.formatCurrency(orderTotal)}</span>
-              </div>
-              <div className="flex justify-between py-1 text-green-600">
-                <span>Total Paid:</span>
-                <span>{PaymentApiService.formatCurrency(totalPaid)}</span>
-              </div>
-              <Separator className="my-2" />
-              <div className={`flex justify-between py-1 font-bold ${
-                outstandingBalance > 0 ? 'text-red-600' : 'text-green-600'
-              }`}>
-                <span>Outstanding Balance:</span>
-                <span>{PaymentApiService.formatCurrency(outstandingBalance)}</span>
-              </div>
-            </div>
-          </div>
+          <p>Dispense Date: {formatDate(latestPayment.paymentDate)}</p>
+          <p>Payment Method: {latestPayment.paymentMethod?.toUpperCase() || 'N/A'}</p>
+          <p>Payment Date: {formatDate(latestPayment.paymentDate)}</p>
         </>
       )}
+      
+      {/* Simple Signature Line */}
+      <div className="mt-8 pt-4">
+        <span>Signed: </span>
+        <span className="inline-block border-b border-black w-48 ml-2"></span>
+      </div>
     </div>
   );
 };
@@ -230,7 +170,16 @@ export default function OrderInvoiceTemplate({
   clinicInfo, 
   clientInfo
 }: OrderInvoiceTemplateProps) {
-  const orderTotal = order.totalAmount || 0;
+  const router = useRouter();
+  const params = useParams();
+  
+  // Use order total directly (no tax calculation)
+  const orderTotal = order.items.reduce((sum, item) => sum + (item.amount || item.subtotal || 0), 0);
+
+  const handleBackToOrder = () => {
+    const orderId = order.id || order._id || params.id;
+    router.push(`/clinic/${params.clinic}/orders/${orderId}`);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -239,7 +188,7 @@ export default function OrderInvoiceTemplate({
         <div className="container mx-auto flex justify-between items-center">
           <Button
             variant="outline"
-            onClick={() => window.history.back()}
+            onClick={handleBackToOrder}
             className="flex items-center gap-2"
           >
             <ArrowLeft size={16} />
@@ -259,31 +208,36 @@ export default function OrderInvoiceTemplate({
 
       {/* Invoice Content */}
       <div className="container mx-auto py-8 px-4 sm:px-6">
-        <Card className="max-w-5xl mx-auto">
+        <Card className="max-w-5xl mx-auto invoice-container">
           <CardContent className="p-8">
-            <OrderHeader order={order} clinicInfo={clinicInfo} />
-            <OrderClientInfo order={order} clientInfo={clientInfo} />
+            <InvoiceHeader order={order} clinicInfo={clinicInfo} clientInfo={clientInfo} />
+            <ServiceDetailsTable order={order} />
             <Separator className="my-6" />
-            <OrderLineItems order={order} />
-            <Separator className="my-6" />
-            <PaymentBreakdown payments={payments} orderTotal={orderTotal} />
-            
-            {/* Footer */}
-            <div className="mt-8 pt-6 border-t text-center text-sm text-gray-600">
-              <p>Thank you for choosing {clinicInfo.displayName || clinicInfo.name}</p>
-              <p className="mt-2">
-                This invoice was generated on {formatDate(new Date().toISOString())}
-              </p>
-            </div>
+            <PaymentInformation payments={payments} orderTotal={orderTotal} />
           </CardContent>
         </Card>
       </div>
 
-      {/* Print Styles */}
+      {/* Enhanced Print Styles with outlined text and dotted borders */}
       <style jsx global>{`
+        /* Outlined "one care" text styling */
+        .outlined-text {
+          color: transparent;
+          -webkit-text-stroke: 1.5px #000;
+          text-stroke: 1.5px #000;
+          font-weight: 300;
+          letter-spacing: 0.08em;
+        }
+        
         @media print {
           .no-print {
             display: none !important;
+          }
+          
+          .invoice-container {
+            max-width: none !important;
+            box-shadow: none !important;
+            border: none !important;
           }
           
           .container {
@@ -293,11 +247,39 @@ export default function OrderInvoiceTemplate({
           
           body {
             background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            font-family: Arial, sans-serif;
           }
           
-          .card {
-            border: none !important;
-            box-shadow: none !important;
+          /* Outlined text for print */
+          .outlined-text {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          
+          /* Dotted borders for print */
+          table, th, td {
+            border-style: dotted !important;
+            border-width: 1px !important;
+            border-color: #000 !important;
+          }
+          
+          /* Maintain text sizing in print */
+          .text-3xl {
+            font-size: 1.875rem !important;
+          }
+          
+          .text-2xl {
+            font-size: 1.5rem !important;
+          }
+          
+          .text-xl {
+            font-size: 1.25rem !important;
+          }
+          
+          .text-lg {
+            font-size: 1.125rem !important;
           }
           
           @page {

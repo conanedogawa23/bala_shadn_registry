@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Lock, Mail, AlertCircle } from "lucide-react";
-import { usePublicRoute } from "@/lib/auth";
+import { usePublicRoute, login } from "@/lib/auth";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -98,18 +98,8 @@ export default function LoginPage() {
       if (response.success && response.data) {
         const { user, accessToken, refreshToken } = response.data;
         
-        // Store authentication data in localStorage
-        localStorage.setItem("isAuthenticated", "true");
-        localStorage.setItem("authToken", accessToken); // Store the real access token
-        localStorage.setItem("refreshToken", refreshToken); // Store refresh token
-        localStorage.setItem("user", JSON.stringify({ 
-          id: user._id || user.id,
-          email: user.email,
-          name: user.name || `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim(),
-          role: user.role,
-          clinics: user.permissions?.allowedClinics || [],
-          token: accessToken
-        }));
+        // Store refresh token separately
+        localStorage.setItem("refreshToken", refreshToken);
         
         // Set remember me preference if checked
         if (values.rememberMe) {
@@ -118,11 +108,107 @@ export default function LoginPage() {
           localStorage.removeItem("rememberMe");
         }
         
+        // Use the login helper to store auth data (localStorage + cookies)
+        login({ 
+          id: user._id || user.id,
+          email: user.email,
+          name: user.name || `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim(),
+          phone: user.profile?.phone || '',
+          dob: user.profile?.dateOfBirth || '',
+          gender: user.profile?.gender || 'Other',
+          address: {
+            street: user.profile?.address?.street || '',
+            city: user.profile?.address?.city || '',
+            state: user.profile?.address?.state || '',
+            zipCode: user.profile?.address?.postalCode || '',
+            country: 'Canada'
+          },
+          emergencyContact: {
+            name: '',
+            relationship: '',
+            phone: ''
+          },
+          insurance: {
+            provider: '',
+            policyNumber: '',
+            groupNumber: '',
+            primaryHolder: true,
+            coverageStartDate: '',
+            coverageEndDate: ''
+          },
+          clinicalInformation: {
+            bloodType: '',
+            allergies: [],
+            chronicConditions: [],
+            currentMedications: [],
+            surgicalHistory: [],
+            vaccinations: []
+          },
+          wellnessProfile: {
+            height: { value: 0, unit: 'cm' },
+            weight: { value: 0, unit: 'kg' },
+            bmi: 0,
+            exerciseFrequency: '',
+            dietaryPreferences: [],
+            sleepAverage: 0,
+            stressLevel: '',
+            goals: []
+          },
+          treatmentPreferences: {
+            preferredClinics: user.permissions?.allowedClinics || [],
+            preferredProviders: [],
+            preferredAppointmentDays: {
+              monday: false,
+              tuesday: false,
+              wednesday: false,
+              thursday: false,
+              friday: false,
+              saturday: false,
+              sunday: false
+            },
+            preferredAppointmentTimes: [],
+            communicationPreferences: {
+              appointmentReminders: 'email',
+              generalCommunication: 'email',
+              promotionalOffers: false
+            }
+          },
+          accountSettings: {
+            language: 'en',
+            timezone: 'America/Toronto',
+            receiveNewsletter: false,
+            twoFactorEnabled: false,
+            notificationSettings: {
+              appointmentReminders: true,
+              appointmentChanges: true,
+              treatmentSummaries: true,
+              billingUpdates: true,
+              promotionalContent: false
+            },
+            privacySettings: {
+              shareDataForResearch: false,
+              allowLocationTracking: false
+            }
+          },
+          membershipDetails: {
+            memberSince: user.createdAt || new Date().toISOString(),
+            membershipType: user.role || 'user',
+            membershipStatus: 'active',
+            membershipExpiration: '',
+            loyaltyPoints: 0,
+            referrals: 0
+          }
+        }, accessToken);
+        
         console.log("Login successful, access token:", accessToken.substring(0, 20) + "...");
         
-        // Reset form and navigate to dashboard
+        // Check if there's a redirect URL from middleware
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectUrl = urlParams.get('redirect');
+        
+        // Reset form and navigate
         form.reset();
-        router.push("/");
+        router.push(redirectUrl || "/");
       } else {
         setAuthError(response.error?.message || "Login failed. Please try again.");
       }

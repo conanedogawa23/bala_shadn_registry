@@ -1,5 +1,20 @@
 "use client";
 
+/**
+ * Order Invoice Page
+ * 
+ * This page fetches order data from MongoDB via the backend API:
+ * - Orders collection: Contains order details, line items, dates, and totals
+ * - Payments collection: Contains payment history linked by orderNumber
+ * - Clinics collection: Contains clinic information (name, address, phone, fax)
+ * - Clients collection: Contains client details including contact information
+ * 
+ * Data Structure (from MongoDB):
+ * - Order: { _id, orderNumber, clientId, clinicName, items[], totalAmount, orderDate, serviceDate }
+ * - Payment: { _id, paymentNumber, orderNumber, amounts: { totalPaymentAmount, totalPaid, ... } }
+ * - Clinic: { _id, clinicId, name, displayName, address: { street, city, province, postalCode } }
+ */
+
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,7 +74,11 @@ export default function OrderInvoicePage() {
     autoFetch: !!orderId
   });
 
-  // Fetch payments for this order
+  // Fetch payments for this order from MongoDB
+  // MongoDB Payment structure: { 
+  //   _id, paymentNumber, orderNumber, clientId, paymentDate, paymentMethod, 
+  //   amounts: { totalPaymentAmount, totalPaid, totalOwed, popAmount, dpaAmount, ... }
+  // }
   const { 
     payments, 
     loading: paymentsLoading, 
@@ -69,21 +88,26 @@ export default function OrderInvoicePage() {
   const isLoading = orderLoading || (order?.orderNumber && paymentsLoading) || !isDataReady;
   const error = orderError || paymentsError;
 
-  // Setup clinic and client info
+  // Setup clinic and client info from MongoDB data
   const setupInvoiceData = useCallback(() => {
     if (!clinicData || !order) return;
 
+    // MongoDB Clinic structure: address is nested object { street, city, province, postalCode }
+    const clinicAddress = clinicData.address || {};
+    
     setClinicInfo({
-      name: clinicData.name,
-      displayName: clinicData.displayName,
-      address: clinicData.address,
-      city: clinicData.city,
-      province: clinicData.province,
-      postalCode: clinicData.postalCode,
-      phone: '(416) 555-0123', // Default values for BodyBliss format
-      fax: '(416) 555-0124'
+      name: clinicData.name || clinicData.displayName || '',
+      displayName: clinicData.displayName || clinicData.name || '',
+      // Handle both flat and nested address structures from MongoDB
+      address: typeof clinicAddress === 'string' ? clinicAddress : (clinicAddress.street || clinicData.address || ''),
+      city: clinicAddress.city || clinicData.city || '',
+      province: clinicAddress.province || clinicData.province || '',
+      postalCode: clinicAddress.postalCode || clinicData.postalCode || '',
+      phone: clinicData.phone || '(416) 555-0123',
+      fax: clinicData.fax || '(416) 555-0124'
     });
 
+    // MongoDB Order structure: clientName comes from order document
     setClientInfo({
       name: order.clientName || 'Unknown Client',
       address: '',

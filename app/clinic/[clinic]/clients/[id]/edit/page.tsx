@@ -119,47 +119,49 @@ export default function EditClientPage() {
       try {
         const client: Client = await ClientApiService.getClientById(clientId);
         
-        // Transform API data to form format
-        const fullName = `${client.personalInfo?.firstName || ''} ${client.personalInfo?.lastName || ''}`.trim();
-        const dateOfBirth = client.personalInfo?.birthday 
-          ? new Date(`${client.personalInfo.birthday.year}-${client.personalInfo.birthday.month}-${client.personalInfo.birthday.day}`)
-          : client.personalInfo?.dateOfBirth 
-            ? new Date(client.personalInfo.dateOfBirth)
-            : new Date();
+        // API returns flattened structure - map directly
+        const fullName = `${client.firstName || ''} ${client.lastName || ''}`.trim();
+        
+        // Parse dateOfBirth from ISO string or birthday object
+        let dateOfBirth = new Date();
+        if (client.dateOfBirth) {
+          dateOfBirth = new Date(client.dateOfBirth);
+        } else if (client.birthday?.year && client.birthday?.month && client.birthday?.day) {
+          dateOfBirth = new Date(
+            `${client.birthday.year}-${client.birthday.month}-${client.birthday.day}`
+          );
+        }
         
         // Extract insurance data (up to 2 insurance plans per visio_req.md)
         const insurance1 = client.insurance?.find((ins) => ins.type === '1st');
         const insurance2 = client.insurance?.find((ins) => ins.type === '2nd');
         
-        // Helper to parse birthday string to date
+        // Helper to parse insurance birthday
         const parseBirthday = (birthday?: { day?: string; month?: string; year?: string }) => {
-          if (!birthday) return undefined;
-          if (birthday.year && birthday.month && birthday.day) {
-            return new Date(`${birthday.year}-${birthday.month}-${birthday.day}`);
-          }
-          return undefined;
+          if (!birthday?.year || !birthday?.month || !birthday?.day) return undefined;
+          return new Date(`${birthday.year}-${birthday.month}-${birthday.day}`);
         };
+        
+        // Parse address from formatted string (fallback)
+        // API returns formatted address like "123 St, City, Province, Postal"
+        // Individual fields (city, province) also available separately
+        const addressParts = client.address?.split(',') || [];
+        const street = addressParts[0]?.trim() || '';
         
         setClientData({
           name: fullName,
           dateOfBirth,
-          gender: client.personalInfo?.gender?.toLowerCase() as "male" | "female" | "other" || "male",
-          email: client.contact?.email || "",
-          cellPhone: typeof client.contact?.phones?.cell === 'string' 
-            ? client.contact.phones.cell 
-            : client.contact?.phones?.cell?.full || "",
-          homePhone: typeof client.contact?.phones?.home === 'string' 
-            ? client.contact.phones.home 
-            : client.contact?.phones?.home?.full || "",
-          address: client.contact?.address?.street || "",
-          apartment: client.contact?.address?.apartment || "",
-          city: client.contact?.address?.city || "",
-          province: client.contact?.address?.province || "",
-          postalCode: typeof client.contact?.address?.postalCode === 'string'
-            ? client.contact.address.postalCode
-            : client.contact?.address?.postalCode?.full || "",
-          companyName: client.contact?.company || "",
-          referringMD: client.medical?.referringMD || "",
+          gender: (client.gender?.toLowerCase() as "male" | "female" | "other") || "male",
+          email: client.email || "",
+          cellPhone: client.phone || "",  // API returns single phone field
+          homePhone: "",  // Not in flattened response
+          address: street || client.address || "",
+          apartment: "",  // Not in flattened response  
+          city: client.city || "",
+          province: client.province || "",
+          postalCode: client.postalCode || "",  // May need to extract from address
+          companyName: client.companyName || "",
+          referringMD: client.referringMD || "",
           
           // 1st Insurance
           has1stInsurance: !!insurance1,

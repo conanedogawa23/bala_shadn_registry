@@ -857,17 +857,18 @@ export default function ClientDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Insurance Information */}
-          {client.insurance && client.insurance.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield size={20} />
-                  Insurance Coverage
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {client.insurance.map((insurance: any, index: number) => (
+          {/* Insurance Information - Always visible */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield size={20} />
+                Insurance Coverage
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {client.insurance && client.insurance.length > 0 ? (
+                // Display existing insurance information
+                client.insurance.map((insurance: any, index: number) => (
                   <InsuranceSummaryCard 
                     key={index}
                     insurance={{
@@ -888,10 +889,27 @@ export default function ClientDetailPage() {
                       }
                     }}
                   />
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                ))
+              ) : (
+                // Prompt to add insurance when none exists
+                <div className="text-center py-8">
+                  <Shield className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                  <p className="text-sm text-gray-600 mb-4">
+                    No insurance information on file
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(generateLink('clinic', `clients/${clientId}/edit`, clinic))}
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Insurance Information
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Recent Activity */}
           <Card>

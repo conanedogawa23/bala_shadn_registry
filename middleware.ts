@@ -4,25 +4,43 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Global routes that should not be redirected
-  const globalRoutes = [
+  // Public routes that don't require authentication
+  const publicRoutes = [
     '/login', 
     '/register', 
     '/forgot-password', 
-    '/contact',
-    '/activity',
-    '/notifications',
-    '/profile'
+    '/contact'
   ];
   
-  // Check if the current path is a global route
-  if (globalRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`))) {
-    return NextResponse.next();
+  // Check if the current path is a public route
+  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`));
+  
+  // Get authentication status from cookies or check for auth token
+  // Note: In Next.js middleware, we can't access localStorage directly
+  // We'll use cookies for server-side auth check
+  const authToken = request.cookies.get('authToken')?.value;
+  const isAuthenticated = request.cookies.get('isAuthenticated')?.value === 'true';
+  
+  // If user is not authenticated and trying to access protected route
+  if (!isPublicRoute && !authToken && !isAuthenticated) {
+    const loginUrl = new URL('/login', request.url);
+    // Add the original URL as a redirect parameter so we can send them back after login
+    loginUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+  
+  // If user is authenticated and trying to access login/register, redirect to home
+  if (isPublicRoute && (authToken || isAuthenticated) && (pathname === '/login' || pathname === '/register')) {
+    return NextResponse.redirect(new URL('/clinic/bodyblissphysio', request.url));
   }
 
-  // Redirect root path to active clinic (BodyBliss Physio)
+  // Redirect root path to active clinic (BodyBliss Physio) if authenticated
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/clinic/bodyblissphysio', request.url));
+    if (authToken || isAuthenticated) {
+      return NextResponse.redirect(new URL('/clinic/bodyblissphysio', request.url));
+    } else {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
   }
 
   // Handle /clinics routes (these should not be redirected)

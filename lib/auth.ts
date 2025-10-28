@@ -108,6 +108,22 @@ export interface User {
   };
 }
 
+// Helper function to set cookie
+const setCookie = (name: string, value: string, days: number = 7) => {
+  if (typeof document === "undefined") return;
+  
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+};
+
+// Helper function to delete cookie
+const deleteCookie = (name: string) => {
+  if (typeof document === "undefined") return;
+  
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+};
+
 // Check if user is authenticated client-side
 export const isAuthenticated = (): boolean => {
   if (typeof window === "undefined") return false;
@@ -162,12 +178,35 @@ export const updateUserProfile = (userData: Partial<User>): boolean => {
   }
 };
 
+// Login the user (call this after successful authentication)
+export const login = (userData: User, token?: string) => {
+  if (typeof window === "undefined") return;
+  
+  // Store in localStorage
+  localStorage.setItem("isAuthenticated", "true");
+  localStorage.setItem("user", JSON.stringify(userData));
+  
+  if (token) {
+    localStorage.setItem("authToken", token);
+    setCookie("authToken", token, 7); // Store token in cookie for 7 days
+  }
+  
+  // Store authentication state in cookie for middleware access
+  setCookie("isAuthenticated", "true", 7);
+};
+
 // Logout the user
 export const logout = () => {
   if (typeof window === "undefined") return;
   
+  // Clear localStorage
   localStorage.removeItem("isAuthenticated");
   localStorage.removeItem("user");
+  localStorage.removeItem("authToken");
+  
+  // Clear cookies
+  deleteCookie("isAuthenticated");
+  deleteCookie("authToken");
 };
 
 // Authentication hook for protected routes
