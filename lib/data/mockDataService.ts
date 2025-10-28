@@ -4,6 +4,7 @@ import { realClinicsData, getRealDataClinicName } from './clinics';
 
 export interface Client {
   id: string;
+  clientId?: string | number; // Add explicit clientId field for backend compatibility
   name: string;
   firstName: string;
   lastName: string;
@@ -15,6 +16,7 @@ export interface Client {
   gender: string;
   city: string;
   province: string;
+  address?: string; // Add formatted address string for display
   phone: string;
   email: string;
   clinic: string;
@@ -22,6 +24,98 @@ export interface Client {
   dateOfBirth?: string;
   createdAt?: string;
   updatedAt?: string;
+  
+  // API response structure (nested format from ClientApiService)
+  personalInfo?: {
+    firstName: string;
+    lastName: string;
+    fullName?: string;
+    dateOfBirth?: Date | string;
+    birthday?: {
+      day: string;
+      month: string;
+      year: string;
+    };
+    age?: number;
+    gender?: 'Male' | 'Female' | 'Other';
+  };
+  contact?: {
+    address?: {
+      street?: string;
+      apartment?: string;
+      city?: string;
+      province?: string;
+      postalCode?: string | {
+        first3: string;
+        last3: string;
+        full?: string;
+      };
+    };
+    phones?: {
+      home?: string | {
+        countryCode?: string;
+        areaCode?: string;
+        number?: string;
+        extension?: string;
+        full?: string;
+      };
+      cell?: string | {
+        countryCode?: string;
+        areaCode?: string;
+        number?: string;
+        full?: string;
+      };
+      work?: string | {
+        countryCode?: string;
+        areaCode?: string;
+        number?: string;
+        extension?: string;
+        full?: string;
+      };
+    };
+    email?: string;
+    company?: string;
+    companyOther?: string;
+  };
+  insurance?: Array<{
+    type: '1st' | '2nd' | '3rd';
+    dpa?: boolean;
+    policyHolder: string;
+    cob?: string;
+    policyHolderName?: string;
+    birthday?: {
+      day: string;
+      month: string;
+      year: string;
+    };
+    company: string;
+    companyAddress?: string;
+    city?: string;
+    province?: string;
+    postalCode?: {
+      first3: string;
+      last3: string;
+    };
+    groupNumber?: string;
+    certificateNumber: string;
+    coverage?: {
+      numberOfOrthotics?: string;
+      totalAmountPerOrthotic?: number;
+      totalAmountPerYear?: number;
+      frequency?: string;
+      numOrthoticsPerYear?: string;
+      orthopedicShoes?: number;
+      compressionStockings?: number;
+      physiotherapy?: number;
+      massage?: number;
+      other?: number;
+    };
+  }>;
+  medical?: {
+    familyMD?: string;
+    referringMD?: string;
+    csrName?: string;
+  };
 }
 
 export interface Order {

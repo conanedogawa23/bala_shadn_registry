@@ -16,6 +16,7 @@ import { FormWrapper } from "@/components/ui/form/FormWrapper";
 import { FormInput } from "@/components/ui/form/FormInput";
 import { FormSelect } from "@/components/ui/form/FormSelect";
 import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
+import { FormCheckbox } from "@/components/ui/form/FormCheckbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InsuranceSection } from "@/components/ui/client/InsuranceSection";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
@@ -127,11 +128,11 @@ export default function EditClientPage() {
             : new Date();
         
         // Extract insurance data (up to 2 insurance plans per visio_req.md)
-        const insurance1 = client.insurance?.find((ins: any) => ins.type === '1st');
-        const insurance2 = client.insurance?.find((ins: any) => ins.type === '2nd');
+        const insurance1 = client.insurance?.find((ins) => ins.type === '1st');
+        const insurance2 = client.insurance?.find((ins) => ins.type === '2nd');
         
         // Helper to parse birthday string to date
-        const parseBirthday = (birthday: any) => {
+        const parseBirthday = (birthday?: { day?: string; month?: string; year?: string }) => {
           if (!birthday) return undefined;
           if (birthday.year && birthday.month && birthday.day) {
             return new Date(`${birthday.year}-${birthday.month}-${birthday.day}`);
@@ -558,13 +559,9 @@ export default function EditClientPage() {
                     {/* 1st Insurance Tab */}
                     <TabsContent value="insurance1" className="space-y-6 mt-6">
                       <div className="mb-4">
-                        <FormSelect
+                        <FormCheckbox
                           name="has1stInsurance"
-                          label="Does this client have 1st insurance?"
-                          options={[
-                            { value: "false", label: "No" },
-                            { value: "true", label: "Yes" },
-                          ]}
+                          label="This client has 1st insurance"
                         />
                       </div>
                       
@@ -588,13 +585,9 @@ export default function EditClientPage() {
                     {/* 2nd Insurance Tab */}
                     <TabsContent value="insurance2" className="space-y-6 mt-6">
                       <div className="mb-4">
-                        <FormSelect
+                        <FormCheckbox
                           name="has2ndInsurance"
-                          label="Does this client have 2nd insurance?"
-                          options={[
-                            { value: "false", label: "No" },
-                            { value: "true", label: "Yes" },
-                          ]}
+                          label="This client has 2nd insurance"
                         />
                       </div>
                       
