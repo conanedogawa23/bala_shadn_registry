@@ -3,7 +3,6 @@
 import React from 'react';
 import { useParams } from 'next/navigation';
 import { 
-  Building2, 
   Users, 
   Calendar, 
   Activity,
@@ -14,42 +13,11 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import InvalidClinicError from '@/components/error/invalid-clinic-error';
 import { generateLink } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'active':
-      return 'bg-green-100 text-green-800';
-    case 'historical':
-      return 'bg-orange-100 text-orange-800';
-    case 'inactive':
-      return 'bg-gray-100 text-gray-800';
-    case 'no-data':
-      return 'bg-blue-100 text-blue-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-};
-
-const getStatusLabel = (status: string) => {
-  switch (status) {
-    case 'active':
-      return 'Active';
-    case 'historical':
-      return 'Recently Inactive';
-    case 'inactive':
-      return 'Inactive';
-    case 'no-data':
-      return 'Setup Required';
-    default:
-      return 'Unknown';
-  }
-};
 
 const formatNumber = (num: number = 0): string => {
   if (num >= 1000) {
@@ -119,34 +87,6 @@ export default function ClinicPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-8">
-      {/* Page Header */}
-      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold">{clinic.displayName}</h1>
-              <p className="text-muted-foreground">
-                {clinic.address && clinic.city 
-                  ? `${clinic.address}, ${clinic.city}, ${clinic.province}`
-                  : 'Healthcare Management System'
-                }
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <Badge 
-          variant="secondary" 
-          className={cn("text-sm px-3 py-1", getStatusColor(clinic.status))}
-        >
-          {clinic.status === 'active' && <Activity className="h-4 w-4 mr-2" />}
-          {clinic.status === 'inactive' && <Clock className="h-4 w-4 mr-2" />}
-          {clinic.status === 'historical' && <Clock className="h-4 w-4 mr-2" />}
-          {clinic.status === 'no-data' && <AlertTriangle className="h-4 w-4 mr-2" />}
-          {getStatusLabel(clinic.status)}
-        </Badge>
-      </div>
 
       {/* Status Messages */}
       {clinic.status !== 'active' && (

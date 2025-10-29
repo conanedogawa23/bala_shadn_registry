@@ -138,7 +138,7 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
     <div className="min-h-screen bg-gray-50">
 
       {/* Main content */}
-      <main className="max-w-9xl mx-auto">
+      <main className="max-w-7xl mx-auto">
         {children}
       </main>
     </div>
