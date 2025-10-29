@@ -452,7 +452,7 @@ export class AppointmentApiService extends BaseApiService {
       });
 
       const queryString = query ? `?${query}` : '';
-      const endpoint = `${this.ENDPOINT}/clinic/${encodeURIComponent(clinicName)}/stats${queryString}`;
+      const endpoint = `${this.ENDPOINT}/stats/clinic/${encodeURIComponent(clinicName)}${queryString}`;
       
       const response = await this.request<any>(endpoint);
       

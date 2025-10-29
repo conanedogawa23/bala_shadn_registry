@@ -15,7 +15,7 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
   const { availableClinics, loading: clinicLoading } = useClinic();
   const [isValidating, setIsValidating] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [clinicInfo, setClinicInfo] = useState<{
+  const [_clinicInfo, setClinicInfo] = useState<{
     slug: string;
     name: string;
     backendName: string;
@@ -136,32 +136,9 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
   // Success state - render children with clinic context
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Clinic header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {clinicInfo?.name || 'Clinic Dashboard'}
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Clinic Management • {clinicInfo?.slug}
-                </p>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  Active
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-9xl mx-auto">
         {children}
       </main>
     </div>

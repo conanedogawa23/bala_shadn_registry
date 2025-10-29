@@ -146,7 +146,7 @@ export default function NavMenu() {
   
   return (
     <nav className="bg-white border-b">
-      <div className="max-w-7xl mx-auto px-1 sm:px-2 lg:px-3">
+      <div className="max-w-8xl mx-auto px-1 sm:px-2 lg:px-3">
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
