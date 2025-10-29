@@ -18,6 +18,11 @@ interface InvoiceTemplateProps {
     postalCode: string;
     phone?: string;
     fax?: string;
+    logo?: {
+      data: string;
+      contentType: string;
+      filename: string;
+    };
   };
   clientInfo: {
     name: string;
@@ -36,36 +41,37 @@ const UniversalInvoiceHeader = ({ clinicInfo, payment, clientInfo }: {
   payment: Payment; 
   clientInfo: InvoiceTemplateProps['clientInfo']; 
 }) => {
-  // Data-driven clinic name formatting - no forEach, optimized approach
-  const getClinicDisplayName = (clinicInfo: InvoiceTemplateProps['clinicInfo']): string => {
-    const name = clinicInfo.displayName || clinicInfo.name;
-    
-    // Handle BodyBliss specific formatting
-    if (name.toLowerCase().includes('bodybliss') && name.toLowerCase().includes('one')) {
-      return 'bodybliss\none + care';
-    }
-    
-    return name;
-  };
-
-  const clinicDisplayName = getClinicDisplayName(clinicInfo);
-  const isBodyBlissFormat = clinicDisplayName.includes('bodybliss');
-
+  // Debug logging
+  console.log('InvoiceTemplate clinicInfo:', {
+    name: clinicInfo.name,
+    hasLogo: !!clinicInfo.logo,
+    logoDetails: clinicInfo.logo ? {
+      contentType: clinicInfo.logo.contentType,
+      filename: clinicInfo.logo.filename,
+      dataLength: clinicInfo.logo.data?.length || 0
+    } : null
+  });
+  
   return (
     <div className="mb-8">
-      {/* Clinic Branding Section */}
+      {/* Clinic Branding Section - Simple header matching reference image */}
       <div className="mb-6">
-        <div className={`${isBodyBlissFormat ? 'text-gray-700' : 'text-blue-600'} mb-4`}>
-          {isBodyBlissFormat ? (
-            <div className="text-2xl font-light leading-tight">
-              {clinicDisplayName.split('\n').map((line, index) => (
-                <div key={`clinic-line-${index}`}>{line}</div>
-              ))}
-            </div>
-          ) : (
-            <h1 className="text-2xl font-bold">{clinicDisplayName}</h1>
-          )}
-        </div>
+        {/* Clinic Logo if available */}
+        {clinicInfo.logo && (
+          <div className="mb-4">
+            <img 
+              src={`data:${clinicInfo.logo.contentType};base64,${clinicInfo.logo.data}`}
+              alt={`${clinicInfo.displayName} logo`}
+              className="max-w-[150px] max-h-[80px] object-contain"
+            />
+          </div>
+        )}
+        
+        {!clinicInfo.logo && (
+          <div className="text-blue-600 mb-4">
+            <h1 className="text-2xl font-bold">{clinicInfo.displayName || clinicInfo.name}</h1>
+          </div>
+        )}
         
         {/* Clinic Address */}
         <div className="text-sm text-gray-700 space-y-1 mb-6">
@@ -102,49 +108,71 @@ const UniversalInvoiceHeader = ({ clinicInfo, payment, clientInfo }: {
 };
 
 // Universal payment amounts breakdown
-const UniversalPaymentBreakdown = ({ payment }: { payment: Payment }) => (
-  <div className="mb-6">
-    <table className="w-full border-collapse border border-gray-900">
-      <thead>
-        <tr>
-          <th className="border border-gray-900 px-3 py-2 text-left font-bold bg-white">PAYMENT TYPE</th>
-          <th className="border border-gray-900 px-3 py-2 text-right font-bold bg-white">AMOUNT</th>
-          <th className="border border-gray-900 px-3 py-2 text-center font-bold bg-white">DATE</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td className="border border-gray-900 px-3 py-2">{payment.paymentType ? PaymentApiService.getPaymentTypeDescription(payment.paymentType) : 'N/A'}</td>
-          <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts?.totalPaymentAmount || payment.total || 0)}</td>
-          <td className="border border-gray-900 px-3 py-2 text-center">
-            {PaymentApiService.formatDate(payment.paymentDate)}
-          </td>
-        </tr>
-        {(payment.amounts?.popAmount || 0) > 0 && (
+const UniversalPaymentBreakdown = ({ payment }: { payment: Payment }) => {
+  // Build breakdown rows for non-zero insurance/breakdown amounts
+  const breakdownRows = [];
+  
+  if ((payment.amounts?.insurance1stAmount || 0) > 0) {
+    breakdownRows.push({
+      label: 'Insurance (Primary)',
+      amount: payment.amounts?.insurance1stAmount || 0
+    });
+  }
+  
+  if ((payment.amounts?.insurance2ndAmount || 0) > 0) {
+    breakdownRows.push({
+      label: 'Insurance (Secondary)',
+      amount: payment.amounts?.insurance2ndAmount || 0
+    });
+  }
+  
+  if ((payment.amounts?.popAmount || 0) > 0) {
+    breakdownRows.push({
+      label: 'Patient Out of Pocket (POP)',
+      amount: payment.amounts?.popAmount || 0
+    });
+  }
+  
+  if ((payment.amounts?.dpaAmount || 0) > 0) {
+    breakdownRows.push({
+      label: 'Direct Payment Authorization (DPA)',
+      amount: payment.amounts?.dpaAmount || 0
+    });
+  }
+
+  return (
+    <div className="mb-6">
+      <table className="w-full border-collapse border border-gray-900">
+        <thead>
           <tr>
-            <td className="border border-gray-900 px-3 py-2">Patient Out of Pocket (POP)</td>
-            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts?.popAmount || 0)}</td>
-            <td className="border border-gray-900 px-3 py-2 text-center">-</td>
+            <th className="border border-gray-900 px-3 py-2 text-left font-bold bg-white">PAYMENT TYPE</th>
+            <th className="border border-gray-900 px-3 py-2 text-right font-bold bg-white">AMOUNT</th>
+            <th className="border border-gray-900 px-3 py-2 text-center font-bold bg-white">DATE</th>
           </tr>
-        )}
-        {(payment.amounts?.dpaAmount || 0) > 0 && (
+        </thead>
+        <tbody>
+          {/* Main payment row with full amount and date */}
           <tr>
-            <td className="border border-gray-900 px-3 py-2">Direct Payment Authorization (DPA)</td>
-            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts?.dpaAmount || 0)}</td>
-            <td className="border border-gray-900 px-3 py-2 text-center">-</td>
+            <td className="border border-gray-900 px-3 py-2">{payment.paymentType ? PaymentApiService.getPaymentTypeDescription(payment.paymentType) : 'N/A'}</td>
+            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts?.totalPaymentAmount || payment.total || 0)}</td>
+            <td className="border border-gray-900 px-3 py-2 text-center">
+              {PaymentApiService.formatDate(payment.paymentDate)}
+            </td>
           </tr>
-        )}
-        {(payment.amounts?.insurance1stAmount || 0) > 0 && (
-          <tr>
-            <td className="border border-gray-900 px-3 py-2">Insurance (Primary)</td>
-            <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(payment.amounts?.insurance1stAmount || 0)}</td>
-            <td className="border border-gray-900 px-3 py-2 text-center">-</td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
-);
+          
+          {/* Breakdown rows with amounts and "-" for date */}
+          {breakdownRows.map((row, index) => (
+            <tr key={`breakdown-${index}`}>
+              <td className="border border-gray-900 px-3 py-2">{row.label}</td>
+              <td className="border border-gray-900 px-3 py-2 text-right">{PaymentApiService.formatCurrency(row.amount)}</td>
+              <td className="border border-gray-900 px-3 py-2 text-center">-</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 // Universal total section - simplified format
 const UniversalTotalSection = ({ payment }: { payment: Payment }) => (

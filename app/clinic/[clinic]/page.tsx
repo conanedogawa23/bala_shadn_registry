@@ -72,7 +72,7 @@ export default function ClinicPage() {
       href: generateLink('clinic', 'orders', clinicSlug),
       icon: TrendingUp,
       description: 'Process orders',
-      count: '0', // No order data in DB analysis
+      count: formatNumber(clinic.totalOrders ?? 0),
       disabled: clinic.status === 'no-data',
     },
     {

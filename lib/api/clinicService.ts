@@ -18,6 +18,7 @@ export interface FullClinicData {
   status: 'active' | 'inactive' | 'historical' | 'no-data';
   lastActivity?: string;
   totalAppointments: number;
+  totalOrders: number;
   clientCount: number;
   description: string;
 }

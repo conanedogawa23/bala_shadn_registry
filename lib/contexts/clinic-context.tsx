@@ -100,6 +100,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
             status: clinic.status,
             lastActivity: clinic.lastActivity,
             totalAppointments: clinic.totalAppointments,
+            totalOrders: clinic.totalOrders,
             clientCount: clinic.clientCount,
             description: clinic.description
           };

@@ -327,7 +327,7 @@ export default function LoginPage() {
             )}
             
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" suppressHydrationWarning>
                 <FormField
                   control={form.control}
                   name="identifier"
@@ -335,7 +335,7 @@ export default function LoginPage() {
                     <FormItem>
                       <FormLabel className="text-gray-700 font-medium">Email</FormLabel>
                       <FormControl>
-                        <div className="relative">
+                        <div className="relative" suppressHydrationWarning>
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                           <Input 
                             placeholder="you@example.com" 
@@ -365,7 +365,7 @@ export default function LoginPage() {
                         </Link>
                       </div>
                       <FormControl>
-                        <div className="relative">
+                        <div className="relative" suppressHydrationWarning>
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                           <Input 
                             type={showPassword ? "text" : "password"}

@@ -88,23 +88,39 @@ export default function InvoicePage() {
       }
       
       setPayment(paymentData);
-      setClinicInfo({
-        name: clinicData.name,
-        displayName: clinicData.displayName,
-        address: clinicData.address,
-        city: clinicData.city,
-        province: clinicData.province,
-        postalCode: clinicData.postalCode,
-        phone: clinicData.phone || '(416) 555-0123', // Use clinic data or default
-        fax: clinicData.fax || '(416) 555-0124'
-      });
-      setClientInfo({
-        name: paymentData.clientName || 'Unknown Client',
-        address: '',
-        city: '',
-        province: '',
-        postalCode: ''
-      });
+      
+      // Use clinic data from backend if available, otherwise fallback to context
+      if (paymentData.clinicData) {
+        console.log('Clinic data received from backend:', {
+          name: paymentData.clinicData.name,
+          hasLogo: !!paymentData.clinicData.logo
+        });
+        setClinicInfo(paymentData.clinicData);
+      } else {
+        setClinicInfo({
+          name: clinicData.name,
+          displayName: clinicData.displayName,
+          address: clinicData.address,
+          city: clinicData.city,
+          province: clinicData.province,
+          postalCode: clinicData.postalCode,
+          phone: clinicData.phone || '(416) 555-0123',
+          fax: clinicData.fax || '(416) 555-0124'
+        });
+      }
+      
+      // Use client data from backend if available, otherwise use fallback
+      if (paymentData.clientData) {
+        setClientInfo(paymentData.clientData);
+      } else {
+        setClientInfo({
+          name: paymentData.clientName || 'Unknown Client',
+          address: '',
+          city: '',
+          province: '',
+          postalCode: ''
+        });
+      }
     } catch (err) {
       console.error('Error loading invoice data:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load invoice';
@@ -180,16 +196,17 @@ export default function InvoicePage() {
     );
   }
 
-  // Create default clinic info with proper types
+  // Create default clinic info with proper types - prioritize backend data
   const defaultClinicInfo = {
-    name: (clinicInfo as Record<string, string>)?.name || clinicData?.name || '',
-    displayName: (clinicInfo as Record<string, string>)?.displayName || clinicData?.displayName || '',
-    address: (clinicInfo as Record<string, string>)?.address || clinicData?.address || '',
-    city: (clinicInfo as Record<string, string>)?.city || clinicData?.city || '',
-    province: (clinicInfo as Record<string, string>)?.province || clinicData?.province || '',
-    postalCode: (clinicInfo as Record<string, string>)?.postalCode || clinicData?.postalCode || '',
-    phone: (clinicInfo as Record<string, string>)?.phone || '',
-    fax: (clinicInfo as Record<string, string>)?.fax || ''
+    name: (clinicInfo as any)?.name || '',
+    displayName: (clinicInfo as any)?.displayName || '',
+    address: (clinicInfo as any)?.address || '',
+    city: (clinicInfo as any)?.city || '',
+    province: (clinicInfo as any)?.province || '',
+    postalCode: (clinicInfo as any)?.postalCode || '',
+    phone: (clinicInfo as any)?.phone || '',
+    fax: (clinicInfo as any)?.fax || '',
+    logo: (clinicInfo as any)?.logo || undefined  // Include logo from backend
   };
 
   const defaultClientInfo = {
