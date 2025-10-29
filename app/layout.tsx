@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import NavMenu from "./nav-menu";
+import NavigationWrapper from "@/components/navigation-wrapper";
 import { ClinicProvider } from "@/lib/contexts/clinic-context";
 import { AuthSync } from "@/components/auth-sync";
 
@@ -28,7 +28,7 @@ export default function RootLayout({
       <body className={cn(inter.className, "min-h-screen bg-slate-50 flex flex-col")}>
         <AuthSync />
         <ClinicProvider>
-          <NavMenu />
+          <NavigationWrapper />
           <main className="flex-1 overflow-auto">
             {children}
           </main>
