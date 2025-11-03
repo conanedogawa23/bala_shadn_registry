@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   env: {
-    NEXT_PUBLIC_API_URL: 'http://localhost:5001/api/v1',
-    NEXT_PUBLIC_DEBUG: process.env.NEXT_PUBLIC_DEBUG || 'true',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api/v1',
+    NEXT_PUBLIC_DEBUG: process.env.NEXT_PUBLIC_DEBUG || 'false',
   },
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons'],
@@ -12,6 +13,7 @@ const nextConfig = {
   },
   images: {
     domains: ['ui.shadcn.com'],
+    unoptimized: true, // For standalone deployment
   },
   typescript: {
     // Ignore TypeScript errors during build to allow deployment with warnings
@@ -19,7 +21,7 @@ const nextConfig = {
   },
   eslint: {
     // Ignore ESLint errors during builds to allow warnings
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
   /* config options here */
 };

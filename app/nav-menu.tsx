@@ -144,13 +144,35 @@ export default function NavMenu() {
   // Get user's notification preferences if available
   const notificationEnabled = userData?.accountSettings?.notificationSettings?.appointmentReminders || false;
   
+  // Debug: Log selected clinic and logo status
+  React.useEffect(() => {
+    if (selectedClinic) {
+      console.log('🏥 Selected clinic in nav:', {
+        name: selectedClinic.name,
+        displayName: selectedClinic.displayName,
+        hasLogo: !!selectedClinic.logo,
+        hasLogoData: !!selectedClinic.logo?.data,
+        logoDataLength: selectedClinic.logo?.data?.length || 0,
+        logoContentType: selectedClinic.logo?.contentType
+      });
+    }
+  }, [selectedClinic]);
+  
   return (
     <nav className="bg-white border-b">
       <div className="max-w-8xl mx-auto px-1 sm:px-2 lg:px-3">
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="font-bold text-xl" style={{ color: themeColors.primary }}>Body Bliss Visio</Link>
+              {selectedClinic?.logo?.data ? (
+                <Link href="/" className="flex items-center">
+                  <img 
+                    src={`data:${selectedClinic.logo.contentType};base64,${selectedClinic.logo.data}`}
+                    alt={`${selectedClinic.displayName} logo`}
+                    className="h-10 w-auto object-contain"
+                  />
+                </Link>
+              ) : null}
             </div>
             
             {/* Clinic Selector */}

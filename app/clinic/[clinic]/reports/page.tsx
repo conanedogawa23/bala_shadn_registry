@@ -74,11 +74,35 @@ export default function ReportsPage() {
     return availableClinics.find(c => c.name === clinicSlug);
   }, [clinicSlug, availableClinics]);
   
-  // Get the proper backend clinic name for API calls
-  // MongoDB expects lowercase names (e.g., 'bodyblissphysio' not 'BodyBlissPhysio')
+  /** 
+   * CRITICAL: MongoDB Collection Clinic Name Formats
+   * ================================================
+   * The database uses DIFFERENT clinic name formats in different collections:
+   * 
+   * 1. ORDERS Collection: Uses slug format (lowercase, no spaces)
+   *    - Example: "bodyblissphysio", "bodyblissonecare"
+   *    - Source: clinic.name (URL slug)
+   *    - Used by: Revenue Analytics, Product Performance, Order queries
+   * 
+   * 2. CLIENTS/APPOINTMENTS Collections: Uses display format (mixed case, spaces allowed)
+   *    - Example: "BodyBlissPhysio", "BodyBlissOneCare", "Century Care"
+   *    - Source: clinic.backendName (from ClinicController.getBackendClinicName)
+   *    - Used by: Client queries, Appointment queries
+   * 
+   * WHY: Historical data migration resulted in inconsistent naming across collections.
+   * The backend ClinicService.slugToClinicName handles slug→name conversion for orders,
+   * while ClinicController.getBackendClinicName provides the correct name for clients.
+   * 
+   * NEVER use clinic.displayName for queries - it's for UI display only!
+   */
+  const orderClinicName = useMemo(() => {
+    // For orders, use the slug (clinic.name) - lowercase format
+    return clinic?.name || "";
+  }, [clinic]);
+
   const backendClinicName = useMemo(() => {
-    const name = clinic?.backendName || clinic?.name || "";
-    return name.toLowerCase().replace(/\s+/g, '');
+    // For clients/appointments, use backendName - proper case format
+    return clinic?.backendName || clinic?.name || "";
   }, [clinic]);
 
   const [selectedPeriod, setSelectedPeriod] = useState('last6months');
@@ -168,7 +192,8 @@ export default function ReportsPage() {
 
 
 
-  // Fetch real analytics data
+  // Fetch real analytics data using correct clinic names for each collection
+  // Orders use slug format, Clients use backendName format
   const { 
     analytics: revenueAnalytics, 
     loading: revenueLoading, 
@@ -178,10 +203,10 @@ export default function ReportsPage() {
     avgOrderValue,
     refetch: refetchRevenue
   } = useRevenueAnalytics({
-    clinicName: clinic?.name || "",
+    clinicName: orderClinicName,  // Orders use slug format
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
-    autoFetch: !!clinic?.name && dateRangeValid
+    autoFetch: !!orderClinicName && dateRangeValid
   });
 
   const { 
@@ -200,8 +225,8 @@ export default function ReportsPage() {
     loading: ordersLoading, 
     error: ordersError 
   } = useOrdersByClinic({
-    clinicName: clinic?.name || "",
-    autoFetch: !!clinic?.name
+    clinicName: orderClinicName,  // Orders use slug format
+    autoFetch: !!orderClinicName
   });
 
   const { 
@@ -229,8 +254,10 @@ export default function ReportsPage() {
           
           while (hasMore && currentPage <= maxPages) {
             const authToken = localStorage.getItem('authToken');
+            const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 
+              `${window.location.protocol}//${window.location.host}/api/v1`;
             const response = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/clients/clinic/${backendClinicName}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`,
+              `${apiBaseUrl}/clients/clinic/${backendClinicName}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`,
               {
                 headers: {
                   'Content-Type': 'application/json',
@@ -412,7 +439,7 @@ export default function ReportsPage() {
 
   // Force data refresh when date range changes - positioned after all hooks
   useEffect(() => {
-    if (clinic?.name && dateRangeValid) {
+    if (orderClinicName && dateRangeValid) {
       // Clear cache when date range changes to ensure fresh data
       if (typeof window !== 'undefined') {
         const cacheKeys = Object.keys(localStorage);
@@ -430,10 +457,10 @@ export default function ReportsPage() {
       
       return () => clearTimeout(timeoutId);
     }
-  }, [dateRange.startDate, dateRange.endDate, clinic?.name, dateRangeValid, refetchRevenue, refetchPerformance]);
+  }, [dateRange.startDate, dateRange.endDate, orderClinicName, dateRangeValid, refetchRevenue, refetchPerformance]);
 
   const handleExportAllReports = async () => {
-    if (!clinic?.name || isExporting) return;
+    if (!orderClinicName || isExporting) return;
     
     setIsExporting(true);
     const reportTypes = ['account-summary', 'payment-summary', 'timesheet', 'order-status', 'copay-summary', 'marketing-budget'];
@@ -443,7 +470,7 @@ export default function ReportsPage() {
       const exportPromises = reportTypes.map(reportType => 
         ReportApiService.exportReport(
           reportType,
-          clinic.name,
+          orderClinicName,  // Use order clinic name for exports
           selectedExportFormat,
           {
             startDate: new Date(dateRange.startDate),

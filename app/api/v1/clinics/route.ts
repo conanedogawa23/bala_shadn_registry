@@ -1,0 +1,53 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:5001/api/v1';
+
+/**
+ * GET /api/v1/clinics
+ * Fetch all available clinics
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const queryString = searchParams.toString();
+    const url = `${BACKEND_URL}/clinics${queryString ? `?${queryString}` : ''}`;
+    
+    const authToken = request.headers.get('authorization');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = authToken;
+    }
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      // Cache for 1 hour (clinics rarely change)
+      next: { revalidate: 3600, tags: ['clinics'] }
+    });
+    
+    const data = await response.json();
+    
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=300'
+      }
+    });
+  } catch (error) {
+    console.error('[API Route] GET /api/v1/clinics error:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: { 
+          message: error instanceof Error ? error.message : 'Internal server error',
+          code: 'INTERNAL_ERROR'
+        }
+      },
+      { status: 500 }
+    );
+  }
+}
+

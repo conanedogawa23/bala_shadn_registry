@@ -88,6 +88,14 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
           // Ensure name is properly set - use API name or derive from displayName
           const clinicName = clinic.name || clinic.displayName.toLowerCase().replace(/\s+/g, '');
           
+          // Debug: Log logo data for each clinic
+          console.log(`🖼️ Clinic ${clinicName} logo:`, {
+            hasLogo: !!clinic.logo,
+            hasData: !!clinic.logo?.data,
+            dataLength: clinic.logo?.data?.length || 0,
+            contentType: clinic.logo?.contentType
+          });
+          
           return {
             id: clinic.id,
             name: clinicName,
@@ -102,7 +110,8 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
             totalAppointments: clinic.totalAppointments,
             totalOrders: clinic.totalOrders,
             clientCount: clinic.clientCount,
-            description: clinic.description
+            description: clinic.description,
+            logo: clinic.logo || null
           };
         });
         

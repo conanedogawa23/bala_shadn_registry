@@ -22,7 +22,17 @@ interface RequestOptions extends RequestInit {
 }
 
 export abstract class BaseApiService {
-  protected static readonly API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
+  protected static getApiBaseUrl(): string {
+    // In browser, construct URL from current origin to avoid CORS
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/api/v1`;
+    }
+    // Server-side or build time
+    return process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+  }
+  protected static get API_BASE_URL(): string {
+    return this.getApiBaseUrl();
+  }
   protected static readonly DEFAULT_TIMEOUT = 30000; // 30 seconds
   
   /**

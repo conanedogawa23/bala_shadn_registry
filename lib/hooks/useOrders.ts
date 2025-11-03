@@ -1,3 +1,14 @@
+/**
+ * @deprecated This hook is deprecated in favor of Server Components with server-side data fetching.
+ * For new pages, use fetchOrdersByClinic from '@/lib/server/data-fetchers' in Server Components.
+ * This hook remains for backward compatibility with existing client-side implementations.
+ * 
+ * Migration Guide:
+ * - Replace useOrders hook with fetchOrdersByClinic in Server Components
+ * - Move interactive logic to separate Client Components
+ * - See app/clinic/[clinic]/orders/page.tsx for reference implementation
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import {
   OrderService,

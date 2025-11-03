@@ -15,6 +15,12 @@ export interface Clinic {
   totalOrders?: number;
   clientCount?: number;
   description?: string;
+  logo?: {
+    data: string;
+    contentType: string;
+    filename: string;
+    uploadedAt: Date;
+  } | null;
 }
 
 export interface ClinicStats {

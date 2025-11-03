@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 
 export default function AccountSettingsPage() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -38,11 +38,6 @@ export default function AccountSettingsPage() {
     
     setSuccessMessage("Your password has been changed successfully.");
     setIsChangingPassword(false);
-  };
-
-  const handleLogout = () => {
-    logout();
-    router.push("/login");
   };
 
   return (
@@ -180,28 +175,6 @@ export default function AccountSettingsPage() {
           </CardFooter>
         </Card>
       </div>
-      
-      <Card className="mt-6 shadow-sm border border-gray-200">
-        <CardHeader className="bg-slate-50 pb-3 pt-4">
-          <CardTitle className="text-base font-medium text-red-600">Danger Zone</CardTitle>
-          <CardDescription>Actions that affect your account status</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-4 pb-4 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between p-4 rounded-md bg-red-50 border border-red-200">
-            <div>
-              <h3 className="font-medium text-red-800">Sign Out from All Devices</h3>
-              <p className="text-sm text-red-600 mt-1">This will sign you out from all devices where you&apos;re currently logged in</p>
-            </div>
-            <Button 
-              variant="outline"
-              className="mt-3 md:mt-0"
-              onClick={handleLogout}
-            >
-              Sign Out
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
       
       <div className="mt-6 text-center md:text-left">
         <Button 

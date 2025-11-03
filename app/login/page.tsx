@@ -36,12 +36,18 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-// API URL - use environment variable or fallback to localhost with /api/v1 path
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
+// API URL - construct from window.location to avoid CORS issues
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api/v1`;
+  }
+  return '/api/v1';
+};
 
 // Login API call
 async function loginAPI(email: string, password: string, rememberMe: boolean) {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  const apiUrl = getApiUrl();
+  const response = await fetch(`${apiUrl}/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -50,7 +56,7 @@ async function loginAPI(email: string, password: string, rememberMe: boolean) {
       email,
       password,
       rememberMe,
-      deviceId: crypto.randomUUID()
+      deviceId: typeof window !== 'undefined' && window.crypto?.randomUUID ? window.crypto.randomUUID() : `${Date.now()}-${Math.random()}`
     }),
   });
 

@@ -1,3 +1,14 @@
+/**
+ * @deprecated This hook is deprecated in favor of Server Components with server-side data fetching.
+ * For new pages, use fetchPaymentsByClinic from '@/lib/server/data-fetchers' in Server Components.
+ * This hook remains for backward compatibility with existing client-side implementations.
+ * 
+ * Migration Guide:
+ * - Replace usePayments hook with fetchPaymentsByClinic in Server Components
+ * - Move interactive logic to separate Client Components
+ * - See app/clinic/[clinic]/payments/page.tsx for reference implementation
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { 
   PaymentApiService, 

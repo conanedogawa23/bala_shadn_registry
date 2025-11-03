@@ -137,6 +137,34 @@ export interface Payment {
       status: string;
     };
   };
+  
+  // Client Data (populated by backend for invoice display)
+  clientData?: {
+    name: string;
+    address: string;
+    city: string;
+    province: string;
+    postalCode: string;
+    phone: string;
+    email: string;
+  } | null;
+  
+  // Clinic Data (populated by backend for invoice display)
+  clinicData?: {
+    name: string;
+    displayName: string;
+    address: string;
+    city: string;
+    province: string;
+    postalCode: string;
+    phone: string;
+    fax: string;
+    logo?: {
+      data: string;
+      contentType: string;
+      filename: string;
+    };
+  } | null;
 }
 
 // API Response Interfaces
@@ -309,24 +337,24 @@ export class PaymentApiService extends BaseApiService {
         throw new Error('Payment ID is required');
       }
 
-      const response = await this.request<PaymentResponse>(`${this.baseUrl}/${id}`);
+      const response = await this.request<Payment>(`${this.baseUrl}/${id}`);
       
       if (response.success && response.data) {
-        // Transform response to ensure compatibility
-        const payment = response.data;
+        // Transform response data to ensure compatibility
+        const payment: Payment = response.data;
         
-        // Add computed fields for backward compatibility
+        // Add computed fields for backward compatibility (these are optional in Payment interface)
         if (payment.amounts) {
           payment.total = payment.amounts.totalPaymentAmount;
           payment.amountPaid = payment.amounts.totalPaid;
           payment.amountDue = payment.amounts.totalOwed;
         }
         
-        // Set paymentId and invoiceNumber if not present
+        // Set paymentId and invoiceNumber if not present (these are optional in Payment interface)
         payment.paymentId = payment.paymentId || payment._id;
         payment.invoiceNumber = payment.invoiceNumber || payment.paymentNumber;
         
-        return response;
+        return { success: true, data: payment };
       }
       
       throw new Error('Payment not found');
