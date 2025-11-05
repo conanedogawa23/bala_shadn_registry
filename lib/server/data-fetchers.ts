@@ -422,9 +422,9 @@ export async function fetchClinics(
     tags = ['clinics']
   } = options;
 
-  const endpoint = '/clinics';
+  const endpoint = '/clinics/frontend-compatible';
 
-  const response = await ServerApiClient.get<Clinic[]>(endpoint, {
+  const response = await ServerApiClient.get<any>(endpoint, {
     revalidate,
     tags
   });
@@ -433,7 +433,10 @@ export async function fetchClinics(
     throw new Error('Failed to fetch clinics');
   }
 
-  return response.data;
+  // The frontend-compatible endpoint returns { clinics: [...] }
+  const clinics = response.data.clinics || response.data;
+  
+  return Array.isArray(clinics) ? clinics : [clinics];
 }
 
 /**
