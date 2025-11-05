@@ -195,19 +195,39 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
   }, [pathname, router, loading, availableClinics, lastInitializedPath]);
 
   const handleSetSelectedClinic = (clinic: Clinic) => {
-    setSelectedClinic(clinic);
-    
-    // Update URL with new clinic
-    const clinicSlug = clinicToSlug(clinic.displayName);
-    const pathSegments = pathname.split('/');
-    
-    if (pathSegments[1] === 'clinic') {
-      // Replace clinic in existing clinic URL
-      const remainingPath = pathSegments.slice(3).join('/');
-      router.push(generateLink('clinic', remainingPath, clinicSlug));
-    } else {
-      // Redirect to clinic-specific homepage
-      router.push(generateLink('clinic', '', clinicSlug));
+    try {
+      // Validate clinic exists in available clinics
+      const clinicExists = availableClinics.some(c => c.id === clinic.id);
+      if (!clinicExists) {
+        console.error('Cannot switch to invalid clinic:', clinic);
+        return;
+      }
+
+      setSelectedClinic(clinic);
+      
+      // Update URL with new clinic
+      const clinicSlug = clinicToSlug(clinic.displayName);
+      const pathSegments = pathname.split('/');
+      
+      if (pathSegments[1] === 'clinic') {
+        // Replace clinic in existing clinic URL
+        const remainingPath = pathSegments.slice(3).join('/');
+        const newPath = generateLink('clinic', remainingPath, clinicSlug);
+        
+        // Clear any clinic-specific cached data
+        if (typeof window !== 'undefined') {
+          // Clear session storage for old clinic
+          sessionStorage.removeItem('clinic-cache');
+        }
+        
+        router.push(newPath);
+      } else {
+        // Redirect to clinic-specific homepage
+        router.push(generateLink('clinic', '', clinicSlug));
+      }
+    } catch (error) {
+      console.error('Error switching clinics:', error);
+      // Don't crash, just log the error and keep current clinic
     }
   };
 

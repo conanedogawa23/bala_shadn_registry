@@ -29,8 +29,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Plus, User, Calendar, Clock, DollarSign, AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { slugToClinic } from "@/lib/data/clinics";
 import { generateLink } from "@/lib/route-utils";
+import { useClinic } from "@/lib/contexts/clinic-context";
 
 // Import API services
 import { useClient, useProducts } from "@/lib/hooks";
@@ -43,8 +43,11 @@ export default function ClientOrderNewPage() {
   const clinic = params.clinic as string;
   const clientId = params.id as string;
   
-  // Get clinic data
-  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+  // Get clinic data from context
+  const { availableClinics } = useClinic();
+  const clinicData = useMemo(() => {
+    return availableClinics.find(c => c.name === clinic);
+  }, [clinic, availableClinics]);
   
   // Fetch client data using real API hook
   const { client, loading: clientLoading, error: clientError } = useClient({ 
@@ -55,17 +58,8 @@ export default function ClientOrderNewPage() {
   // Get the real clinic name that matches our MongoDB data
   const realClinicName = useMemo(() => {
     if (!clinicData) return '';
-    // Use clinic name directly from MongoDB without mapping
-    const clinicNameMap: Record<string, string> = {
-      'bodyblissphysio': 'bodyblissphysio',
-      'physio-bliss': 'Physio Bliss',
-      'ortholine-duncan-mills': 'Ortholine Duncan Mills',
-      'bodyblissoneCare': 'BodyBlissOneCare',
-      'markham-orthopedic': 'Markham Orthopedic',
-      'my-cloud': 'My Cloud',
-      'extremephysio': 'ExtremePhysio'
-    };
-    return clinicNameMap[clinicData.name] || clinicData.displayName || clinicData.name;
+    // Use backendName if available, otherwise use displayName
+    return clinicData.backendName || clinicData.displayName || clinicData.name;
   }, [clinicData]);
 
   // Fetch products for the specific clinic using real API
@@ -86,21 +80,47 @@ export default function ClientOrderNewPage() {
 
   // Filter products for current clinic if API doesn't filter correctly
   const availableProducts = useMemo(() => {
-    if (!products || products.length === 0) return [];
+    if (!products || products.length === 0) {
+      console.log('No products available from API');
+      return [];
+    }
     
-    // If we got no products from clinic-specific API, try to filter manually
-    return products.filter(product => {
+    console.log(`Filtering ${products.length} products for clinic: ${realClinicName}`);
+    
+    // Filter products that match this clinic
+    const filtered = products.filter(product => {
+      // Only include active products
+      if (product.status !== 'active') {
+        return false;
+      }
+      
       // Check if product is available for this clinic using the applicableClinics field
       if (product.applicableClinics && product.applicableClinics.length > 0) {
-        return product.applicableClinics.includes(realClinicName);
+        const matchesClinic = product.applicableClinics.some(
+          clinicName => clinicName.toLowerCase() === realClinicName.toLowerCase()
+        );
+        if (matchesClinic) return true;
       }
+      
       // Fallback to checking clinics field
       if (product.clinics && product.clinics.length > 0) {
-        return product.clinics.includes(realClinicName);
+        const matchesClinic = product.clinics.some(
+          clinicName => clinicName.toLowerCase() === realClinicName.toLowerCase()
+        );
+        if (matchesClinic) return true;
       }
-      // If no clinic restrictions, it's available to all
-      return true;
+      
+      // If no clinic restrictions and product is active, it's available to all
+      if ((!product.applicableClinics || product.applicableClinics.length === 0) && 
+          (!product.clinics || product.clinics.length === 0)) {
+        return true;
+      }
+      
+      return false;
     });
+    
+    console.log(`Found ${filtered.length} products available for ${realClinicName}`);
+    return filtered;
   }, [products, realClinicName]);
 
   const handleBack = () => {
@@ -407,11 +427,19 @@ export default function ClientOrderNewPage() {
                 <div className="text-center py-8 text-gray-500">
                   <AlertCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                   <p className="text-lg font-medium">No Services Available</p>
-                  <p>No services are configured for {clinicData?.name}.</p>
-                  <Button onClick={refetchProducts} variant="outline" className="mt-4">
-                    <RefreshCw size={16} className="mr-2" />
-                    Refresh Services
-                  </Button>
+                  <p>No services are configured for {clinicData?.displayName || clinicData?.name}.</p>
+                  <p className="text-sm mt-2">Backend clinic name: {realClinicName}</p>
+                  {products && products.length > 0 && (
+                    <p className="text-sm text-yellow-600 mt-2">
+                      {products.length} products loaded but none match this clinic
+                    </p>
+                  )}
+                  <div className="flex gap-2 justify-center mt-4">
+                    <Button onClick={refetchProducts} variant="outline">
+                      <RefreshCw size={16} className="mr-2" />
+                      Refresh Services
+                    </Button>
+                  </div>
                 </div>
               )}
 

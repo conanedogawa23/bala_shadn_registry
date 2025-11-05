@@ -10,19 +10,30 @@ import { FormInput } from "@/components/ui/form/FormInput";
 import { FormSelect } from "@/components/ui/form/FormSelect";
 import { FormDatePicker } from "@/components/ui/form/FormDatePicker";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { ArrowLeft, Save, Edit3 } from "lucide-react";
+import { ArrowLeft, Save, Edit3, AlertTriangle } from "lucide-react";
+import { PaymentApiService, PaymentMethod, PaymentStatus, PaymentType } from "@/lib/api/paymentService";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Define the payment schema using zod for validation
 const paymentSchema = z.object({
   clientName: z.string().min(2, { message: "Client name is required" }),
-  orderNumber: z.string().min(1, { message: "Order number is required" }),
-  amount: z.string().min(1, { message: "Amount is required" }),
-  paymentMethod: z.enum(["cash", "credit", "debit", "cheque", "insurance"], { required_error: "Payment method is required" }),
+  orderNumber: z.string().optional(),
+  amount: z.coerce.number({ invalid_type_error: "Amount must be a valid number" }),
+  paymentMethod: z.nativeEnum(PaymentMethod, { required_error: "Payment method is required" }),
   paymentDate: z.date({ required_error: "Payment date is required" }),
-  status: z.enum(["pending", "processing", "completed", "failed", "refunded"], { required_error: "Status is required" }),
+  status: z.nativeEnum(PaymentStatus, { required_error: "Status is required" }),
+  paymentType: z.nativeEnum(PaymentType, { required_error: "Payment type is required" }),
   transactionId: z.string().optional(),
   notes: z.string().optional(),
-  practitioner: z.string().min(1, { message: "Practitioner is required" }),
 });
 
 // Type definitions
@@ -37,44 +48,121 @@ export default function EditPaymentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [paymentData, setPaymentData] = useState<PaymentFormValues | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showNegativeAmountDialog, setShowNegativeAmountDialog] = useState(false);
+  const [pendingPaymentData, setPendingPaymentData] = useState<PaymentFormValues | null>(null);
 
-  // Mock data - in real app, this would come from an API
+  // Fetch real payment data from API
   useEffect(() => {
     const fetchPayment = async () => {
       setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        setPaymentData({
-          clientName: "Jane Smith",
-          orderNumber: "ORD-001234",
-          amount: "85.00",
-          paymentMethod: "credit",
-          paymentDate: new Date("2024-01-20"),
-          status: "completed",
-          transactionId: "TXN-567890",
-          notes: "Payment processed successfully",
-          practitioner: "Dr. Michael Chen",
-        });
+      setError(null);
+      
+      try {
+        const response = await PaymentApiService.getPaymentById(paymentId);
+        
+        if (response.success && response.data) {
+          const payment = response.data;
+          
+          setPaymentData({
+            clientName: payment.clientName || '',
+            orderNumber: payment.orderNumber || '',
+            amount: payment.amounts.totalPaymentAmount,
+            paymentMethod: payment.paymentMethod,
+            paymentDate: new Date(payment.paymentDate),
+            status: payment.status,
+            paymentType: payment.paymentType,
+            transactionId: payment.referringNo || '',
+            notes: payment.notes || '',
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch payment:", err);
+        setError(err instanceof Error ? err.message : 'Failed to load payment');
+      } finally {
         setIsLoading(false);
-      }, 1000);
+      }
     };
 
     fetchPayment();
   }, [paymentId]);
 
   // Handle payment update
-  const handlePaymentSubmit = React.useCallback((data: PaymentFormValues) => {
+  const handlePaymentSubmit = React.useCallback(async (data: PaymentFormValues) => {
+    // Check for negative amount and show confirmation dialog
+    if (data.amount < 0) {
+      setPendingPaymentData(data);
+      setShowNegativeAmountDialog(true);
+      return;
+    }
+
+    await submitPaymentUpdate(data);
+  }, []);
+
+  // Actually submit the payment update
+  const submitPaymentUpdate = async (data: PaymentFormValues) => {
     setIsSubmitting(true);
+    setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Payment updated for clinic:", clinic, "Payment ID:", paymentId, data);
-      setIsSubmitting(false);
+    try {
+      const updateData = {
+        clientName: data.clientName,
+        orderNumber: data.orderNumber,
+        paymentMethod: data.paymentMethod,
+        paymentType: data.paymentType,
+        status: data.status,
+        amounts: {
+          totalPaymentAmount: data.amount,
+          totalPaid: data.amount >= 0 ? data.amount : 0,
+          totalOwed: data.amount < 0 ? Math.abs(data.amount) : 0,
+          popAmount: 0,
+          popfpAmount: 0,
+          dpaAmount: 0,
+          dpafpAmount: 0,
+          cob1Amount: 0,
+          cob2Amount: 0,
+          cob3Amount: 0,
+          insurance1stAmount: 0,
+          insurance2ndAmount: 0,
+          insurance3rdAmount: 0,
+          refundAmount: data.amount < 0 ? Math.abs(data.amount) : 0,
+          salesRefundAmount: 0,
+          writeoffAmount: 0,
+          noInsurFpAmount: 0,
+          badDebtAmount: 0,
+        },
+        referringNo: data.transactionId,
+        notes: data.notes,
+      };
+
+      await PaymentApiService.updatePayment(paymentId, updateData);
+      
+      console.log("Payment updated successfully for clinic:", clinic, "Payment ID:", paymentId);
       
       // Navigate back to payments page
       router.push(`/clinic/${clinic}/payments`);
-    }, 1000);
-  }, [clinic, paymentId, router]);
+    } catch (err) {
+      console.error("Failed to update payment:", err);
+      setError(err instanceof Error ? err.message : 'Failed to update payment');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle negative amount confirmation
+  const handleConfirmNegativeAmount = async () => {
+    setShowNegativeAmountDialog(false);
+    if (pendingPaymentData) {
+      await submitPaymentUpdate(pendingPaymentData);
+      setPendingPaymentData(null);
+    }
+  };
+
+  // Handle negative amount cancellation
+  const handleCancelNegativeAmount = () => {
+    setShowNegativeAmountDialog(false);
+    setPendingPaymentData(null);
+  };
 
   // Handle back navigation
   const handleBack = () => {
@@ -86,6 +174,23 @@ export default function EditPaymentPage() {
       <div className="container mx-auto py-8 px-4 sm:px-6">
         <div className="flex items-center justify-center min-h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex flex-col items-center justify-center min-h-64 gap-4">
+          <div className="text-red-600 text-center">
+            <h2 className="text-xl font-semibold mb-2">Error Loading Payment</h2>
+            <p>{error}</p>
+          </div>
+          <Button onClick={handleBack} variant="outline">
+            <ArrowLeft size={16} className="mr-2" />
+            Back to Payments
+          </Button>
         </div>
       </div>
     );
@@ -108,8 +213,33 @@ export default function EditPaymentPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 sm:px-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+    <>
+      {/* Negative Amount Confirmation Dialog */}
+      <AlertDialog open={showNegativeAmountDialog} onOpenChange={setShowNegativeAmountDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              Negative Amount Detected
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to save a payment with a negative amount. This typically represents a refund or adjustment.
+              Are you sure you want to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelNegativeAmount}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmNegativeAmount}>
+              Confirm Refund/Adjustment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <div className="container mx-auto py-8 px-4 sm:px-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
@@ -177,11 +307,13 @@ export default function EditPaymentPage() {
                       name="paymentMethod"
                       label="Payment Method"
                       options={[
-                        { value: "cash", label: "Cash" },
-                        { value: "credit", label: "Credit Card" },
-                        { value: "debit", label: "Debit Card" },
-                        { value: "cheque", label: "Cheque" },
-                        { value: "insurance", label: "Insurance" },
+                        { value: PaymentMethod.CASH, label: "Cash" },
+                        { value: PaymentMethod.CREDIT_CARD, label: "Credit Card" },
+                        { value: PaymentMethod.DEBIT, label: "Debit" },
+                        { value: PaymentMethod.CHEQUE, label: "Cheque" },
+                        { value: PaymentMethod.INSURANCE, label: "Insurance" },
+                        { value: PaymentMethod.BANK_TRANSFER, label: "Bank Transfer" },
+                        { value: PaymentMethod.OTHER, label: "Other" },
                       ]}
                     />
                     
@@ -200,29 +332,34 @@ export default function EditPaymentPage() {
                       name="status"
                       label="Payment Status"
                       options={[
-                        { value: "pending", label: "Pending" },
-                        { value: "processing", label: "Processing" },
-                        { value: "completed", label: "Completed" },
-                        { value: "failed", label: "Failed" },
-                        { value: "refunded", label: "Refunded" },
+                        { value: PaymentStatus.PENDING, label: "Pending" },
+                        { value: PaymentStatus.COMPLETED, label: "Completed" },
+                        { value: PaymentStatus.PARTIAL, label: "Partial" },
+                        { value: PaymentStatus.FAILED, label: "Failed" },
+                        { value: PaymentStatus.REFUNDED, label: "Refunded" },
+                        { value: PaymentStatus.WRITEOFF, label: "Write-off" },
+                      ]}
+                    />
+                    
+                    <FormSelect
+                      name="paymentType"
+                      label="Payment Type"
+                      options={[
+                        { value: PaymentType.POP, label: "Patient Out of Pocket" },
+                        { value: PaymentType.POPFP, label: "POP Final Payment" },
+                        { value: PaymentType.DPA, label: "Direct Payment Authorization" },
+                        { value: PaymentType.DPAFP, label: "DPA Final Payment" },
+                        { value: PaymentType.INSURANCE_1ST, label: "1st Insurance" },
+                        { value: PaymentType.INSURANCE_2ND, label: "2nd Insurance" },
+                        { value: PaymentType.SALES_REFUND, label: "Sales Refund" },
+                        { value: PaymentType.WRITEOFF, label: "Write-off" },
                       ]}
                     />
                     
                     <FormInput
                       name="transactionId"
-                      label="Transaction ID"
+                      label="Transaction/Reference ID"
                       placeholder="TXN-567890"
-                    />
-                    
-                    <FormSelect
-                      name="practitioner"
-                      label="Practitioner"
-                      options={[
-                        { value: "Dr. Sarah Johnson", label: "Dr. Sarah Johnson" },
-                        { value: "Dr. Michael Chen", label: "Dr. Michael Chen" },
-                        { value: "Dr. Emily Davis", label: "Dr. Emily Davis" },
-                        { value: "Dr. David Wilson", label: "Dr. David Wilson" },
-                      ]}
                     />
                   </div>
                 </div>
@@ -277,6 +414,7 @@ export default function EditPaymentPage() {
           )}
         </FormWrapper>
       </Card>
-    </div>
+      </div>
+    </>
   );
 } 

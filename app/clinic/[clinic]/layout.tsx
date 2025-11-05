@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ClinicApiService, getFirstAvailableClinicSlug } from '@/lib/api/clinicService';
 import { useClinic } from '@/lib/contexts/clinic-context';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 interface ClinicLayoutProps {
   children: React.ReactNode;
@@ -133,14 +134,20 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
     );
   }
 
-  // Success state - render children with clinic context
+  // Success state - render children with clinic context wrapped in error boundary
   return (
-    <div className="min-h-screen bg-gray-50">
-
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto">
-        {children}
-      </main>
-    </div>
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('Clinic layout error:', error);
+        console.error('Error info:', errorInfo);
+      }}
+    >
+      <div className="min-h-screen bg-gray-50">
+        {/* Main content */}
+        <main className="max-w-7xl mx-auto">
+          {children}
+        </main>
+      </div>
+    </ErrorBoundary>
   );
 } 

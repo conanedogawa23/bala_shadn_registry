@@ -13,9 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FormWrapper } from "@/components/ui/form/FormWrapper";
 import { z } from "zod";
 import { useFieldArray, useWatch, useForm } from "react-hook-form";
-import { X, Plus } from "lucide-react";
-import { useEffect } from "react";
+import { X, Plus, AlertCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 /**
  * Zod schema for line items
@@ -150,6 +151,9 @@ function OrderFormContent({
     name: "lineItems",
   });
 
+  // Track original prices for each line item to detect overrides
+  const [originalPrices, setOriginalPrices] = useState<{[key: number]: number}>({});
+
   // Watch values for auto-calculations
   const lineItems = useWatch({
     control: form.control,
@@ -179,7 +183,20 @@ function OrderFormContent({
     if (selectedProduct) {
       form.setValue(`lineItems.${index}.productName`, selectedProduct.name);
       form.setValue(`lineItems.${index}.unitPrice`, selectedProduct.price);
+      
+      // Store the original price for this line item
+      setOriginalPrices(prev => ({
+        ...prev,
+        [index]: selectedProduct.price
+      }));
     }
+  };
+
+  // Check if price has been overridden
+  const isPriceOverridden = (index: number, currentPrice: number): boolean => {
+    const originalPrice = originalPrices[index];
+    if (originalPrice === undefined) return false;
+    return Math.abs(originalPrice - currentPrice) > 0.01; // Allow for floating point precision
   };
 
   return (
@@ -327,22 +344,38 @@ function OrderFormContent({
                 <FormField
                   control={form.control}
                   name={`lineItems.${index}.unitPrice`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Unit Price</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          {...field}
-                          disabled={isLoading}
-                          aria-label="Unit price"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const isOverridden = isPriceOverridden(index, Number(field.value));
+                    return (
+                      <FormItem>
+                        <FormLabel className="text-xs flex items-center gap-1">
+                          Unit Price
+                          {isOverridden && (
+                            <AlertCircle className="h-3 w-3 text-yellow-600" title="Price has been overridden" />
+                          )}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            {...field}
+                            disabled={isLoading}
+                            aria-label="Unit price"
+                            className={cn(
+                              isOverridden && "border-yellow-400 bg-yellow-50 focus:border-yellow-500"
+                            )}
+                          />
+                        </FormControl>
+                        {isOverridden && (
+                          <p className="text-xs text-yellow-600 mt-1">
+                            Original: ${originalPrices[index]?.toFixed(2)}
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 

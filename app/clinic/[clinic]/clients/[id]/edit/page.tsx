@@ -120,7 +120,10 @@ export default function EditClientPage() {
         const client: Client = await ClientApiService.getClientById(clientId);
         
         // API returns flattened structure - map directly
-        const fullName = `${client.firstName || ''} ${client.lastName || ''}`.trim();
+        // Handle both firstName/lastName and name field
+        const fullName = client.firstName && client.lastName 
+          ? `${client.firstName} ${client.lastName}`.trim()
+          : client.name || '';
         
         // Parse dateOfBirth from ISO string or birthday object
         let dateOfBirth = new Date();
@@ -339,9 +342,9 @@ export default function EditClientPage() {
       };
 
       // Call real API
-      await ClientApiService.updateClient(clientId, updateData);
+      const result = await ClientApiService.updateClient(clientId, updateData);
       
-      console.log("✅ Client updated successfully for clinic:", clinic, "Client ID:", clientId);
+      console.log("✅ Client updated successfully for clinic:", clinic, "Client ID:", clientId, result);
       
       // Navigate back to client detail page
       router.push(generateLink('clinic', `clients/${clientId}`, clinic));
@@ -416,7 +419,7 @@ export default function EditClientPage() {
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: themeColors.primary }}>
-              Edit Client #{clientId} - {clinic.replace('-', ' ')}
+              Edit Client: {clientData.name || `#${clientId}`}
             </h1>
             <p className="text-gray-600 mt-1">Update client information for {clinic.replace('-', ' ')} clinic</p>
           </div>
