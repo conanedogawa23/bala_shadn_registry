@@ -1,11 +1,11 @@
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   pagination?: {
     page: number;
@@ -78,7 +78,7 @@ export abstract class BaseApiService {
       try {
         result = await response.json();
       } catch (parseError) {
-        throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
+        throw new Error(`Failed to parse response as JSON: ${response.statusText}, ${parseError}`);
       }
       
       console.log(`[API] Response ${response.status}:`, result);
@@ -146,7 +146,7 @@ export abstract class BaseApiService {
   /**
    * Cache management utilities
    */
-  private static cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private static cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>();
   
   protected static getCached<T>(key: string): T | null {
     const cached = this.cache.get(key);
@@ -158,7 +158,7 @@ export abstract class BaseApiService {
       return null;
     }
     
-    return cached.data;
+    return cached.data as T;
   }
   
   protected static setCached<T>(key: string, data: T, ttlMs: number = 300000): void { // 5min default
