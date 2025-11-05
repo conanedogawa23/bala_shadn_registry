@@ -23,9 +23,9 @@ interface RequestOptions extends RequestInit {
 
 export abstract class BaseApiService {
   protected static getApiBaseUrl(): string {
-    // In browser, construct URL from current origin to avoid CORS
+    // Always use environment variable
     if (typeof window !== 'undefined') {
-      return `${window.location.origin}/api/v1`;
+      return process.env.NEXT_PUBLIC_API_URL || '/api/v1';
     }
     // Server-side or build time
     return process.env.NEXT_PUBLIC_API_URL || '/api/v1';

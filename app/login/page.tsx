@@ -36,12 +36,9 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-// API URL - construct from window.location to avoid CORS issues
+// API URL - use environment variable
 const getApiUrl = () => {
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin}/api/v1`;
-  }
-  return '/api/v1';
+  return process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 };
 
 // Login API call
