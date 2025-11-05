@@ -33,8 +33,32 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
         return;
       }
 
+      console.log('🔍 Validating clinic slug:', clinicSlug);
+      console.log('📋 Available clinics:', availableClinics.map(c => ({ name: c.name, displayName: c.displayName, backendName: c.backendName })));
+
+      // First check with context data (case-insensitive matching)
+      const localClinic = availableClinics.find(c => 
+        c.name.toLowerCase() === clinicSlug.toLowerCase() ||
+        c.displayName.toLowerCase().replace(/\s+/g, '') === clinicSlug.toLowerCase() ||
+        c.backendName?.toLowerCase() === clinicSlug.toLowerCase()
+      );
+
+      if (localClinic) {
+        console.log('✅ Found clinic in context:', localClinic);
+        setClinicInfo({
+          slug: clinicSlug,
+          name: localClinic.displayName,
+          backendName: localClinic.backendName || localClinic.displayName,
+          isActive: localClinic.status === 'active'
+        });
+        setValidationError(null);
+        setIsValidating(false);
+        return;
+      }
+
+      // If not found in context, try backend API validation
       try {
-        // First check with backend API for retained clinic validation
+        console.log('🔄 Trying backend validation for:', clinicSlug);
         const validationResult = await ClinicApiService.validateClinicSlug(clinicSlug);
         
         // Backend validation successful
@@ -47,29 +71,19 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
         
         setValidationError(null);
       } catch (error) {
-        console.error('Clinic validation failed:', error);
+        console.error('❌ Clinic validation failed:', error);
         
-        // Try fallback validation with context data
-        const localClinic = availableClinics.find(c => c.name === clinicSlug);
-        
-        if (localClinic) {
-          // Clinic exists in context but backend validation failed
-          setValidationError(
-            `Clinic "${localClinic.displayName}" is not available in the current system. Please select from available clinics.`
-          );
-        } else {
-          // Clinic doesn't exist at all
-          setValidationError(
-            `Clinic "${clinicSlug}" not found. Please select from available clinics.`
-          );
-        }
+        // Clinic not found anywhere
+        setValidationError(
+          `Clinic "${clinicSlug}" not found. Please select from available clinics.`
+        );
 
         // Redirect to first available clinic
         try {
           const firstAvailableSlug = await getFirstAvailableClinicSlug();
           if (firstAvailableSlug && firstAvailableSlug !== clinicSlug) {
-            console.log(`Redirecting to available clinic: ${firstAvailableSlug}`);
-            router.replace(`/clinic/${firstAvailableSlug}/payments`);
+            console.log(`🔄 Redirecting to available clinic: ${firstAvailableSlug}`);
+            router.replace(`/clinic/${firstAvailableSlug}/clients`);
             return;
           }
         } catch (redirectError) {
@@ -81,8 +95,11 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
     };
 
     // Wait for clinic context to load before validating
-    if (!clinicLoading) {
+    if (!clinicLoading && availableClinics.length > 0) {
       validateClinic();
+    } else if (!clinicLoading && availableClinics.length === 0) {
+      setValidationError('No clinics available in the system');
+      setIsValidating(false);
     }
   }, [clinicSlug, router, availableClinics, clinicLoading]);
 
