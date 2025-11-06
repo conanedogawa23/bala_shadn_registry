@@ -8,6 +8,8 @@
  * - Type-safe API responses
  */
 
+import { cookies } from 'next/headers';
+
 interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -66,11 +68,16 @@ export class ServerApiClient {
     const backendUrl = this.getBackendUrl();
     const url = `${backendUrl}${endpoint}`;
     
+    // Read accessToken from HttpOnly cookie (server-side only)
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('accessToken')?.value;
+    
     // Build fetch configuration
     const config: RequestInit = {
       method,
       headers: {
         'Content-Type': 'application/json',
+        ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
         ...fetchOptions.headers,
       },
       ...fetchOptions,

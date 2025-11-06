@@ -179,20 +179,19 @@ export const updateUserProfile = (userData: Partial<User>): boolean => {
 };
 
 // Login the user (call this after successful authentication)
+// Note: Backend now sets HttpOnly cookies automatically for security
 export const login = (userData: User, token?: string) => {
   if (typeof window === "undefined") return;
   
-  // Store in localStorage
+  // Store in localStorage for client-side UI state only
   localStorage.setItem("isAuthenticated", "true");
   localStorage.setItem("user", JSON.stringify(userData));
   
   if (token) {
     localStorage.setItem("authToken", token);
-    setCookie("authToken", token, 7); // Store token in cookie for 7 days
   }
   
-  // Store authentication state in cookie for middleware access
-  setCookie("isAuthenticated", "true", 7);
+  // Backend sets httpOnly cookies automatically - no need to set client-side cookies
 };
 
 // Logout the user

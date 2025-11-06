@@ -46,6 +46,7 @@ async function loginAPI(email: string, password: string, rememberMe: boolean) {
   const apiUrl = getApiUrl();
   const response = await fetch(`${apiUrl}/auth/login`, {
     method: 'POST',
+    credentials: 'include', // Important: allows HttpOnly cookies to be set
     headers: {
       'Content-Type': 'application/json',
     },
