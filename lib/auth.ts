@@ -179,8 +179,8 @@ export const updateUserProfile = (userData: Partial<User>): boolean => {
 };
 
 // Login the user (call this after successful authentication)
-// Note: Backend now sets HttpOnly cookies automatically for security
-export const login = (userData: User, token?: string) => {
+// Note: Backend sets HttpOnly cookies, but we also set client-side cookies for Next.js middleware
+export const login = (userData: User, token?: string, refreshToken?: string) => {
   if (typeof window === "undefined") return;
   
   // Store in localStorage for client-side UI state only
@@ -189,9 +189,18 @@ export const login = (userData: User, token?: string) => {
   
   if (token) {
     localStorage.setItem("authToken", token);
+    // Set non-HttpOnly cookie for Next.js middleware to read
+    setCookie("accessToken", token, 1/96); // 15 minutes (1/96 of a day)
   }
   
-  // Backend sets httpOnly cookies automatically - no need to set client-side cookies
+  if (refreshToken) {
+    localStorage.setItem("refreshToken", refreshToken);
+    // Set non-HttpOnly cookie for Next.js middleware to read
+    setCookie("refreshToken", refreshToken, 7); // 7 days
+  }
+  
+  // Backend sets httpOnly cookies for API security
+  // We also set non-HttpOnly cookies for Next.js middleware authentication
 };
 
 // Logout the user
@@ -202,10 +211,14 @@ export const logout = () => {
   localStorage.removeItem("isAuthenticated");
   localStorage.removeItem("user");
   localStorage.removeItem("authToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("rememberMe");
   
-  // Clear cookies
+  // Clear cookies (both client-side and server-side will be cleared)
   deleteCookie("isAuthenticated");
   deleteCookie("authToken");
+  deleteCookie("accessToken");
+  deleteCookie("refreshToken");
 };
 
 // Authentication hook for protected routes

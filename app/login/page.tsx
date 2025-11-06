@@ -202,7 +202,7 @@ export default function LoginPage() {
             loyaltyPoints: 0,
             referrals: 0
           }
-        }, accessToken);
+        }, accessToken, refreshToken);
         
         console.log("Login successful, access token:", accessToken.substring(0, 20) + "...");
         
@@ -210,9 +210,12 @@ export default function LoginPage() {
         const urlParams = new URLSearchParams(window.location.search);
         const redirectUrl = urlParams.get('redirect');
         
-        // Reset form and navigate
+        // Reset form
         form.reset();
-        router.push(redirectUrl || "/");
+        
+        // Use window.location.href instead of router.push to ensure cookies are sent with the request
+        // This forces a full page reload which allows the middleware to read the newly set cookies
+        window.location.href = redirectUrl || "/";
       } else {
         setAuthError(response.error?.message || "Login failed. Please try again.");
       }
