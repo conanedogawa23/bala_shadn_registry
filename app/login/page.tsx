@@ -346,6 +346,9 @@ export default function LoginPage() {
                             className="pl-10 h-12 rounded-xl border-gray-200 focus-visible:ring-blue-600 shadow-sm" 
                             {...field} 
                             disabled={isLoading}
+                            data-1p-ignore
+                            data-lpignore="true"
+                            data-form-type="other"
                           />
                         </div>
                       </FormControl>
@@ -377,6 +380,9 @@ export default function LoginPage() {
                             className="pl-10 h-12 rounded-xl border-gray-200 focus-visible:ring-blue-600 shadow-sm" 
                             {...field} 
                             disabled={isLoading}
+                            data-1p-ignore
+                            data-lpignore="true"
+                            data-form-type="other"
                           />
                           <button
                             type="button"
