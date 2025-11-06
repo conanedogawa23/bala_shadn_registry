@@ -55,8 +55,13 @@ export abstract class BaseApiService {
       headers: {
         'Content-Type': 'application/json',
         ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
+        // Disable browser caching to avoid 304 responses without body
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
         ...fetchOptions.headers,
       },
+      // Force fetch to bypass cache
+      cache: 'no-store',
       ...fetchOptions,
     };
     
@@ -74,11 +79,19 @@ export abstract class BaseApiService {
       const response = await fetch(`${this.API_BASE_URL}${endpoint}`, config);
       clearTimeout(timeoutId);
       
+      console.log(`[API] Response status: ${response.status} for ${endpoint}`);
+      
       let result;
       try {
         result = await response.json();
       } catch (parseError) {
-        throw new Error(`Failed to parse response as JSON: ${response.statusText}, ${parseError}`);
+        console.error(`[API] Failed to parse response:`, { 
+          status: response.status, 
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type'),
+          error: parseError
+        });
+        throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
       }
       
       console.log(`[API] Response ${response.status}:`, result);

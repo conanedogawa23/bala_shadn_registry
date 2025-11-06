@@ -121,8 +121,16 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
         
         setAvailableClinics(clinicsData);
       } catch (err) {
-        console.error('Failed to fetch clinics:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load clinics');
+        console.error('❌ Failed to fetch clinics:', err);
+        console.error('Error details:', {
+          errorType: err instanceof Error ? err.constructor.name : typeof err,
+          errorMessage: err instanceof Error ? err.message : String(err),
+          errorStack: err instanceof Error ? err.stack : undefined
+        });
+        
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load clinics';
+        setError(`Failed to load clinics: ${errorMessage}`);
+        
         // Set empty array as fallback
         setAvailableClinics([]);
       } finally {
