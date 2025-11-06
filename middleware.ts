@@ -15,14 +15,15 @@ export function middleware(request: NextRequest) {
   // Check if the current path is a public route
   const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`));
   
-  // Get authentication status from cookies or check for auth token
+  // Get authentication status from cookies
   // Note: In Next.js middleware, we can't access localStorage directly
-  // We'll use cookies for server-side auth check
-  const authToken = request.cookies.get('authToken')?.value;
-  const isAuthenticated = request.cookies.get('isAuthenticated')?.value === 'true';
+  // We check for accessToken and refreshToken cookies set by the backend
+  const accessToken = request.cookies.get('accessToken')?.value;
+  const refreshToken = request.cookies.get('refreshToken')?.value;
+  const isAuthenticated = !!(accessToken || refreshToken);
   
   // If user is not authenticated and trying to access protected route
-  if (!isPublicRoute && !authToken && !isAuthenticated) {
+  if (!isPublicRoute && !isAuthenticated) {
     const loginUrl = new URL('/login', request.url);
     // Add the original URL as a redirect parameter so we can send them back after login
     loginUrl.searchParams.set('redirect', pathname);
@@ -30,13 +31,13 @@ export function middleware(request: NextRequest) {
   }
   
   // If user is authenticated and trying to access login/register, redirect to home
-  if (isPublicRoute && (authToken || isAuthenticated) && (pathname === '/login' || pathname === '/register')) {
+  if (isPublicRoute && isAuthenticated && (pathname === '/login' || pathname === '/register')) {
     return NextResponse.redirect(new URL('/clinic/bodyblissphysio', request.url));
   }
 
   // Redirect root path to active clinic (BodyBliss Physio) if authenticated
   if (pathname === '/') {
-    if (authToken || isAuthenticated) {
+    if (isAuthenticated) {
       return NextResponse.redirect(new URL('/clinic/bodyblissphysio', request.url));
     } else {
       return NextResponse.redirect(new URL('/login', request.url));
