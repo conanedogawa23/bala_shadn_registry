@@ -226,8 +226,8 @@ export default function AppointmentsPage() {
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div className="flex items-center gap-4">
+      <div className="mb-6">
+        <div className="flex items-center gap-4 mb-4">
           <Button
             variant="outline"
             size="sm"
@@ -237,19 +237,21 @@ export default function AppointmentsPage() {
             <ArrowLeft size={16} />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">
-              Appointments - {clinic?.displayName || clinicSlug}
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Manage and schedule appointments
-            </p>
-          </div>
         </div>
-        <Button onClick={handleNewAppointment} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          New Appointment
-        </Button>
+        
+        <h1 className="text-2xl sm:text-3xl font-bold break-words">
+          Appointments - {clinic?.displayName || clinicSlug}
+        </h1>
+        
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-2">
+          <p className="text-gray-600">
+            Manage and schedule appointments
+          </p>
+          <Button onClick={handleNewAppointment} className="flex items-center gap-2 whitespace-nowrap">
+            <Plus className="h-4 w-4" />
+            New Appointment
+          </Button>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -307,8 +309,8 @@ export default function AppointmentsPage() {
       {/* Filters and Search */}
       <Card className="mb-6">
         <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="lg:col-span-2">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -320,7 +322,7 @@ export default function AppointmentsPage() {
               </div>
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
+              <SelectTrigger className="w-full">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>

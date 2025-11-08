@@ -309,8 +309,8 @@ export default function ClientDetailPage() {
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 max-w-7xl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div className="flex items-center gap-4">
+      <div className="mb-6">
+        <div className="flex items-center gap-4 mb-4">
           <Button
             variant="outline"
             size="sm"
@@ -320,39 +320,39 @@ export default function ClientDetailPage() {
             <ArrowLeft size={16} />
             Back to Clients
           </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              {client.firstName} {client.lastName}
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              {clinicData?.name || clinic} • Client ID: {client.clientId}
-            </p>
-          </div>
         </div>
         
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 break-words">
+          {client.firstName} {client.lastName}
+        </h1>
+        <p className="text-sm text-gray-600 mt-1">
+          {clinicData?.name || clinic} • Client ID: {client.clientId}
+        </p>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
           <Button
             variant="outline"
             size="sm"
             onClick={handleEditClient}
-            className="flex items-center gap-2 flex-1 sm:flex-none"
+            className="flex items-center gap-2"
           >
             <Edit size={16} />
             Edit Client
           </Button>
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             onClick={handleNewAppointment}
-            className="flex items-center gap-2 flex-1 sm:flex-none"
+            className="flex items-center gap-2"
           >
             <Calendar size={16} />
-            New Appointment
+            Schedule
           </Button>
           <Button
+            variant="default"
             size="sm"
             onClick={handleCreateOrder}
-            className="flex items-center gap-2 flex-1 sm:flex-none"
+            className="flex items-center gap-2"
           >
             <Plus size={16} />
             New Order

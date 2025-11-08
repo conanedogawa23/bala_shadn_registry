@@ -160,8 +160,8 @@ export default function OrderDetailPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div className="flex items-center gap-4">
+      <div className="mb-6">
+        <div className="flex items-center gap-4 mb-4">
           <Button
             variant="outline"
             size="sm"
@@ -171,16 +171,16 @@ export default function OrderDetailPage() {
             <ArrowLeft size={16} />
             Back
           </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: themeColors.primary }}>
-              Order #{order.orderNumber}
-            </h1>
-            <p className="text-gray-600 mt-1">
-              {formatDate(order.serviceDate)} - {clinicData?.displayName || clinicData?.name || clinic}
-            </p>
-          </div>
         </div>
-        <div className="flex items-center gap-2 self-start">
+        
+        <h1 className="text-2xl sm:text-3xl font-bold break-words" style={{ color: themeColors.primary }}>
+          Order #{order.orderNumber}
+        </h1>
+        <p className="text-gray-600 mt-1">
+          {formatDate(order.serviceDate)} - {clinicData?.displayName || clinicData?.name || clinic}
+        </p>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
           {(order.status === OrderStatus.SCHEDULED || order.status === OrderStatus.IN_PROGRESS) && (
             <Button
               variant="outline"

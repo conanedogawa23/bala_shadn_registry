@@ -171,6 +171,12 @@ export interface AvailableReportsResponse {
   categories: string[];
 }
 
+export interface ClientStatisticsData {
+  totalClients: number;
+  newClientsThisMonth: number;
+  activeClients: number;
+}
+
 // Query options interface
 export interface ReportQueryOptions {
   startDate?: Date;
@@ -181,6 +187,29 @@ export interface ReportQueryOptions {
 export class ReportApiService extends BaseApiService {
   private static readonly ENDPOINT = '/reports';
   private static readonly CACHE_TTL = 300000; // 5 minutes cache for reports
+
+  /**
+   * Get client statistics using backend aggregation
+   */
+  static async getClientStatistics(clinicName: string): Promise<ClientStatisticsData> {
+    const cacheKey = `client_stats_${clinicName}`;
+    const cached = this.getCached<ClientStatisticsData>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const endpoint = `${this.ENDPOINT}/${encodeURIComponent(clinicName)}/client-statistics`;
+      const response = await this.request<ClientStatisticsData>(endpoint);
+      
+      if (response.success && response.data) {
+        this.setCached(cacheKey, response.data, this.CACHE_TTL);
+        return response.data;
+      }
+      
+      throw new Error('Failed to fetch client statistics');
+    } catch (error) {
+      throw this.handleError(error, 'getClientStatistics');
+    }
+  }
 
   /**
    * Get all available reports for a clinic

@@ -39,7 +39,7 @@ import {
   OrderStatus
 } from '@/lib/hooks';
 import { PaymentStatus } from '@/lib/api/orderService';
-import { ReportApiService } from '@/lib/api/reportService';
+import { ReportApiService, type ClientStatisticsData } from '@/lib/api/reportService';
 
 interface ReportMetrics {
   totalClients: number;
@@ -115,7 +115,7 @@ export default function ReportsPage() {
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   const [dateRangeValid, setDateRangeValid] = useState(true);
   const [selectedQuickPreset, setSelectedQuickPreset] = useState<string | null>(null);
-  const [allClients, setAllClients] = useState<any[]>([]);
+  const [clientStats, setClientStats] = useState<ClientStatisticsData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
   // Calculate date ranges based on selected period or custom dates
@@ -238,62 +238,28 @@ export default function ReportsPage() {
     autoFetch: !!backendClinicName
   });
 
-  // Fetch ALL clients for proper statistics calculation using pagination
+  // Fetch client statistics using aggregation (optimized - no data transfer)
   useEffect(() => {
     if (backendClinicName) {
-      const fetchAllClientsForStats = async () => {
+      const fetchClientStats = async () => {
         setStatsLoading(true);
         try {
-          const allClientsData: any[] = [];
-          const maxLimit = 100; // API limit
-          let currentPage = 1;
-          let hasMore = true;
-
-          // Check first 10 pages for recent clients, then use search for September 2025 clients
-          const maxPages = 10;
-          
-          while (hasMore && currentPage <= maxPages) {
-            const authToken = localStorage.getItem('authToken');
-            const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 
-              `${window.location.protocol}//${window.location.host}/api/v1`;
-            const response = await fetch(
-              `${apiBaseUrl}/clients/clinic/${backendClinicName}/frontend-compatible?page=${currentPage}&limit=${maxLimit}`,
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(authToken && { 'Authorization': `Bearer ${authToken}` }),
-                }
-              }
-            );
-            
-            if (response.ok) {
-              const data = await response.json();
-              if (data.success && data.data && data.data.length > 0) {
-                allClientsData.push(...data.data);
-                hasMore = data.pagination?.hasNext || false && currentPage < maxPages;
-                currentPage++;
-              } else {
-                hasMore = false;
-              }
-            } else {
-              hasMore = false;
-            }
-          }
-          
-          setAllClients(allClientsData);
+          const stats = await ReportApiService.getClientStatistics(backendClinicName);
+          setClientStats(stats);
         } catch (error) {
-          setAllClients([]);
+          console.error('Failed to fetch client stats:', error);
+          setClientStats(null);
         } finally {
           setStatsLoading(false);
         }
       };
-      fetchAllClientsForStats();
+      fetchClientStats();
     }
   }, [backendClinicName]);
 
   // Calculate comprehensive metrics from real data
   const metrics = useMemo((): ReportMetrics => {
-    if (!revenueAnalytics || !orders || !clients) {
+    if (!revenueAnalytics || !orders || !clientStats) {
       return {
         totalClients: 0,
         activeClients: 0,
@@ -319,24 +285,10 @@ export default function ReportsPage() {
       o.paymentStatus === PaymentStatus.OVERDUE
     ).length;
 
-    // Calculate client metrics  
-    const totalClients = clients.length;
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    
-    // Use allClients if available, otherwise fall back to regular clients
-    const clientsForStats = allClients.length > 0 ? allClients : clients;
-    const newClientsThisMonth = clientsForStats.filter(client => {
-      const dateToUse = client.createdAt || client.dateOfBirth;
-      if (!dateToUse) return false;
-      const clientDate = new Date(dateToUse);
-      return clientDate.getMonth() === currentMonth && clientDate.getFullYear() === currentYear;
-    }).length;
-
-    // Assume 85% of clients are active (those with orders in last 6 months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const activeClients = Math.floor(totalClients * 0.85);
+    // Use aggregated stats instead of client array
+    const totalClients = clientStats.totalClients;
+    const newClientsThisMonth = clientStats.newClientsThisMonth;
+    const activeClients = clientStats.activeClients;
 
     // Calculate growth rates from analytics data with safe array operations
     const isValidAnalytics = Array.isArray(revenueAnalytics) && revenueAnalytics.length > 0;
@@ -368,7 +320,7 @@ export default function ReportsPage() {
             orderCompletionRate,
             revenueGrowthRate
     };
-  }, [revenueAnalytics, orders, clients, totalRevenue, avgOrderValue, allClients]);
+  }, [revenueAnalytics, orders, clientStats, totalRevenue, avgOrderValue]);
 
   // Generate chart data from real analytics
   const chartData = useMemo((): ChartData[] => {
@@ -437,23 +389,14 @@ export default function ReportsPage() {
     setSelectedQuickPreset(preset);
   }, []);
 
-  // Force data refresh when date range changes - positioned after all hooks
+  // Force data refresh when date range changes with debouncing
   useEffect(() => {
     if (orderClinicName && dateRangeValid) {
-      // Clear cache when date range changes to ensure fresh data
-      if (typeof window !== 'undefined') {
-        const cacheKeys = Object.keys(localStorage);
-        cacheKeys.forEach(key => {
-          if (key.includes('revenue_analytics') || key.includes('product_performance')) {
-            localStorage.removeItem(key);
-          }
-        });
-      }
-      // Force hooks to refetch with new date range
+      // Only refetch, don't clear entire cache
       const timeoutId = setTimeout(() => {
         refetchRevenue();
         refetchPerformance();
-      }, 100); // Small delay to ensure state updates are complete
+      }, 300); // Debounce date changes
       
       return () => clearTimeout(timeoutId);
     }
@@ -542,44 +485,44 @@ export default function ReportsPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleBack}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">
-              Reports & Analytics - {clinic.displayName || clinic.name}
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Real-time business insights and performance metrics
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-4 items-start">
-          {/* Date Range Controls */}
-          <div className="flex-1">
-            <div className="flex flex-col sm:flex-row gap-3 items-start">
+      {/* Separate row for back button and title */}
+      <div className="mb-6">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleBack}
+          className="mb-4"
+        >
+          <ArrowLeft size={16} className="mr-2" />
+          Back
+        </Button>
+        <h1 className="text-2xl sm:text-3xl font-bold break-words">
+          Reports & Analytics - {clinic.displayName || clinic.name}
+        </h1>
+        <p className="text-gray-600 mt-2">
+          Real-time business insights and performance metrics
+        </p>
+      </div>
+
+      {/* Grid layout for controls - better mobile handling */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+        {/* Date Range Control Column */}
+        <div className="lg:col-span-2">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
               <Button
                 variant={useCustomRange ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleCustomRangeToggle(!useCustomRange)}
-                className="flex items-center gap-2"
+                className="whitespace-nowrap"
               >
-                <CalendarDays className="h-4 w-4" />
+                <CalendarDays className="h-4 w-4 mr-2" />
                 {useCustomRange ? "Custom Range" : "Quick Periods"}
               </Button>
               
-              {!useCustomRange ? (
+              {!useCustomRange && (
                 <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
@@ -590,59 +533,65 @@ export default function ReportsPage() {
                     <SelectItem value="lastyear">Last Year</SelectItem>
                   </SelectContent>
                 </Select>
-              ) : (
-                <div className="flex flex-col sm:flex-row gap-2 items-start">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">From:</span>
-                    <DatePicker
-                      date={customStartDate}
-                      setDate={setCustomStartDate}
-                      className="w-40"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">To:</span>
-                    <DatePicker
-                      date={customEndDate}
-                      setDate={setCustomEndDate}
-                      className="w-40"
-                    />
-                  </div>
-                </div>
               )}
             </div>
             
             {useCustomRange && (
-              <div className="flex gap-2 mt-2">
-                <Button 
-                  variant={selectedQuickPreset === 'thisWeek' ? "default" : "ghost"} 
-                  size="sm" 
-                  onClick={() => handleQuickDateRange('thisWeek')}
-                >
-                  This Week
-                </Button>
-                <Button 
-                  variant={selectedQuickPreset === 'thisMonth' ? "default" : "ghost"} 
-                  size="sm" 
-                  onClick={() => handleQuickDateRange('thisMonth')}
-                >
-                  This Month
-                </Button>
-                <Button 
-                  variant={selectedQuickPreset === 'thisQuarter' ? "default" : "ghost"} 
-                  size="sm" 
-                  onClick={() => handleQuickDateRange('thisQuarter')}
-                >
-                  This Quarter
-                </Button>
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium">From:</span>
+                    <DatePicker
+                      date={customStartDate}
+                      setDate={setCustomStartDate}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium">To:</span>
+                    <DatePicker
+                      date={customEndDate}
+                      setDate={setCustomEndDate}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant={selectedQuickPreset === 'thisWeek' ? "default" : "ghost"} 
+                    size="sm" 
+                    onClick={() => handleQuickDateRange('thisWeek')}
+                  >
+                    This Week
+                  </Button>
+                  <Button 
+                    variant={selectedQuickPreset === 'thisMonth' ? "default" : "ghost"} 
+                    size="sm" 
+                    onClick={() => handleQuickDateRange('thisMonth')}
+                  >
+                    This Month
+                  </Button>
+                  <Button 
+                    variant={selectedQuickPreset === 'thisQuarter' ? "default" : "ghost"} 
+                    size="sm" 
+                    onClick={() => handleQuickDateRange('thisQuarter')}
+                  >
+                    This Quarter
+                  </Button>
+                </div>
+              </>
             )}
           </div>
-          
-          {/* Export Controls */}
-          <div className="flex items-center gap-2">
-            <Select value={selectedExportFormat} onValueChange={(value: 'csv' | 'json' | 'pdf') => setSelectedExportFormat(value)}>
-              <SelectTrigger className="w-20">
+        </div>
+        
+        {/* Export Control Column */}
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Export Options</span>
+          <div className="flex gap-2">
+            <Select 
+              value={selectedExportFormat} 
+              onValueChange={(value: 'csv' | 'json' | 'pdf') => setSelectedExportFormat(value)}
+            >
+              <SelectTrigger className="w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -657,8 +606,9 @@ export default function ReportsPage() {
               size="sm"
               onClick={handleExportAllReports}
               disabled={isExporting}
+              className="flex-1"
             >
-              <Download size={14} />
+              <Download size={14} className="mr-2" />
               Export All
             </Button>
           </div>
