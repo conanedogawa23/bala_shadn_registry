@@ -6,7 +6,6 @@ import {
   ArrowLeft, 
   User, 
   Package, 
-  FileText, 
   Phone, 
   Mail,
   Edit,
@@ -21,7 +20,6 @@ import {
   CheckCircle,
   AlertTriangle,
   Search,
-  Filter,
   Download,
   Eye,
   Shield
@@ -30,7 +28,6 @@ import { slugToClinic } from '@/lib/data/clinics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { 
   Select, 
@@ -50,8 +47,6 @@ import {
   useAppointments,
   OrderUtils,
   OrderStatus,
-  PaymentStatus,
-  type Order
 } from "@/lib/hooks";
 
 export default function ClientDetailPage() {
@@ -87,7 +82,7 @@ export default function ClientDetailPage() {
   // State to control when to load orders and appointments
   const [shouldLoadOrders, setShouldLoadOrders] = useState(true);
   // Auto-load appointments on client detail page to show accurate statistics
-  const [shouldLoadAppointments, setShouldLoadAppointments] = useState(true);
+  const [shouldLoadAppointments] = useState(true);
 
   // Fetch client's order history only when needed
   const { 
@@ -222,6 +217,7 @@ export default function ClientDetailPage() {
   }, [appointments, appointmentPagination]);
 
   // Get appointment ID helper
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getAppointmentId = (appointment: any): string | number => {
     return appointment.appointmentId || appointment._id || appointment.id;
   };
@@ -664,7 +660,7 @@ export default function ClientDetailPage() {
                 {!shouldLoadOrders ? (
                   <div className="text-center py-8 text-gray-500">
                     <Package className="mx-auto h-12 w-12 text-gray-300" />
-                    <p className="mt-2">Click "Load Order History" to view client orders</p>
+                    <p className="mt-2">Click &quot;Load Order History&quot; to view client orders</p>
                   </div>
                 ) : ordersLoading ? (
                   <div className="text-center py-8">
@@ -868,6 +864,7 @@ export default function ClientDetailPage() {
             <CardContent className="space-y-4">
               {client.insurance && client.insurance.length > 0 ? (
                 // Display existing insurance information
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 client.insurance.map((insurance: any, index: number) => (
                   <InsuranceSummaryCard 
                     key={index}
