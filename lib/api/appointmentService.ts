@@ -192,12 +192,20 @@ export class AppointmentApiService extends BaseApiService {
       const queryString = query ? `?${query}` : '';
       const endpoint = `${this.ENDPOINT}/clinic/${encodeURIComponent(clinicName)}${queryString}`;
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response = await this.request<any>(endpoint);
       
       if (response.success && response.data) {
         const formattedResponse: PaginatedAppointmentResponse = {
           appointments: response.data,
-          pagination: response.pagination
+          pagination: response.pagination || {
+            page: 1,
+            limit: 20,
+            total: 0,
+            pages: 0,
+            hasNext: false,
+            hasPrev: false
+          }
         };
         if (!bypassCache) {
           this.setCached(cacheKey, formattedResponse, this.CACHE_TTL);
@@ -279,8 +287,14 @@ export class AppointmentApiService extends BaseApiService {
         endDate: updates.endDate?.toISOString()
       };
 
+      // Use business ID endpoint if appointmentId is a number, otherwise use ObjectId endpoint
+      const isBusinessId = /^\d+$/.test(appointmentId);
+      const endpoint = isBusinessId 
+        ? `${this.ENDPOINT}/business/${encodeURIComponent(appointmentId)}`
+        : `${this.ENDPOINT}/${encodeURIComponent(appointmentId)}`;
+
       const response = await this.request<Appointment>(
-        `${this.ENDPOINT}/${encodeURIComponent(appointmentId)}`,
+        endpoint,
         'PUT',
         processedUpdates
       );
@@ -304,8 +318,14 @@ export class AppointmentApiService extends BaseApiService {
    */
   static async cancelAppointment(appointmentId: string, reason?: string): Promise<void> {
     try {
+      // Use business ID endpoint if appointmentId is a number, otherwise use ObjectId endpoint
+      const isBusinessId = /^\d+$/.test(appointmentId);
+      const endpoint = isBusinessId 
+        ? `${this.ENDPOINT}/business/${encodeURIComponent(appointmentId)}/cancel`
+        : `${this.ENDPOINT}/${encodeURIComponent(appointmentId)}/cancel`;
+
       const response = await this.request(
-        `${this.ENDPOINT}/${encodeURIComponent(appointmentId)}/cancel`,
+        endpoint,
         'DELETE',
         { reason }
       );
@@ -329,8 +349,14 @@ export class AppointmentApiService extends BaseApiService {
    */
   static async completeAppointment(appointmentId: string, notes?: string): Promise<Appointment> {
     try {
+      // Use business ID endpoint if appointmentId is a number, otherwise use ObjectId endpoint
+      const isBusinessId = /^\d+$/.test(appointmentId);
+      const endpoint = isBusinessId 
+        ? `${this.ENDPOINT}/business/${encodeURIComponent(appointmentId)}/complete`
+        : `${this.ENDPOINT}/${encodeURIComponent(appointmentId)}/complete`;
+
       const response = await this.request<Appointment>(
-        `${this.ENDPOINT}/${encodeURIComponent(appointmentId)}/complete`,
+        endpoint,
         'PUT',
         { notes }
       );
@@ -415,11 +441,13 @@ export class AppointmentApiService extends BaseApiService {
     };
   }> {
     const cacheKey = `client_history_${clientId}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cached = this.getCached<any>(cacheKey);
     if (cached) return cached;
 
     try {
       const endpoint = `${this.ENDPOINT}/client/${encodeURIComponent(clientId)}/history`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response = await this.request<any>(endpoint);
       
       if (response.success && response.data) {
@@ -454,6 +482,7 @@ export class AppointmentApiService extends BaseApiService {
       const queryString = query ? `?${query}` : '';
       const endpoint = `${this.ENDPOINT}/stats/clinic/${encodeURIComponent(clinicName)}${queryString}`;
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const response = await this.request<any>(endpoint);
       
       if (response.success && response.data && response.data.statistics) {
