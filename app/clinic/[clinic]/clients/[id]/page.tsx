@@ -85,7 +85,7 @@ export default function ClientDetailPage() {
   });
 
   // State to control when to load orders and appointments
-  const [shouldLoadOrders, setShouldLoadOrders] = useState(false);
+  const [shouldLoadOrders, setShouldLoadOrders] = useState(true);
   // Auto-load appointments on client detail page to show accurate statistics
   const [shouldLoadAppointments, setShouldLoadAppointments] = useState(true);
 
