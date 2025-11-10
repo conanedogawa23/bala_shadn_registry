@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { 
   Card, 
@@ -34,7 +34,7 @@ import { useClinic } from "@/lib/contexts/clinic-context";
 
 // Import API services
 import { useClient, useProducts } from "@/lib/hooks";
-import { ProductService, Product, ProductStatus } from "@/lib/api/productService";
+import { ProductStatus } from "@/lib/api/productService";
 import { OrderService, CreateOrderData, OrderLineItem } from "@/lib/api/orderService";
 
 export default function ClientOrderNewPage() {
@@ -138,6 +138,7 @@ export default function ClientOrderNewPage() {
     }]);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateOrderItem = (index: number, field: keyof OrderLineItem, value: any) => {
     setOrderItems(prev => {
       const updated = [...prev];
@@ -182,7 +183,7 @@ export default function ClientOrderNewPage() {
       const orderData: CreateOrderData = {
         clientId: parseInt(clientId),
         clientName: `${client.lastName}, ${client.firstName}`,
-        clinicName: clinicData?.name || '',
+        clinicName: realClinicName || clinicData?.backendName || clinicData?.displayName || '',
         serviceDate: serviceDatetime.toISOString(),
         endDate: endDatetime.toISOString(),
         items: orderItems as OrderLineItem[],
@@ -445,7 +446,7 @@ export default function ClientOrderNewPage() {
 
               {orderItems.length === 0 && availableProducts.length > 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <p>No items added yet. Click "Add Item" to start.</p>
+                  <p>No items added yet. Click &rdquo;Add Item&rdquo; to start.</p>
                 </div>
               )}
 

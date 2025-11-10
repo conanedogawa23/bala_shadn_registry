@@ -25,41 +25,41 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // COMPLIANT CLIENT SCHEMA - Per visio_req.md with Insurance
 const clientSchema = z.object({
   // Personal Information
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }).max(100, { message: "Name cannot exceed 100 characters" }),
   dateOfBirth: z.date({ required_error: "Date of birth is required" }),
   gender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
   
   // Contact Information - RETAINED FIELDS ONLY
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  cellPhone: z.string().min(10, { message: "Please enter a valid phone number" }),
-  homePhone: z.string().optional(),
+  email: z.string().email({ message: "Please enter a valid email address" }).max(100, { message: "Email cannot exceed 100 characters" }),
+  cellPhone: z.string().min(10, { message: "Please enter a valid phone number" }).max(20, { message: "Phone number cannot exceed 20 characters" }),
+  homePhone: z.string().max(20, { message: "Phone number cannot exceed 20 characters" }).optional(),
   
   // Address Information
-  address: z.string().min(5, { message: "Address is required" }),
-  apartment: z.string().optional(),
-  city: z.string().min(2, { message: "City is required" }),
-  province: z.string().min(2, { message: "Province is required" }),
+  address: z.string().min(5, { message: "Address is required" }).max(200, { message: "Address cannot exceed 200 characters" }),
+  apartment: z.string().max(50, { message: "Apartment/Unit cannot exceed 50 characters" }).optional(),
+  city: z.string().min(2, { message: "City is required" }).max(100, { message: "City cannot exceed 100 characters" }),
+  province: z.string().min(2, { message: "Province is required" }).max(50, { message: "Province cannot exceed 50 characters" }),
   postalCode: z.string().regex(/^[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d$/, { message: "Please enter a valid Canadian postal code (A1A 1A1)" }),
   
   // Additional Information - RETAINED FIELDS ONLY
-  companyName: z.string().optional(),
-  referringMD: z.string().optional(),
+  companyName: z.string().max(200, { message: "Company name cannot exceed 200 characters" }).optional(),
+  referringMD: z.string().max(200, { message: "Referring MD cannot exceed 200 characters" }).optional(),
   
   // 1st Insurance (Optional)
   has1stInsurance: z.boolean().default(false),
-  insurance1PolicyHolderName: z.string().optional(),
+  insurance1PolicyHolderName: z.string().max(100, { message: "Policy holder name cannot exceed 100 characters" }).optional(),
   insurance1PolicyHolderBirthday: z.date().optional(),
-  insurance1Company: z.string().optional(),
-  insurance1GroupNumber: z.string().optional(),
-  insurance1CertificateNumber: z.string().optional(),
+  insurance1Company: z.string().max(100, { message: "Company name cannot exceed 100 characters" }).optional(),
+  insurance1GroupNumber: z.string().max(50, { message: "Group number cannot exceed 50 characters" }).optional(),
+  insurance1CertificateNumber: z.string().max(50, { message: "Certificate number cannot exceed 50 characters" }).optional(),
   
   // 2nd Insurance (Optional)
   has2ndInsurance: z.boolean().default(false),
-  insurance2PolicyHolderName: z.string().optional(),
+  insurance2PolicyHolderName: z.string().max(100, { message: "Policy holder name cannot exceed 100 characters" }).optional(),
   insurance2PolicyHolderBirthday: z.date().optional(),
-  insurance2Company: z.string().optional(),
-  insurance2GroupNumber: z.string().optional(),
-  insurance2CertificateNumber: z.string().optional(),
+  insurance2Company: z.string().max(100, { message: "Company name cannot exceed 100 characters" }).optional(),
+  insurance2GroupNumber: z.string().max(50, { message: "Group number cannot exceed 50 characters" }).optional(),
+  insurance2CertificateNumber: z.string().max(50, { message: "Certificate number cannot exceed 50 characters" }).optional(),
 });
 
 // Type definitions

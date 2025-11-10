@@ -212,13 +212,18 @@ export default function NewAppointmentPage() {
               </div>
               
               <div className="grid gap-4 md:grid-cols-2">
-                <FormResourceSelect
-                  name="resourceId"
-                  label="Resource"
-                  placeholder="Select a practitioner or resource"
-                  clinicName={clinicName}
-                  required
-                />
+                <div>
+                  <FormResourceSelect
+                    name="resourceId"
+                    label="Resource"
+                    placeholder="Type to search for a practitioner..."
+                    clinicName={clinicName}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 Start typing a name to search (min. 2 characters)
+                  </p>
+                </div>
                 
                 <FormInput
                   name="duration"

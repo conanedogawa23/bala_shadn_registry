@@ -151,6 +151,11 @@ export default async function ClientsPage({ params, searchParams }: PageProps) {
       {/* Statistics Cards */}
       <ClientsStats stats={clientStats} />
 
+      {/* Search Bar */}
+      <div className="mb-6">
+        <ClientsSearchWrapper initialSearch={search || ''} />
+      </div>
+
       {/* Clients Table */}
       <Card>
         <CardHeader>
