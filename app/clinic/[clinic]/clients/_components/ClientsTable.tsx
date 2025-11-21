@@ -2,8 +2,7 @@
 
 import React, { useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  User, 
+import {
   Phone, 
   Mail, 
   Calendar,
@@ -28,7 +27,7 @@ interface Client {
   status?: string;
   createdAt: string;
   updatedAt: string;
-  [key: string]: any;
+  [key: string]: string | number | undefined;
 }
 
 interface ClientsTableProps {
@@ -46,7 +45,7 @@ export function ClientsTable({
   clients, 
   clinicName,
   searchValue = '',
-  onSearchChange 
+  onSearchChange
 }: ClientsTableProps) {
   const router = useRouter();
 
@@ -216,6 +215,7 @@ export function ClientsTable({
     <DataTable 
       columns={columns} 
       data={clients}
+      showFilter={true}
       filterPlaceholder="Search clients by name, email, or phone..."
       searchValue={searchValue}
       onSearchChange={onSearchChange}

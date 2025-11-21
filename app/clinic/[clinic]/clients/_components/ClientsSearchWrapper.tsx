@@ -24,7 +24,8 @@ export function ClientsSearchWrapper({ initialSearch = '' }: ClientsSearchWrappe
       params.delete('page');
     }
     
-    router.push(`${pathname}?${params.toString()}`);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    router.refresh();
   }, [router, pathname, searchParams]);
 
   return (

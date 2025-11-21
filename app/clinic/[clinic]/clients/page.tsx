@@ -5,14 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 // Server-side data fetchers
-import { fetchClientsByClinic, fetchClinics } from '@/lib/server/data-fetchers';
+import { fetchClientsByClinic, fetchClinics, fetchClientStats } from '@/lib/server/data-fetchers';
 
 // Client Components
 import { ClientsHeader } from './_components/ClientsHeader';
 import { ClientsStats } from './_components/ClientsStats';
-import { ClientsTable } from './_components/ClientsTable';
+import { ClientsTableWrapper } from './_components/ClientsTableWrapper';
 import { ClientsPagination } from './_components/ClientsPagination';
-import { ClientsSearchWrapper } from './_components/ClientsSearchWrapper';
 
 interface PageProps {
   params: Promise<{
@@ -70,7 +69,52 @@ export default async function ClientsPage({ params, searchParams }: PageProps) {
   // Get the proper backend clinic name for API calls
   const backendClinicName = clinicData.backendName || clinicData.name.toLowerCase().replace(/\s+/g, '');
 
-  // Fetch clients data server-side
+  // Fetch clinic-wide statistics (NOT affected by search/filters)
+  let statsData;
+  try {
+    statsData = await fetchClientStats(backendClinicName, {
+      revalidate: 600, // Cache stats for 10 minutes
+      tags: ['client-stats', `clinic-${backendClinicName}`]
+    });
+  } catch (err) {
+    console.error('Error fetching client statistics:', err);
+    statsData = {
+      totalClients: 0,
+      activeClients: 0,
+      newThisMonth: 0,
+      clientsWithInsurance: 0
+    };
+  }
+
+  // Fetch a small sample to count clients with email
+  let emailSampleData;
+  try {
+    emailSampleData = await fetchClientsByClinic(backendClinicName, {
+      page: 1,
+      limit: 100, // Sample for email count estimate
+      revalidate: 600,
+      tags: ['client-email-stats', `clinic-${backendClinicName}`]
+    });
+  } catch (err) {
+    console.error('Error fetching email statistics:', err);
+    emailSampleData = { data: [], pagination: { total: 0 } };
+  }
+
+  // Calculate email stats from sample
+  const sampleClients = emailSampleData.data;
+  const sampleSize = sampleClients.length;
+  const withEmailCount = sampleSize > 0
+    ? Math.round((sampleClients.filter(c => c.email && c.email.trim()).length / sampleSize) * statsData.totalClients)
+    : 0;
+  
+  const clientStats = {
+    total: statsData.totalClients,
+    active: statsData.activeClients,
+    withEmail: withEmailCount,
+    newThisMonth: statsData.newThisMonth
+  };
+
+  // Fetch filtered/paginated clients data for the table
   let clientsData;
   let error: string | null = null;
   
@@ -102,25 +146,6 @@ export default async function ClientsPage({ params, searchParams }: PageProps) {
   const clients = clientsData.data;
   const pagination = clientsData.pagination;
 
-  // Calculate client statistics from current page data
-  // For accurate "New This Month" stat, we'd need to fetch all clients or have a stats endpoint
-  const clientStats = {
-    total: pagination.total,
-    active: clients.filter(c => (c.status || 'active') === 'active').length,
-    withEmail: clients.filter(c => c.email && c.email.trim()).length,
-    newThisMonth: 0 // TODO: Calculate from all clients or use stats endpoint
-  };
-
-  // Calculate "New This Month" from current page (approximation)
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  clientStats.newThisMonth = clients.filter(client => {
-    const dateToUse = client.createdAt || client.dateOfBirth;
-    if (!dateToUse) return false;
-    const clientDate = new Date(dateToUse);
-    return clientDate.getMonth() === currentMonth && clientDate.getFullYear() === currentYear;
-  }).length;
-
   // Error state
   if (error) {
     return (
@@ -151,12 +176,7 @@ export default async function ClientsPage({ params, searchParams }: PageProps) {
       {/* Statistics Cards */}
       <ClientsStats stats={clientStats} />
 
-      {/* Search Bar */}
-      <div className="mb-6">
-        <ClientsSearchWrapper initialSearch={search || ''} />
-      </div>
-
-      {/* Clients Table */}
+      {/* Clients Table with integrated search */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -207,10 +227,10 @@ export default async function ClientsPage({ params, searchParams }: PageProps) {
             </div>
           ) : (
             <>
-              <ClientsTable 
+              <ClientsTableWrapper 
                 clients={clients}
                 clinicName={clinic}
-                searchValue={search || ''}
+                initialSearch={search || ''}
               />
               
               {/* Server-side Pagination Controls */}

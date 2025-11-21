@@ -31,7 +31,8 @@ export function ClientsPagination({ pagination }: ClientsPaginationProps) {
 
   const handlePageChange = (page: number) => {
     const queryString = createQueryString('page', page.toString());
-    router.push(`${pathname}?${queryString}`);
+    router.push(`${pathname}?${queryString}`, { scroll: false });
+    router.refresh();
   };
 
   const handlePreviousPage = () => {
