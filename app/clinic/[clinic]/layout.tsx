@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ClinicApiService, getFirstAvailableClinicSlug } from '@/lib/api/clinicService';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { isAuthenticated } from '@/lib/auth';
 
 interface ClinicLayoutProps {
   children: React.ReactNode;
@@ -24,6 +25,23 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
   } | null>(null);
 
   const clinicSlug = params.clinic as string;
+
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isUserAuthenticated, setIsUserAuthenticated] = useState(false);
+
+  // Check authentication first - redirect to login if not authenticated
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const authenticated = isAuthenticated();
+      setIsUserAuthenticated(authenticated);
+      setIsAuthChecking(false);
+      
+      if (!authenticated) {
+        const currentPath = window.location.pathname;
+        router.replace(`/login?redirect=${encodeURIComponent(currentPath)}`);
+      }
+    }
+  }, [router]);
 
   useEffect(() => {
     const validateClinic = async () => {
@@ -103,7 +121,31 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
     }
   }, [clinicSlug, router, availableClinics, clinicLoading]);
 
-  // Loading state
+  // Auth checking state - show nothing while checking
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated - show redirecting message
+  if (!isUserAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state - validating clinic
   if (isValidating) {
     return (
       <div className="min-h-screen flex items-center justify-center">

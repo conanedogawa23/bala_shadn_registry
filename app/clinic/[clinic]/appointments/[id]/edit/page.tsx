@@ -101,6 +101,8 @@ export default function EditAppointmentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [appointmentData, setAppointmentData] = useState<AppointmentFormValues | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [clientName, setClientName] = useState<string>('');
+  const [resourceName, setResourceName] = useState<string>('');
 
   const clinicData = slugToClinic(clinicSlug);
   const clinicName = clinicData ? getRealDataClinicName(clinicData) : clinicSlug;
@@ -120,6 +122,14 @@ export default function EditAppointmentPage() {
           const date = new Date(dateString);
           return date.toISOString().slice(0, 16);
         };
+
+        // Store resource name if available
+        if (appointment.resourceName) {
+          setResourceName(appointment.resourceName);
+        }
+
+        // Store subject as client name (subject usually contains client name in appointments)
+        setClientName(appointment.subject);
 
         setAppointmentData({
           startDate: formatDateTimeLocal(appointment.startDate),
@@ -294,6 +304,7 @@ export default function EditAppointmentPage() {
                   placeholder="Select a client"
                   clinicName={clinicName}
                   required
+                  defaultClientName={clientName}
                 />
               </div>
               
@@ -304,12 +315,14 @@ export default function EditAppointmentPage() {
                   placeholder="Select a practitioner or resource"
                   clinicName={clinicName}
                   required
+                  defaultResourceName={resourceName}
                 />
                 
                 <FormInput
                   name="duration"
                   label="Duration (minutes)"
                   type="number"
+                  min="5"
                   placeholder="Enter duration in minutes"
                   required
                 />

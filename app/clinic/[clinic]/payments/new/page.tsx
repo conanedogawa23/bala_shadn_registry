@@ -23,6 +23,11 @@ import {
 import { useProductsByClinic } from '@/lib/hooks/useProducts';
 import { ProductStatus } from '@/lib/api/productService';
 
+// Import client search component
+import { ClientSearchSelect } from './_components/ClientSearchSelect';
+// Import order search component
+import { OrderSearchSelect } from './_components/OrderSearchSelect';
+
 // Line item interface for the form - updated to include product data
 interface FormLineItem {
   id: string;
@@ -129,6 +134,34 @@ export default function NewPaymentPage() {
     setFormData(prev => ({
       ...prev,
       [field]: value
+    }));
+    setError(null);
+  }, []);
+
+  // Handle client selection from search
+  const handleClientSelect = useCallback((clientId: number, clientName: string) => {
+    setFormData(prev => ({
+      ...prev,
+      clientId,
+      clientName
+    }));
+    setError(null);
+  }, []);
+
+  // Handle order selection from search - auto-populate client info and amount
+  const handleOrderSelect = useCallback((orderNumber: string, clientId: number, clientName: string, totalAmount: number) => {
+    setFormData(prev => ({
+      ...prev,
+      orderNumber,
+      clientId,
+      clientName,
+      lineItems: [{
+        ...prev.lineItems[0],
+        serviceName: 'Payment for Order',
+        description: `Payment for order #${orderNumber}`,
+        unitPrice: totalAmount,
+        totalPrice: totalAmount
+      }]
     }));
     setError(null);
   }, []);
@@ -383,36 +416,60 @@ export default function NewPaymentPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="clientId">Client ID *</Label>
-                <Input
-                  id="clientId"
-                  type="number"
-                  value={formData.clientId}
-                  onChange={(e) => handleInputChange('clientId', Number(e.target.value) || '')}
-                  placeholder="Enter client ID"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="clientName">Client Name *</Label>
-                <Input
-                  id="clientName"
-                  value={formData.clientName}
-                  onChange={(e) => handleInputChange('clientName', e.target.value)}
-                  placeholder="Enter client name"
-                  required
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Select Client *</Label>
+              <ClientSearchSelect
+                clinicName={realClinicName}
+                selectedClientId={formData.clientId}
+                selectedClientName={formData.clientName}
+                onClientSelect={handleClientSelect}
+                placeholder="Search and select a client..."
+                required
+                disabled={!realClinicName}
+              />
+              <p className="text-xs text-muted-foreground">
+                Search by client name. Shows 20 clients by default.
+              </p>
             </div>
+
+            {/* Display selected client info */}
+            {formData.clientId && formData.clientName && (
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <span className="text-xs text-muted-foreground">Client ID</span>
+                    <p className="font-medium">{formData.clientId}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Client Name</span>
+                    <p className="font-medium">{formData.clientName}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Search Order (Optional)</Label>
+              <OrderSearchSelect
+                clinicName={realClinicName}
+                selectedOrderNumber={formData.orderNumber}
+                onOrderSelect={handleOrderSelect}
+                placeholder="Search by order number..."
+                disabled={!realClinicName}
+              />
+              <p className="text-xs text-muted-foreground">
+                Search by order number. Selecting an order will auto-populate client info and amount.
+              </p>
+            </div>
+
+            {/* Manual order number input as fallback */}
             <div>
-              <Label htmlFor="orderNumber">Order Number (Optional)</Label>
+              <Label htmlFor="orderNumber">Or Enter Order Number Manually</Label>
               <Input
                 id="orderNumber"
                 value={formData.orderNumber}
                 onChange={(e) => handleInputChange('orderNumber', e.target.value)}
-                placeholder="Enter related order number"
+                placeholder="Enter order number if not found above"
               />
             </div>
           </CardContent>

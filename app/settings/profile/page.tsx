@@ -139,7 +139,21 @@ export default function ProfileSettingsPage() {
     console.log('=== ProfileSettingsPage useEffect DONE (async function initiated) ===');
   }, []); // Run only once on mount
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
   const handleInputChange = (field: string, value: string) => {
+    setHasUnsavedChanges(true);
+    
+    // Clear field error when user starts typing
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+    
     if (field.startsWith('address.')) {
       const addressField = field.split('.')[1];
       setFormData(prev => ({
@@ -157,7 +171,52 @@ export default function ProfileSettingsPage() {
     }
   };
 
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.firstName.trim()) {
+      errors.firstName = "First name is required";
+    } else if (formData.firstName.trim().length < 2) {
+      errors.firstName = "First name must be at least 2 characters";
+    }
+
+    if (!formData.lastName.trim()) {
+      errors.lastName = "Last name is required";
+    } else if (formData.lastName.trim().length < 2) {
+      errors.lastName = "Last name must be at least 2 characters";
+    }
+
+    if (formData.phone && !/^[\d\s\-\(\)\+]+$/.test(formData.phone)) {
+      errors.phone = "Please enter a valid phone number";
+    }
+
+    if (formData.dateOfBirth) {
+      const birthDate = new Date(formData.dateOfBirth);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      
+      if (age < 13) {
+        errors.dateOfBirth = "You must be at least 13 years old";
+      } else if (age > 120) {
+        errors.dateOfBirth = "Please enter a valid date of birth";
+      }
+    }
+
+    if (formData.address.postalCode && !/^[A-Za-z0-9\s\-]+$/.test(formData.address.postalCode)) {
+      errors['address.postalCode'] = "Please enter a valid postal code";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSaveChanges = async () => {
+    // Validate form first
+    if (!validateForm()) {
+      setErrorMessage("Please fix the validation errors before saving.");
+      return;
+    }
+
     // Get user ID from localStorage directly
     const userJson = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
     if (!userJson) {
@@ -187,12 +246,18 @@ export default function ProfileSettingsPage() {
     try {
       const updateData = {
         profile: {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phone: formData.phone,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          phone: formData.phone.trim(),
           dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth) : undefined,
           gender: formData.gender,
-          address: formData.address
+          address: {
+            street: formData.address.street.trim(),
+            city: formData.address.city.trim(),
+            province: formData.address.province.trim(),
+            postalCode: formData.address.postalCode.trim(),
+            country: formData.address.country.trim()
+          }
         }
       };
 
@@ -200,13 +265,44 @@ export default function ProfileSettingsPage() {
       const updatedUser = await UserApiService.updateUserProfile(userId, updateData);
       setUserProfile(updatedUser);
       setSuccessMessage("Your profile has been updated successfully.");
+      setHasUnsavedChanges(false);
+      
+      // Update localStorage with new user data
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      storedUser.profile = updatedUser.profile;
+      localStorage.setItem('user', JSON.stringify(storedUser));
     } catch (error: any) {
       console.error("Failed to update profile:", error);
-      setErrorMessage(error.message || "Failed to update profile. Please try again.");
+      
+      // Provide more specific error messages
+      if (error.message.includes('email')) {
+        setErrorMessage("Email validation failed. Please check your email address.");
+      } else if (error.message.includes('phone')) {
+        setErrorMessage("Phone number validation failed. Please check your phone number.");
+      } else if (error.message.includes('unauthorized') || error.message.includes('403')) {
+        setErrorMessage("You don't have permission to update this profile.");
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        setErrorMessage("Network error. Please check your connection and try again.");
+      } else {
+        setErrorMessage(error.message || "Failed to update profile. Please try again.");
+      }
     } finally {
       setIsSaving(false);
     }
   };
+
+  // Warn user about unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Only render select components after hydration
   const renderSelects = () => {
@@ -282,22 +378,34 @@ export default function ProfileSettingsPage() {
         <CardContent className="pt-4 pb-4 space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label htmlFor="firstName" className="text-sm font-medium">First Name</label>
+              <label htmlFor="firstName" className="text-sm font-medium">
+                First Name <span className="text-red-500">*</span>
+              </label>
               <Input 
                 id="firstName" 
                 placeholder="Your first name" 
                 value={formData.firstName}
                 onChange={(e) => handleInputChange('firstName', e.target.value)}
+                className={fieldErrors.firstName ? 'border-red-500' : ''}
               />
+              {fieldErrors.firstName && (
+                <p className="text-sm text-red-500">{fieldErrors.firstName}</p>
+              )}
             </div>
             <div className="space-y-2">
-              <label htmlFor="lastName" className="text-sm font-medium">Last Name</label>
+              <label htmlFor="lastName" className="text-sm font-medium">
+                Last Name <span className="text-red-500">*</span>
+              </label>
               <Input 
                 id="lastName" 
                 placeholder="Your last name" 
                 value={formData.lastName}
                 onChange={(e) => handleInputChange('lastName', e.target.value)}
+                className={fieldErrors.lastName ? 'border-red-500' : ''}
               />
+              {fieldErrors.lastName && (
+                <p className="text-sm text-red-500">{fieldErrors.lastName}</p>
+              )}
             </div>
           </div>
           
@@ -319,10 +427,14 @@ export default function ProfileSettingsPage() {
               <label htmlFor="phone" className="text-sm font-medium">Phone Number</label>
               <Input 
                 id="phone" 
-                placeholder="Your phone number" 
+                placeholder="(555) 123-4567" 
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
+                className={fieldErrors.phone ? 'border-red-500' : ''}
               />
+              {fieldErrors.phone && (
+                <p className="text-sm text-red-500">{fieldErrors.phone}</p>
+              )}
             </div>
           </div>
           
@@ -335,7 +447,11 @@ export default function ProfileSettingsPage() {
                 placeholder="Date of birth" 
                 value={formData.dateOfBirth}
                 onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                className={fieldErrors.dateOfBirth ? 'border-red-500' : ''}
               />
+              {fieldErrors.dateOfBirth && (
+                <p className="text-sm text-red-500">{fieldErrors.dateOfBirth}</p>
+              )}
             </div>
             {/* Render gender select conditionally based on mounted state */}
             {renderSelects()}
@@ -377,10 +493,14 @@ export default function ProfileSettingsPage() {
                 <label htmlFor="postalCode" className="text-sm font-medium">Postal Code</label>
                 <Input 
                   id="postalCode" 
-                  placeholder="Postal Code" 
+                  placeholder="A1B 2C3" 
                   value={formData.address.postalCode}
                   onChange={(e) => handleInputChange('address.postalCode', e.target.value)}
+                  className={fieldErrors['address.postalCode'] ? 'border-red-500' : ''}
                 />
+                {fieldErrors['address.postalCode'] && (
+                  <p className="text-sm text-red-500">{fieldErrors['address.postalCode']}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <label htmlFor="country" className="text-sm font-medium">Country</label>
@@ -394,16 +514,24 @@ export default function ProfileSettingsPage() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button 
-            variant="outline" 
-            onClick={() => router.push("/settings")}
-          >
-            Back to Settings
-          </Button>
+        <CardFooter className="flex flex-col sm:flex-row justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => router.push("/settings")}
+            >
+              Back to Settings
+            </Button>
+            {hasUnsavedChanges && (
+              <span className="text-sm text-amber-600 hidden sm:inline">
+                • Unsaved changes
+              </span>
+            )}
+          </div>
           <Button 
             onClick={handleSaveChanges}
-            disabled={isSaving}
+            disabled={isSaving || !hasUnsavedChanges}
+            className="w-full sm:w-auto"
           >
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>

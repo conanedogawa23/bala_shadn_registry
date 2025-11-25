@@ -56,6 +56,24 @@ export interface PaymentSummaryData {
   }>;
 }
 
+export interface UserSessionData {
+  userId: string;
+  username: string;
+  fullName: string;
+  role: string;
+  lastLogin: string | null;
+  lastActivity: string | null;
+  totalSessions: number;
+  activeSessions: number;
+  sessions: Array<{
+    deviceId: string;
+    ipAddress: string;
+    userAgent: string;
+    lastActivity: string;
+    isActive: boolean;
+  }>;
+}
+
 export interface TimesheetData {
   clinicName: string;
   dateRange: {
@@ -73,10 +91,13 @@ export interface TimesheetData {
     revenue: number;
     utilization: number;
   }>;
+  userActivity: Array<UserSessionData>;
   summary: {
     totalHours: number;
     totalRevenue: number;
     averageUtilization: number;
+    totalActiveUsers: number;
+    totalLoginSessions: number;
   };
 }
 
@@ -646,7 +667,7 @@ export class ReportApiService extends BaseApiService {
         });
       }
     } else if (data.practitioners) {
-      // Timesheet Report
+      // Timesheet Report - Practitioners
       for (let i = 0; i < data.practitioners.length; i++) {
         const practitioner = data.practitioners[i];
         flatData.push({
@@ -662,6 +683,43 @@ export class ReportApiService extends BaseApiService {
           revenue: practitioner.revenue,
           utilization: practitioner.utilization
         });
+      }
+      
+      // Timesheet Report - User Activity (Login/Logout Times)
+      if (data.userActivity && Array.isArray(data.userActivity)) {
+        for (let i = 0; i < data.userActivity.length; i++) {
+          const user = data.userActivity[i];
+          flatData.push({
+            report_type: 'User Login Activity',
+            clinic_name: data.clinicName,
+            user_id: user.userId,
+            username: user.username,
+            full_name: user.fullName,
+            role: user.role,
+            last_login: user.lastLogin || 'Never',
+            last_activity: user.lastActivity || 'Never',
+            total_sessions: user.totalSessions,
+            active_sessions: user.activeSessions
+          });
+          
+          // Add individual session details
+          if (user.sessions && user.sessions.length > 0) {
+            for (let j = 0; j < user.sessions.length; j++) {
+              const session = user.sessions[j];
+              flatData.push({
+                report_type: 'User Session Detail',
+                clinic_name: data.clinicName,
+                username: user.username,
+                full_name: user.fullName,
+                session_device: session.deviceId,
+                session_ip: session.ipAddress,
+                session_user_agent: session.userAgent?.substring(0, 100) || 'Unknown',
+                session_last_activity: session.lastActivity,
+                session_is_active: session.isActive ? 'Yes' : 'No'
+              });
+            }
+          }
+        }
       }
     } else if (Array.isArray(data)) {
       // Handle array-based reports

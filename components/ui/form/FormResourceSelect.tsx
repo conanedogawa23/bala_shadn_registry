@@ -59,6 +59,7 @@ interface FormResourceSelectProps {
   required?: boolean;
   disabled?: boolean;
   type?: 'practitioner' | 'service' | 'equipment' | 'room';
+  defaultResourceName?: string; // For pre-populated edit forms
 }
 
 /**
@@ -74,15 +75,17 @@ export function FormResourceSelect({
   clinicName,
   required = false,
   disabled = false,
-  type
+  type,
+  defaultResourceName
 }: FormResourceSelectProps) {
-  const { control } = useFormContext();
+  const { control, getValues } = useFormContext();
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedResourceInfo, setSelectedResourceInfo] = useState<{ id: number; name: string } | null>(null);
 
   // Debounce search term to avoid too many API calls
   useEffect(() => {
@@ -93,12 +96,9 @@ export function FormResourceSelect({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Only fetch resources when there's a debounced search term (minimum 2 characters)
-  const shouldFetch = debouncedSearchTerm.length >= 2;
-
-  // Fetch resources for the clinic based on debounced search term
+  // Fetch resources for the clinic - show 20 by default, filter when user searches
   const fetchResources = async () => {
-    if (!clinicName || !shouldFetch) {
+    if (!clinicName) {
       setResources([]);
       return;
     }
@@ -116,23 +116,28 @@ export function FormResourceSelect({
         limit: 100
       });
 
-      // Filter resources by debounced search term (client-side filtering)
-      const filteredResources = response.resources?.filter(resource => {
-        const searchLower = debouncedSearchTerm.toLowerCase();
-        const resourceName = resource.resourceName?.toLowerCase() || '';
-        const name = resource.name?.toLowerCase() || '';
-        const fullName = resource.fullName?.toLowerCase() || '';
-        const practitionerName = resource.practitioner 
-          ? `${resource.practitioner.firstName || ''} ${resource.practitioner.lastName || ''}`.toLowerCase()
-          : '';
-        const serviceCategory = resource.service?.category?.toLowerCase() || '';
-        
-        return resourceName.includes(searchLower) || 
-               name.includes(searchLower) ||
-               fullName.includes(searchLower) ||
-               practitionerName.includes(searchLower) || 
-               serviceCategory.includes(searchLower);
-      }) || [];
+      // Filter resources by debounced search term if provided (client-side filtering)
+      let filteredResources = response.resources || [];
+      
+      if (debouncedSearchTerm) {
+        filteredResources = filteredResources.filter(resource => {
+          const searchLower = debouncedSearchTerm.toLowerCase();
+          const resourceName = resource.resourceName?.toLowerCase() || '';
+          const practitionerName = resource.practitioner 
+            ? `${resource.practitioner.firstName || ''} ${resource.practitioner.lastName || ''}`.toLowerCase()
+            : '';
+          const serviceCategory = resource.service?.category?.toLowerCase() || '';
+          
+          return resourceName.includes(searchLower) || 
+                 practitionerName.includes(searchLower) || 
+                 serviceCategory.includes(searchLower);
+        });
+      }
+      
+      // Limit to first 20 if no search term
+      if (!debouncedSearchTerm) {
+        filteredResources = filteredResources.slice(0, 20);
+      }
 
       setResources(filteredResources);
     } catch (err) {
@@ -145,7 +150,20 @@ export function FormResourceSelect({
 
   useEffect(() => {
     fetchResources();
-  }, [clinicName, type, debouncedSearchTerm, shouldFetch]);
+  }, [clinicName, type, debouncedSearchTerm]);
+
+  // Set initial selected resource info from defaultResourceName
+  useEffect(() => {
+    if (defaultResourceName && !selectedResourceInfo) {
+      const currentValue = getValues(name);
+      if (currentValue) {
+        setSelectedResourceInfo({
+          id: currentValue,
+          name: defaultResourceName
+        });
+      }
+    }
+  }, [defaultResourceName, name, getValues, selectedResourceInfo]);
 
   // Get icon for resource type
   const getResourceIcon = (resourceType: string) => {
@@ -163,16 +181,13 @@ export function FormResourceSelect({
     }
   };
 
-  // Transform resources into select options - only when we have search results
+  // Transform resources into select options
   const resourceOptions = useMemo(() => {
-    // No options if debounced search term is too short
-    if (debouncedSearchTerm.length < 2) return [];
-    
     if (!resources || resources.length === 0) return [];
 
     return resources.map(resource => {
-      // Handle field name variations from API
-      const resourceName = resource.resourceName || resource.name || resource.fullName;
+      // Handle field name from API
+      const resourceName = resource.resourceName;
       let displayName = resourceName;
       let subtitle = '';
 
@@ -201,8 +216,17 @@ export function FormResourceSelect({
       control={control}
       name={name}
       render={({ field, fieldState }) => {
-        // Find selected resource for display
-        const selectedResource = resourceOptions.find(option => option.value === field.value?.toString());
+        // Find selected resource for display - check resourceOptions first, then fallback to selectedResourceInfo
+        let selectedResource = resourceOptions.find(option => option.value === field.value?.toString());
+        
+        // If not found in options but we have selectedResourceInfo, use that for display
+        const displayLabel = selectedResource 
+          ? selectedResource.label 
+          : (selectedResourceInfo && field.value === selectedResourceInfo.id)
+            ? selectedResourceInfo.name
+            : null;
+        
+        const displayType = selectedResource?.type || 'practitioner';
         
         return (
           <FormItem className={cn("w-full", className)}>
@@ -243,9 +267,9 @@ export function FormResourceSelect({
                       )}
                     >
                       <div className="flex items-center gap-2 truncate">
-                        {selectedResource && getResourceIcon(selectedResource.type)}
+                        {(displayLabel || selectedResource) && getResourceIcon(displayType)}
                         <span className="truncate">
-                          {selectedResource ? selectedResource.label : placeholder}
+                          {displayLabel || placeholder}
                         </span>
                       </div>
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -262,25 +286,24 @@ export function FormResourceSelect({
                     />
                     
                     <CommandList className="max-h-[300px]">
-                      {searchTerm.length < 2 ? (
-                        <CommandEmpty>
-                          <div className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground">
-                            <Search className="h-8 w-8 opacity-50" />
-                            <p>Type at least 2 characters to search</p>
-                          </div>
-                        </CommandEmpty>
-                      ) : loading || (searchTerm !== debouncedSearchTerm && searchTerm.length >= 2) ? (
+                      {loading || (searchTerm !== debouncedSearchTerm) ? (
                         <CommandEmpty>
                           <div className="flex items-center justify-center gap-2 py-6">
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm text-muted-foreground">Searching resources...</span>
+                            <span className="text-sm text-muted-foreground">
+                              {searchTerm ? `Searching ${type || 'resources'}...` : `Loading ${type || 'resources'}...`}
+                            </span>
                           </div>
                         </CommandEmpty>
                       ) : resourceOptions.length === 0 ? (
                         <CommandEmpty>
                           <div className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground">
                             <AlertCircle className="h-8 w-8 opacity-50" />
-                            <p>No {type || 'resources'} found matching "{debouncedSearchTerm}"</p>
+                            {debouncedSearchTerm ? (
+                              <p>No {type || 'resources'} found matching "{debouncedSearchTerm}"</p>
+                            ) : (
+                              <p>No {type || 'resources'} available</p>
+                            )}
                           </div>
                         </CommandEmpty>
                       ) : (
@@ -288,25 +311,26 @@ export function FormResourceSelect({
                           {resourceOptions.map((option) => (
                             <CommandItem
                               key={option.value}
-                              value={option.resource.resourceName || option.resource.name || ''}
+                              value={option.resource.resourceName || ''}
                               onSelect={() => {
                                 field.onChange(parseInt(option.value, 10));
+                                setSelectedResourceInfo({ id: parseInt(option.value, 10), name: option.label });
                                 setOpen(false);
                               }}
-                              className="cursor-pointer"
+                              className="cursor-pointer py-3"
                             >
                               <Check
                                 className={cn(
-                                  "mr-2 h-4 w-4",
+                                  "mr-2 h-4 w-4 shrink-0",
                                   field.value?.toString() === option.value ? "opacity-100" : "opacity-0"
                                 )}
                               />
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
                                 {getResourceIcon(option.type)}
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{option.label}</span>
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <span className="font-medium truncate">{option.label}</span>
                                   {option.subtitle && (
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className="text-xs text-muted-foreground truncate">
                                       {option.subtitle}
                                     </span>
                                   )}

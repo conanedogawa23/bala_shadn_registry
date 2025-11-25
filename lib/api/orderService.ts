@@ -215,6 +215,39 @@ export class OrderService extends BaseApiService {
   }
 
   /**
+   * Search orders by order number
+   * Used for searching orders by order ID/number in the payment form
+   */
+  static async searchOrders(
+    searchTerm: string, 
+    clinicName?: string, 
+    limit: number = 20
+  ): Promise<Order[]> {
+    try {
+      const query: OrderQuery = {
+        search: searchTerm,
+        limit
+      };
+      
+      if (clinicName) {
+        query.clinicName = clinicName;
+      }
+
+      const queryString = this.buildQuery(query);
+      const endpoint = queryString ? `${this.ENDPOINT}?${queryString}` : this.ENDPOINT;
+      const response = await this.request<OrdersResponse>(endpoint);
+      
+      if (response.success && response.data) {
+        return response.data;
+      }
+      
+      return [];
+    } catch (error) {
+      throw this.handleError(error, 'searchOrders');
+    }
+  }
+
+  /**
    * Get orders by client ID
    * Client order history for appointment tracking
    */
@@ -507,14 +540,15 @@ export class OrderService extends BaseApiService {
    */
   static async getProductPerformance(
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    clinicName?: string
   ): Promise<ProductPerformanceResponse> {
-    const cacheKey = `product_performance_${startDate || 'all'}_${endDate || 'all'}`;
+    const cacheKey = `product_performance_${clinicName || 'all'}_${startDate || 'all'}_${endDate || 'all'}`;
     const cached = this.getCached<ProductPerformanceResponse>(cacheKey);
     if (cached) return cached;
 
     try {
-      const queryString = this.buildQuery({ startDate, endDate });
+      const queryString = this.buildQuery({ startDate, endDate, clinicName });
       const endpoint = queryString 
         ? `${this.ENDPOINT}/analytics/products?${queryString}`
         : `${this.ENDPOINT}/analytics/products`;

@@ -193,4 +193,12 @@ export abstract class BaseApiService {
       this.cache.delete(key);
     }
   }
+
+  /**
+   * Public method to clear all cached data - called during logout
+   */
+  public static clearAllCache(): void {
+    this.cache.clear();
+    console.log('[API] All cache cleared');
+  }
 }

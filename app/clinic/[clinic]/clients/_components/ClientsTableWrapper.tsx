@@ -17,7 +17,14 @@ interface Client {
   status?: string;
   createdAt: string;
   updatedAt: string;
-  [key: string]: any;
+  // Enrichment data from backend
+  nextAppointment?: {
+    date: string;
+    subject: string;
+    formattedDate: string;
+  } | null;
+  totalOrders?: number;
+  [key: string]: string | number | object | null | undefined;
 }
 
 interface ClientsTableWrapperProps {

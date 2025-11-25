@@ -241,6 +241,8 @@ export function InsuranceSection({
                       name={`${prefix}CoveragePhysiotherapy`}
                       label="Physiotherapy Coverage ($)"
                       type="number"
+                      min="0"
+                      step="0.01"
                       placeholder="0"
                       disabled={isViewMode}
                     />
@@ -249,6 +251,8 @@ export function InsuranceSection({
                       name={`${prefix}CoverageMassage`}
                       label="Massage Coverage ($)"
                       type="number"
+                      min="0"
+                      step="0.01"
                       placeholder="0"
                       disabled={isViewMode}
                     />
@@ -259,6 +263,8 @@ export function InsuranceSection({
                       name={`${prefix}CoverageOrthopedicShoes`}
                       label="Orthopedic Shoes ($)"
                       type="number"
+                      min="0"
+                      step="0.01"
                       placeholder="0"
                       disabled={isViewMode}
                     />
@@ -267,6 +273,8 @@ export function InsuranceSection({
                       name={`${prefix}CoverageCompressionStockings`}
                       label="Compression Stockings ($)"
                       type="number"
+                      min="0"
+                      step="0.01"
                       placeholder="0"
                       disabled={isViewMode}
                     />
@@ -276,6 +284,8 @@ export function InsuranceSection({
                     name={`${prefix}CoverageOther`}
                     label="Other Coverage ($)"
                     type="number"
+                    min="0"
+                    step="0.01"
                     placeholder="0"
                     disabled={isViewMode}
                   />
@@ -292,6 +302,8 @@ export function InsuranceSection({
                       name={`${prefix}CoverageTotalAmountPerYear`}
                       label="Total Amount Per Year ($)"
                       type="number"
+                      min="0"
+                      step="0.01"
                       placeholder="0"
                       disabled={isViewMode}
                     />

@@ -23,7 +23,10 @@ const orderSchema = z.object({
   endDate: z.date().optional(),
   location: z.string().optional(),
   description: z.string().optional(),
-  totalAmount: z.string().min(1, { message: "Total amount is required" }),
+  totalAmount: z.string().min(1, { message: "Total amount is required" }).refine(
+    (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
+    { message: "Total amount must be a non-negative number" }
+  ),
 });
 
 // Type definitions
@@ -221,6 +224,7 @@ export default function EditOrderPage() {
                       name="totalAmount"
                       label="Total Amount ($)"
                       type="number"
+                      min="0"
                       step="0.01"
                       placeholder="125.00"
                     />

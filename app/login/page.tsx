@@ -120,6 +120,7 @@ export default function LoginPage() {
           phone: user.profile?.phone || '',
           dob: user.profile?.dateOfBirth || '',
           gender: user.profile?.gender || 'Other',
+          role: user.role || 'user', // Add role as top-level property
           address: {
             street: user.profile?.address?.street || '',
             city: user.profile?.address?.city || '',
@@ -206,16 +207,15 @@ export default function LoginPage() {
         
         console.log("Login successful, access token:", accessToken.substring(0, 20) + "...");
         
-        // Check if there's a redirect URL from middleware
+        // Check if there's a redirect URL from query params
         const urlParams = new URLSearchParams(window.location.search);
         const redirectUrl = urlParams.get('redirect');
         
         // Reset form
         form.reset();
         
-        // Use window.location.href instead of router.push to ensure cookies are sent with the request
-        // This forces a full page reload which allows the middleware to read the newly set cookies
-        window.location.href = redirectUrl || "/";
+        // Redirect to clinic or specified URL
+        window.location.href = redirectUrl || "/clinic/bodyblissphysio";
       } else {
         setAuthError(response.error?.message || "Login failed. Please try again.");
       }

@@ -13,17 +13,32 @@ import {
   Bell, 
   Shield, 
   CreditCard, 
-  ArrowRight 
+  ArrowRight,
+  Users
 } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { selectedClinic } = useClinic();
   const [mounted, setMounted] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Set mounted state to true after hydration
   useEffect(() => {
     setMounted(true);
+    
+    // Get user role from localStorage
+    if (typeof window !== 'undefined') {
+      const userJson = localStorage.getItem('user');
+      if (userJson) {
+        try {
+          const userData = JSON.parse(userJson);
+          setUserRole(userData.role);
+        } catch (error) {
+          console.error('Failed to parse user data:', error);
+        }
+      }
+    }
   }, []);
 
   // Get clinic slug for generating links
@@ -71,6 +86,16 @@ export default function SettingsPage() {
       icon: <CreditCard className="h-6 w-6" />,
       href: generateLink('clinic', 'settings?tab=billing', getClinicSlug()),
       color: "text-indigo-600"
+    }
+  ] : [];
+
+  const adminSettings = (userRole === 'admin' || userRole === 'manager') ? [
+    {
+      title: "User Management",
+      description: "Manage system users, roles, and permissions",
+      icon: <Users className="h-6 w-6" />,
+      href: "/admin/users",
+      color: "text-rose-600"
     }
   ] : [];
 
@@ -126,6 +151,39 @@ export default function SettingsPage() {
                 <Card 
                   key={setting.title} 
                   className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => router.push(setting.href)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className={`${setting.color} mb-2`}>
+                      {setting.icon}
+                    </div>
+                    <CardTitle className="text-lg">{setting.title}</CardTitle>
+                    <CardDescription>{setting.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <Button 
+                      variant="ghost" 
+                      className="p-0 h-auto text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      <span>Manage</span>
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Admin Settings */}
+        {adminSettings.length > 0 && (
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Administration</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {adminSettings.map((setting) => (
+                <Card 
+                  key={setting.title} 
+                  className="hover:shadow-md transition-shadow cursor-pointer border-rose-100"
                   onClick={() => router.push(setting.href)}
                 >
                   <CardHeader className="pb-2">

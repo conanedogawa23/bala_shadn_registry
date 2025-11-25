@@ -4,44 +4,18 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Public routes that don't require authentication
-  const publicRoutes = [
-    '/login', 
-    '/register', 
-    '/forgot-password', 
-    '/contact'
-  ];
-  
-  // Check if the current path is a public route
-  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`));
-  
-  // Get authentication status from cookies
-  // Note: In Next.js middleware, we can't access localStorage directly
-  // We check for accessToken and refreshToken cookies set by the backend
-  const accessToken = request.cookies.get('accessToken')?.value;
-  const refreshToken = request.cookies.get('refreshToken')?.value;
-  const isAuthenticated = !!(accessToken || refreshToken);
-  
-  // If user is not authenticated and trying to access protected route
-  if (!isPublicRoute && !isAuthenticated) {
-    const loginUrl = new URL('/login', request.url);
-    // Add the original URL as a redirect parameter so we can send them back after login
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-  
-  // If user is authenticated and trying to access login/register, redirect to home
-  if (isPublicRoute && isAuthenticated && (pathname === '/login' || pathname === '/register')) {
-    return NextResponse.redirect(new URL('/clinic/bodyblissphysio', request.url));
+  // Static assets and API routes that should be skipped
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.') // Files with extensions (images, etc.)
+  ) {
+    return NextResponse.next();
   }
 
-  // Redirect root path to active clinic (BodyBliss Physio) if authenticated
+  // Redirect root path to login (client-side will handle auth check)
   if (pathname === '/') {
-    if (isAuthenticated) {
-      return NextResponse.redirect(new URL('/clinic/bodyblissphysio', request.url));
-    } else {
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // Handle /clinics routes (these should not be redirected)

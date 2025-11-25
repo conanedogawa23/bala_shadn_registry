@@ -97,21 +97,31 @@ export default async function ClientsPage({ params, searchParams }: PageProps) {
     });
   } catch (err) {
     console.error('Error fetching email statistics:', err);
-    emailSampleData = { data: [], pagination: { total: 0 } };
+    emailSampleData = {
+      data: [],
+      pagination: {
+        page: 1,
+        limit: 100,
+        total: 0,
+        pages: 0,
+        hasNext: false,
+        hasPrev: false
+      }
+    };
   }
 
   // Calculate email stats from sample
-  const sampleClients = emailSampleData.data;
+  const sampleClients = emailSampleData?.data || [];
   const sampleSize = sampleClients.length;
   const withEmailCount = sampleSize > 0
-    ? Math.round((sampleClients.filter(c => c.email && c.email.trim()).length / sampleSize) * statsData.totalClients)
+    ? Math.round((sampleClients.filter(c => c.email && c.email.trim()).length / sampleSize) * (statsData?.totalClients || 0))
     : 0;
   
   const clientStats = {
-    total: statsData.totalClients,
-    active: statsData.activeClients,
+    total: statsData?.totalClients || 0,
+    active: statsData?.activeClients || 0,
     withEmail: withEmailCount,
-    newThisMonth: statsData.newThisMonth
+    newThisMonth: statsData?.newThisMonth || 0
   };
 
   // Fetch filtered/paginated clients data for the table

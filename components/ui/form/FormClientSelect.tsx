@@ -38,6 +38,7 @@ interface FormClientSelectProps {
   clinicName: string;
   required?: boolean;
   disabled?: boolean;
+  defaultClientName?: string; // For pre-populated edit forms
 }
 
 /**
@@ -52,12 +53,14 @@ export function FormClientSelect({
   className,
   clinicName,
   required = false,
-  disabled = false
+  disabled = false,
+  defaultClientName
 }: FormClientSelectProps) {
-  const { control } = useFormContext();
+  const { control, getValues } = useFormContext();
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [selectedClientInfo, setSelectedClientInfo] = useState<{ id: string; name: string } | null>(null);
 
   // Debounce search term to avoid too many API calls
   React.useEffect(() => {
@@ -68,9 +71,7 @@ export function FormClientSelect({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Only fetch clients when there's a debounced search term (minimum 2 characters)
-  const shouldFetch = debouncedSearchTerm.length >= 2;
-  
+  // Fetch clients - show 20 by default, or search when user types
   const { 
     clients, 
     loading, 
@@ -78,16 +79,26 @@ export function FormClientSelect({
     refetch 
   } = useClients({
     clinicName,
-    limit: 100, // Backend maximum allowed limit
-    search: debouncedSearchTerm,
-    autoFetch: !!clinicName && shouldFetch // Only fetch when search term exists
+    limit: 20, // Show 20 clients by default (similar to payment page)
+    search: debouncedSearchTerm || undefined,
+    autoFetch: !!clinicName // Always fetch when clinic is available
   });
 
-  // Transform clients into select options - only when we have search results
+  // Set initial selected client info from defaultClientName
+  React.useEffect(() => {
+    if (defaultClientName && !selectedClientInfo) {
+      const currentValue = getValues(name);
+      if (currentValue) {
+        setSelectedClientInfo({
+          id: currentValue,
+          name: defaultClientName
+        });
+      }
+    }
+  }, [defaultClientName, name, getValues, selectedClientInfo]);
+
+  // Transform clients into select options
   const clientOptions = useMemo(() => {
-    // No options if debounced search term is too short
-    if (debouncedSearchTerm.length < 2) return [];
-    
     if (!clients || clients.length === 0) return [];
 
     // Backend already filters by search term, so we can use all returned clients
@@ -117,8 +128,15 @@ export function FormClientSelect({
       control={control}
       name={name}
       render={({ field, fieldState }) => {
-        // Find selected client for display
-        const selectedClient = clientOptions.find(option => option.value === field.value);
+        // Find selected client for display - check clientOptions first, then fallback to selectedClientInfo
+        let selectedClient = clientOptions.find(option => option.value === field.value);
+        
+        // If not found in options but we have selectedClientInfo, use that for display
+        const displayLabel = selectedClient 
+          ? selectedClient.label 
+          : (selectedClientInfo && field.value === selectedClientInfo.id)
+            ? selectedClientInfo.name
+            : null;
         
         return (
           <FormItem className={cn("w-full", className)}>
@@ -159,7 +177,7 @@ export function FormClientSelect({
                       )}
                     >
                       <span className="truncate">
-                        {selectedClient ? selectedClient.label : placeholder}
+                        {displayLabel || placeholder}
                       </span>
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -175,25 +193,24 @@ export function FormClientSelect({
                     />
                     
                     <CommandList className="max-h-[300px]">
-                      {searchTerm.length < 2 ? (
-                        <CommandEmpty>
-                          <div className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground">
-                            <Search className="h-8 w-8 opacity-50" />
-                            <p>Type at least 2 characters to search</p>
-                          </div>
-                        </CommandEmpty>
-                      ) : loading || (searchTerm !== debouncedSearchTerm && searchTerm.length >= 2) ? (
+                      {loading || (searchTerm !== debouncedSearchTerm) ? (
                         <CommandEmpty>
                           <div className="flex items-center justify-center gap-2 py-6">
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm text-muted-foreground">Searching clients...</span>
+                            <span className="text-sm text-muted-foreground">
+                              {searchTerm ? 'Searching clients...' : 'Loading clients...'}
+                            </span>
                           </div>
                         </CommandEmpty>
                       ) : clientOptions.length === 0 ? (
                         <CommandEmpty>
                           <div className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground">
                             <AlertCircle className="h-8 w-8 opacity-50" />
-                            <p>No clients found matching "{debouncedSearchTerm}"</p>
+                            {debouncedSearchTerm ? (
+                              <p>No clients found matching "{debouncedSearchTerm}"</p>
+                            ) : (
+                              <p>No clients available</p>
+                            )}
                           </div>
                         </CommandEmpty>
                       ) : (
@@ -204,20 +221,21 @@ export function FormClientSelect({
                               value={option.searchText}
                               onSelect={() => {
                                 field.onChange(option.value);
+                                setSelectedClientInfo({ id: option.value, name: option.label });
                                 setOpen(false);
                               }}
-                              className="cursor-pointer"
+                              className="cursor-pointer py-3"
                             >
                               <Check
                                 className={cn(
-                                  "mr-2 h-4 w-4",
+                                  "mr-2 h-4 w-4 shrink-0",
                                   field.value === option.value ? "opacity-100" : "opacity-0"
                                 )}
                               />
-                              <div className="flex flex-col">
-                                <span className="font-medium">{option.label}</span>
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <span className="font-medium truncate">{option.label}</span>
                                 {option.subtitle && (
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="text-xs text-muted-foreground truncate">
                                     {option.subtitle}
                                   </span>
                                 )}

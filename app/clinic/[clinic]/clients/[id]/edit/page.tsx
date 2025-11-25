@@ -117,9 +117,10 @@ export default function EditClientPage() {
       setError(null);
       
       try {
-        const client: Client = await ClientApiService.getClientById(clientId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const client: any = await ClientApiService.getClientById(clientId);
         
-        // API returns flattened structure - map directly
+        // API returns flattened structure with all fields needed for edit form
         // Handle both firstName/lastName and name field
         const fullName = client.firstName && client.lastName 
           ? `${client.firstName} ${client.lastName}`.trim()
@@ -136,8 +137,8 @@ export default function EditClientPage() {
         }
         
         // Extract insurance data (up to 2 insurance plans per visio_req.md)
-        const insurance1 = client.insurance?.find((ins) => ins.type === '1st');
-        const insurance2 = client.insurance?.find((ins) => ins.type === '2nd');
+        const insurance1 = client.insurance?.find((ins: { type: string }) => ins.type === '1st');
+        const insurance2 = client.insurance?.find((ins: { type: string }) => ins.type === '2nd');
         
         // Helper to parse insurance birthday
         const parseBirthday = (birthday?: { day?: string; month?: string; year?: string }) => {
@@ -145,24 +146,25 @@ export default function EditClientPage() {
           return new Date(`${birthday.year}-${birthday.month}-${birthday.day}`);
         };
         
-        // Parse address from formatted string (fallback)
-        // API returns formatted address like "123 St, City, Province, Postal"
-        // Individual fields (city, province) also available separately
-        const addressParts = client.address?.split(',') || [];
-        const street = addressParts[0]?.trim() || '';
-        
         setClientData({
+          // Personal Info
           name: fullName,
           dateOfBirth,
           gender: (client.gender?.toLowerCase() as "male" | "female" | "other") || "male",
+          
+          // Contact Info - API now returns individual fields
           email: client.email || "",
-          cellPhone: client.phone || "",  // API returns single phone field
-          homePhone: "",  // Not in flattened response
-          address: street || client.address || "",
-          apartment: "",  // Not in flattened response  
+          cellPhone: client.cellPhone || client.phone || "",  // Use cellPhone if available, fallback to phone
+          homePhone: client.homePhone || "",
+          
+          // Address - API now returns individual address fields
+          address: client.street || client.address || "",  // street field or fallback to formatted address
+          apartment: client.apartment || "",
           city: client.city || "",
           province: client.province || "",
-          postalCode: client.postalCode || "",  // May need to extract from address
+          postalCode: client.postalCode || "",
+          
+          // Additional Info
           companyName: client.companyName || "",
           referringMD: client.referringMD || "",
           

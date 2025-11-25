@@ -510,8 +510,9 @@ export default function ClientOrderNewPage() {
                           <Input
                             type="number"
                             step="0.01"
+                            min="0"
                             value={item.unitPrice || 0}
-                            onChange={(e) => updateOrderItem(index, 'unitPrice', parseFloat(e.target.value))}
+                            onChange={(e) => updateOrderItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                             className="w-24"
                           />
                         </TableCell>

@@ -5,6 +5,9 @@ import { AlertCircle } from 'lucide-react';
 // Server-side data fetchers
 import { fetchPaymentsByClinic, fetchClinics } from '@/lib/server/data-fetchers';
 
+// Force dynamic rendering to always fetch fresh data
+export const dynamic = 'force-dynamic';
+
 // Client Components
 import { PaymentsHeader } from './_components/PaymentsHeader';
 import { PaymentsTable } from './_components/PaymentsTable';
@@ -73,7 +76,7 @@ export default async function PaymentsPage({ params, searchParams }: PageProps) 
       page: currentPage,
       limit: pageSize,
       status,
-      revalidate: 180, // Cache for 3 minutes
+      revalidate: 0, // No caching - always fetch fresh data
       tags: ['payments', `clinic-${backendClinicName}`]
     });
   } catch (err) {

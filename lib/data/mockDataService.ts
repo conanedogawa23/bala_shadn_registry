@@ -17,13 +17,31 @@ export interface Client {
   city: string;
   province: string;
   address?: string; // Add formatted address string for display
-  phone: string;
+  
+  // Individual address fields for edit form
+  street?: string;
+  apartment?: string;
+  postalCode?: string;
+  
+  // Phone fields - both primary and individual
+  phone: string; // Primary phone for display (backwards compatible)
+  cellPhone?: string;
+  homePhone?: string;
+  workPhone?: string;
+  
   email: string;
   clinic: string;
   status?: string;
   dateOfBirth?: string;
   createdAt?: string;
   updatedAt?: string;
+  
+  // Additional personal/medical info
+  companyName?: string;
+  referringMD?: string;
+  familyMD?: string;
+  csrName?: string;
+  companyOther?: string;
   
   // API response structure (nested format from ClientApiService)
   personalInfo?: {

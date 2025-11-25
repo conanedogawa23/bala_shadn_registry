@@ -1,59 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Edit2, ChevronRight, Settings, User, Calendar, CreditCard, Bell, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserInfo, ProfileFormValues } from "./user-info";
 import { AppointmentHistory, Appointment } from "./appointment-history";
-
-// Mock user data
-const mockUserData: ProfileFormValues = {
-  fullName: "Sarah Johnson",
-  email: "sarah.johnson@example.com",
-  phone: "(555) 123-4567",
-  address: "123 Wellness Ave, Healthtown, CA 94123",
-  bio: "Fitness enthusiast and wellness advocate focused on holistic health approaches. Regularly attending yoga and pilates sessions to maintain balance and strength.",
-  dateOfBirth: "1988-05-15",
-  emergencyContact: "John Johnson (Husband) - (555) 987-6543",
-};
-
-// Mock appointment data
-const appointments: Appointment[] = [
-  {
-    id: 1,
-    service: "Therapeutic Massage",
-    provider: "Dr. Maria Lopez",
-    date: "2023-10-15",
-    time: "10:00 AM",
-    status: "completed",
-  },
-  {
-    id: 2,
-    service: "Wellness Consultation",
-    provider: "Dr. James Wilson",
-    date: "2023-11-05",
-    time: "2:30 PM",
-    status: "completed",
-  },
-  {
-    id: 3,
-    service: "Physical Therapy",
-    provider: "Dr. Lisa Chen",
-    date: "2023-12-20",
-    time: "11:15 AM",
-    status: "scheduled",
-  },
-  {
-    id: 4,
-    service: "Nutritional Assessment",
-    provider: "Dr. Michael Brown",
-    date: "2024-01-10",
-    time: "3:00 PM",
-    status: "scheduled",
-  },
-];
+import { UserApiService, User as UserType } from "@/lib/api/userApiService";
 
 // Placeholder component for UserSettings
 const UserSettings = () => (
@@ -299,9 +254,79 @@ const Badge = ({ className, children }: { className?: string, children: React.Re
 );
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [isEditMode, setIsEditMode] = useState(false);
-  const [userData, setUserData] = useState<ProfileFormValues>(mockUserData);
+  const [userData, setUserData] = useState<ProfileFormValues | null>(null);
+  const [userProfile, setUserProfile] = useState<UserType | null>(null);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [activeTab, setActiveTab] = useState("profile");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Fetch user profile on mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        // Check authentication
+        if (typeof window === 'undefined') return;
+        
+        const isAuthenticatedValue = localStorage.getItem('isAuthenticated');
+        if (isAuthenticatedValue !== 'true') {
+          router.push('/login');
+          return;
+        }
+
+        // Get user ID from localStorage
+        const userJson = localStorage.getItem('user');
+        if (!userJson) {
+          router.push('/login');
+          return;
+        }
+
+        const userData = JSON.parse(userJson);
+        const userId = userData.id || userData._id;
+        
+        if (!userId) {
+          setError("Invalid user data. Please log in again.");
+          return;
+        }
+
+        // Fetch user profile
+        const profile = await UserApiService.getCurrentUser(userId);
+        setUserProfile(profile);
+        
+        // Transform API data to ProfileFormValues format
+        const formattedData: ProfileFormValues = {
+          fullName: `${profile.profile?.firstName || ''} ${profile.profile?.lastName || ''}`.trim(),
+          email: profile.email,
+          phone: profile.profile?.phone || '',
+          address: profile.profile?.address 
+            ? `${profile.profile.address.street || ''}, ${profile.profile.address.city || ''}, ${profile.profile.address.province || ''} ${profile.profile.address.postalCode || ''}`.trim()
+            : '',
+          bio: '', // Bio not in current API model
+          dateOfBirth: profile.profile?.dateOfBirth 
+            ? new Date(profile.profile.dateOfBirth).toISOString().split('T')[0]
+            : '',
+          emergencyContact: '', // Emergency contact not in current API model
+          occupation: '', // Occupation not in current API model
+        };
+        
+        setUserData(formattedData);
+        
+        // TODO: Fetch appointments from appointments API when available
+        // For now, use empty array
+        setAppointments([]);
+        
+      } catch (err) {
+        console.error('Failed to fetch user profile:', err);
+        setError('Failed to load profile data. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [router]);
   
   // Toggle between view and edit modes
   const toggleEditMode = () => {
@@ -309,9 +334,33 @@ export default function ProfilePage() {
   };
   
   // Handle form submission
-  const handleSave = (values: ProfileFormValues) => {
-    setUserData(values);
-    setIsEditMode(false);
+  const handleSave = async (values: ProfileFormValues) => {
+    try {
+      if (!userProfile) return;
+      
+      // Split full name into first and last name
+      const nameParts = values.fullName.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      // Update user profile via API
+      const userId = userProfile._id;
+      await UserApiService.updateUserProfile(userId, {
+        profile: {
+          firstName,
+          lastName,
+          phone: values.phone,
+          dateOfBirth: values.dateOfBirth ? new Date(values.dateOfBirth) : undefined,
+          // Note: address, bio, emergencyContact, occupation not supported by current API
+        }
+      });
+      
+      setUserData(values);
+      setIsEditMode(false);
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      setError('Failed to save profile. Please try again.');
+    }
   };
   
   // Handle cancel edit
@@ -327,6 +376,32 @@ export default function ProfilePage() {
     { id: "settings", label: "Account Settings", icon: Settings },
     { id: "preferences", label: "Preferences", icon: Bell },
   ];
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6666FF] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !userData) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold mb-2">Error Loading Profile</h2>
+          <p className="text-gray-600 mb-4">{error || 'Failed to load profile data'}</p>
+          <Button onClick={() => router.push('/login')}>Return to Login</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -376,7 +451,7 @@ export default function ProfilePage() {
               <div className="p-4 flex flex-col items-center space-y-4 border-b">
                 <div className="relative w-24 h-24">
                   <Image 
-                    src="https://ui.shadcn.com/avatars/01.png"
+                    src={userProfile?.profile?.avatar || "https://ui.shadcn.com/avatars/01.png"}
                     alt={userData.fullName}
                     fill
                     className="rounded-full object-cover border-4 border-white"
@@ -384,7 +459,8 @@ export default function ProfilePage() {
                 </div>
                 <div className="text-center">
                   <h3 className="font-bold text-lg">{userData.fullName}</h3>
-                  <p className="text-sm text-gray-500">Patient ID: #BV78923</p>
+                  <p className="text-sm text-gray-500">User ID: #{userProfile?._id.slice(-8)}</p>
+                  <p className="text-xs text-gray-400 capitalize">{userProfile?.role || 'User'}</p>
                 </div>
               </div>
               

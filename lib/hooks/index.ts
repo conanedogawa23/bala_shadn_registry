@@ -54,6 +54,7 @@ export {
   useRevenueAnalytics,
   useProductPerformance,
   useOrderMutation,
+  useOrderSearch,
   OrderUtils
 } from './useOrders';
 

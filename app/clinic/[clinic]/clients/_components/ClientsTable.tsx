@@ -27,7 +27,14 @@ interface Client {
   status?: string;
   createdAt: string;
   updatedAt: string;
-  [key: string]: string | number | undefined;
+  // Enrichment data from backend
+  nextAppointment?: {
+    date: string;
+    subject: string;
+    formattedDate: string;
+  } | null;
+  totalOrders?: number;
+  [key: string]: string | number | object | null | undefined;
 }
 
 interface ClientsTableProps {
@@ -171,17 +178,44 @@ export function ClientsTable({
     {
       accessorKey: "nextAppointment",
       header: "Next Appointment",
-      cell: () => {
+      cell: ({ row }) => {
+        const client = row.original;
+        const appointment = client.nextAppointment;
+        
+        if (!appointment) {
+          return (
+            <span className="text-sm text-gray-400">No upcoming</span>
+          );
+        }
+        
         return (
-          <span className="text-sm text-gray-400">Check appointments</span>
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-blue-500" />
+            <div>
+              <div className="font-medium">{appointment.formattedDate}</div>
+              <div className="text-xs text-gray-500 truncate max-w-[120px]" title={appointment.subject}>
+                {appointment.subject}
+              </div>
+            </div>
+          </div>
         );
       },
     },
     {
       accessorKey: "totalOrders",
       header: "Orders",
-      cell: () => {
-        return <span className="text-sm font-medium">-</span>;
+      cell: ({ row }) => {
+        const client = row.original;
+        const totalOrders = client.totalOrders ?? 0;
+        
+        return (
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-medium">{totalOrders}</span>
+            <span className="text-xs text-gray-400">
+              {totalOrders === 1 ? 'order' : 'orders'}
+            </span>
+          </div>
+        );
       },
     },
     {

@@ -7,11 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
+interface PaymentAmounts {
+  totalPaymentAmount: number;
+  totalPaid: number;
+  totalOwed: number;
+  [key: string]: number;
+}
+
 interface Payment {
   _id: string;
   paymentId: string;
+  paymentNumber?: string;
   clientName: string;
-  amount: number;
+  amounts: PaymentAmounts;
   paymentDate: string;
   paymentMethod: string;
   status: string;
@@ -69,7 +77,7 @@ export function PaymentsTable({ payments, clinicName }: PaymentsTableProps) {
             <div className="flex justify-between items-start">
               <div>
                 <CardTitle className="text-lg font-medium">
-                  {payment.paymentId}
+                  {payment.paymentNumber || payment.paymentId}
                 </CardTitle>
                 <p className="text-sm text-gray-600 mt-1">
                   <CreditCard className="inline h-3 w-3 mr-1" />
@@ -84,7 +92,7 @@ export function PaymentsTable({ payments, clinicName }: PaymentsTableProps) {
           <div className="px-6 pb-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Amount:</span>
-              <span className="font-medium">{formatCurrency(payment.amount)}</span>
+              <span className="font-medium">{formatCurrency(payment.amounts?.totalPaymentAmount || 0)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Date:</span>

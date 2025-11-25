@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { currentUserData } from "@/lib/mock-data";
+import { BaseApiService } from "@/lib/api/baseApiService";
 
 // Enhanced User interface with comprehensive profile information
 export interface User {
@@ -12,6 +13,7 @@ export interface User {
   phone: string;
   dob: string;
   gender: string;
+  role?: string; // User role for authorization (admin, manager, staff, etc.)
   address: {
     street: string;
     city: string;
@@ -108,20 +110,57 @@ export interface User {
   };
 }
 
-// Helper function to set cookie
-const setCookie = (name: string, value: string, days: number = 7) => {
+// Helper to set a non-HttpOnly cookie for server-side reads
+const setServerReadableCookie = (name: string, value: string, days: number) => {
   if (typeof document === "undefined") return;
-  
   const expires = new Date();
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
   document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
 };
 
-// Helper function to delete cookie
-const deleteCookie = (name: string) => {
+// Clear any session cookies (backup cleanup)
+const destroyAllCookies = () => {
   if (typeof document === "undefined") return;
   
-  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+  const hostname = window.location.hostname;
+  const domains = [hostname, `.${hostname}`, ''];
+  const paths = ['/', ''];
+  
+  // Get current pathname segments to clear path-specific cookies
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  let currentPath = '';
+  for (const segment of pathSegments) {
+    currentPath += '/' + segment;
+    paths.push(currentPath);
+  }
+  
+  // Get all visible cookies
+  const allCookies = document.cookie.split(';');
+  
+  for (const cookieStr of allCookies) {
+    const cookieName = cookieStr.split('=')[0].trim();
+    if (!cookieName) continue;
+    
+    // Try EVERY combination to kill this cookie
+    for (const domain of domains) {
+      for (const path of paths) {
+        const domainPart = domain ? `;domain=${domain}` : '';
+        
+        // Expired date approach
+        document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path || '/'}${domainPart}`;
+        document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path || '/'}${domainPart};SameSite=Lax`;
+        document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path || '/'}${domainPart};SameSite=Strict`;
+        document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path || '/'}${domainPart};SameSite=None;Secure`;
+        
+        // Max-age=0 approach
+        document.cookie = `${cookieName}=;max-age=0;path=${path || '/'}${domainPart}`;
+        document.cookie = `${cookieName}=;max-age=0;path=${path || '/'}${domainPart};SameSite=Lax`;
+        
+        // Max-age=-1 approach (negative)
+        document.cookie = `${cookieName}=;max-age=-1;path=${path || '/'}${domainPart}`;
+      }
+    }
+  }
 };
 
 // Check if user is authenticated client-side
@@ -179,46 +218,119 @@ export const updateUserProfile = (userData: Partial<User>): boolean => {
 };
 
 // Login the user (call this after successful authentication)
-// Note: Backend sets HttpOnly cookies, but we also set client-side cookies for Next.js middleware
+// Tokens stored in localStorage + non-HttpOnly cookie for server-side reads
 export const login = (userData: User, token?: string, refreshToken?: string) => {
   if (typeof window === "undefined") return;
   
-  // Store in localStorage for client-side UI state only
+  console.log('[Auth] Logging in user, storing tokens in localStorage');
+  
+  // Store in localStorage (primary storage)
   localStorage.setItem("isAuthenticated", "true");
   localStorage.setItem("user", JSON.stringify(userData));
   
   if (token) {
     localStorage.setItem("authToken", token);
-    // Set non-HttpOnly cookie for Next.js middleware to read
-    setCookie("accessToken", token, 1/96); // 15 minutes (1/96 of a day)
+    // Also set non-HttpOnly cookie for Next.js Server Components
+    setServerReadableCookie("accessToken", token, 1/96); // 15 minutes
+    console.log('[Auth] Access token stored in localStorage + cookie for SSR');
   }
   
   if (refreshToken) {
     localStorage.setItem("refreshToken", refreshToken);
-    // Set non-HttpOnly cookie for Next.js middleware to read
-    setCookie("refreshToken", refreshToken, 7); // 7 days
+    setServerReadableCookie("refreshToken", refreshToken, 7); // 7 days
+    console.log('[Auth] Refresh token stored in localStorage + cookie for SSR');
   }
-  
-  // Backend sets httpOnly cookies for API security
-  // We also set non-HttpOnly cookies for Next.js middleware authentication
 };
 
-// Logout the user
-export const logout = () => {
+// Call backend logout API to revoke tokens
+const callBackendLogout = async (): Promise<boolean> => {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const endpoint = `${apiUrl}/api/v1/auth/logout`;
+    const refreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+    const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : null;
+    
+    console.log('[Auth] Calling backend logout at:', endpoint);
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(authToken && { 'Authorization': `Bearer ${authToken}` }), // Include access token in header
+      },
+      // Include refresh token in the request body for revocation
+      body: JSON.stringify({ refreshToken })
+    });
+    
+    if (response.ok) {
+      console.log('[Auth] Backend logout successful - tokens revoked');
+      return true;
+    } else {
+      console.warn(`[Auth] Backend logout failed:`, response.status, response.statusText);
+      return false;
+    }
+  } catch (error) {
+    console.warn('[Auth] Backend logout error:', error);
+    return false;
+  }
+};
+
+// Logout the user - async version that calls backend API
+export const logout = async () => {
   if (typeof window === "undefined") return;
   
-  // Clear localStorage
-  localStorage.removeItem("isAuthenticated");
-  localStorage.removeItem("user");
-  localStorage.removeItem("authToken");
-  localStorage.removeItem("refreshToken");
-  localStorage.removeItem("rememberMe");
+  console.log('[Auth] ========== LOGOUT START ==========');
+  console.log('[Auth] localStorage keys BEFORE:', Object.keys(localStorage));
   
-  // Clear cookies (both client-side and server-side will be cleared)
-  deleteCookie("isAuthenticated");
-  deleteCookie("authToken");
-  deleteCookie("accessToken");
-  deleteCookie("refreshToken");
+  // 1. Call backend to revoke tokens in database
+  await callBackendLogout();
+  
+  // 2. CLEAR localStorage completely (where tokens are stored)
+  try { 
+    localStorage.clear(); 
+    console.log('[Auth] ✓ localStorage cleared (tokens removed)');
+  } catch (e) { 
+    console.error('[Auth] ✗ Could not clear localStorage:', e);
+  }
+  
+  // 3. CLEAR sessionStorage
+  try { 
+    sessionStorage.clear(); 
+    console.log('[Auth] ✓ sessionStorage cleared');
+  } catch (e) {
+    console.error('[Auth] ✗ Could not clear sessionStorage:', e);
+  }
+  
+  // 4. Clear any remaining cookies (just session cookies, not auth tokens)
+  destroyAllCookies();
+  
+  // 5. Clear API cache
+  try { 
+    BaseApiService.clearAllCache(); 
+    console.log('[Auth] ✓ API cache cleared');
+  } catch (e) {
+    console.error('[Auth] ✗ Could not clear API cache:', e);
+  }
+  
+  console.log('[Auth] localStorage keys AFTER:', Object.keys(localStorage));
+  console.log('[Auth] ========== LOGOUT COMPLETE ==========');
+};
+
+// Synchronous logout for cases where async isn't practical
+export const logoutSync = () => {
+  if (typeof window === "undefined") return;
+  
+  console.log('[Auth] Sync logout - clearing local data');
+  
+  // Fire and forget backend call
+  callBackendLogout().catch(() => {});
+  
+  // Clear local storage (where tokens are stored)
+  try { localStorage.clear(); } catch { /* ignore */ }
+  try { sessionStorage.clear(); } catch { /* ignore */ }
+  try { BaseApiService.clearAllCache(); } catch { /* ignore */ }
+  destroyAllCookies();
 };
 
 // Authentication hook for protected routes
@@ -238,21 +350,23 @@ export function useAuth(redirectTo = "/login") {
     isAuthenticated: isAuthenticated(),
     user: getUser(),
     updateProfile: updateUserProfile,
-    logout: () => {
-      logout();
-      router.push(redirectTo);
+    logout: async () => {
+      await logout();
+      // Force hard reload to clear all in-memory state
+      window.location.href = redirectTo;
     }
   };
 }
 
 // Public routes hook for login/register pages
-export function usePublicRoute(redirectIfAuthenticated = "/") {
+export function usePublicRoute(redirectIfAuthenticated = "/clinic/bodyblissphysio") {
   const router = useRouter();
 
   useEffect(() => {
     // Only access localStorage when in browser environment
     if (typeof window !== "undefined") {
       if (isAuthenticated()) {
+        console.log('[Auth] User already authenticated, redirecting to:', redirectIfAuthenticated);
         router.push(redirectIfAuthenticated);
       }
     }

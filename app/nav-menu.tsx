@@ -13,7 +13,8 @@ import {
   LogIn,
   UserCircle,
   Bell,
-  ChevronDown
+  ChevronDown,
+  Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
@@ -82,13 +83,19 @@ export default function NavMenu() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [userMenuOpen, notificationsOpen, mobileMenuOpen]);
 
-  const handleLogout = useCallback(() => {
-    logout();
+  const handleLogout = useCallback(async () => {
+    // Immediately update UI state
     setUserAuthenticated(false);
     setUserData(null);
     setUserMenuOpen(false);
-    router.push('/login');
-  }, [router]);
+    
+    // Perform logout (clears cookies, localStorage, sessionStorage, API cache, calls backend API)
+    await logout();
+    
+    // Force a hard page reload to clear all in-memory state (React state, contexts, etc.)
+    // This ensures a completely clean slate and redirects to login
+    window.location.href = '/login';
+  }, []);
   
   const isActive = useCallback((path: string) => {
     // Exact match only
@@ -304,6 +311,20 @@ export default function NavMenu() {
                       >
                         Account Settings
                       </Link>
+                      {(userData?.role === 'admin' || userData?.role === 'manager') && (
+                        <>
+                          <div className="border-t border-gray-100 my-1"></div>
+                          <Link 
+                            href="/admin/users"
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setUserMenuOpen(false)}
+                          >
+                            <Shield className="h-4 w-4 mr-2" />
+                            User Management
+                          </Link>
+                        </>
+                      )}
+                      <div className="border-t border-gray-100 my-1"></div>
                       <button 
                         onClick={handleLogout}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
@@ -387,6 +408,26 @@ export default function NavMenu() {
               </span>
             </Link>
           ))}
+          {mounted && userAuthenticated && (userData?.role === 'admin' || userData?.role === 'manager') && (
+            <>
+              <div className="border-t border-gray-200 my-2"></div>
+              <Link
+                href="/admin/users"
+                onClick={() => setMobileMenuOpen(false)}
+                className={cn(
+                  "block pl-3 pr-4 py-3 border-l-4 text-base font-medium transition-colors",
+                  isActive('/admin/users')
+                    ? "bg-purple-50 border-purple-500 text-purple-700"
+                    : "border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700"
+                )}
+              >
+                <span className="flex items-center">
+                  <Shield className="h-5 w-5" />
+                  <span className="ml-3">User Management</span>
+                </span>
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </nav>

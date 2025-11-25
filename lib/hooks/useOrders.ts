@@ -399,6 +399,11 @@ export function useRevenueAnalytics({
   const [analytics, setAnalytics] = useState<RevenueAnalyticsData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<{
+    totalRevenue: number;
+    totalOrders: number;
+    avgOrderValue: number;
+  } | null>(null);
 
   const fetchAnalytics = useCallback(async () => {
     if (!clinicName) return;
@@ -408,12 +413,23 @@ export function useRevenueAnalytics({
 
     try {
       const response = await OrderService.getRevenueAnalytics(clinicName, startDate, endDate);
+      
       // Extract analytics array from the nested response structure
       const analyticsArray = response.data?.analytics || [];
       setAnalytics(Array.isArray(analyticsArray) ? analyticsArray : []);
+      
+      // Extract summary data if available
+      if (response.data?.summary) {
+        setSummary({
+          totalRevenue: response.data.summary.totalRevenue || 0,
+          totalOrders: response.data.summary.totalOrders || 0,
+          avgOrderValue: response.data.summary.avgOrderValue || 0
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch revenue analytics');
       setAnalytics([]);
+      setSummary(null);
     } finally {
       setLoading(false);
     }
@@ -423,10 +439,13 @@ export function useRevenueAnalytics({
     setError(null);
   }, []);
 
-  // Calculate totals with safe array operations
-  const totalRevenue = Array.isArray(analytics) ? analytics.reduce((sum, item) => sum + (item.totalRevenue || 0), 0) : 0;
-  const totalOrders = Array.isArray(analytics) ? analytics.reduce((sum, item) => sum + (item.orderCount || 0), 0) : 0;
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  // Use summary data if available, otherwise calculate from analytics
+  const totalRevenue = summary?.totalRevenue ?? 
+    (Array.isArray(analytics) ? analytics.reduce((sum, item) => sum + (item.totalRevenue || 0), 0) : 0);
+  const totalOrders = summary?.totalOrders ?? 
+    (Array.isArray(analytics) ? analytics.reduce((sum, item) => sum + (item.orderCount || 0), 0) : 0);
+  const avgOrderValue = summary?.avgOrderValue ?? 
+    (totalOrders > 0 ? totalRevenue / totalOrders : 0);
 
   useEffect(() => {
     if (autoFetch && clinicName) {
@@ -449,6 +468,7 @@ export function useRevenueAnalytics({
 interface UseProductPerformanceOptions {
   startDate?: string;
   endDate?: string;
+  clinicName?: string;
   autoFetch?: boolean;
 }
 
@@ -467,6 +487,7 @@ interface UseProductPerformanceReturn {
 export function useProductPerformance({
   startDate,
   endDate,
+  clinicName,
   autoFetch = true
 }: UseProductPerformanceOptions = {}): UseProductPerformanceReturn {
   const [performance, setPerformance] = useState<ProductPerformanceData[]>([]);
@@ -478,7 +499,7 @@ export function useProductPerformance({
     setError(null);
 
     try {
-      const response = await OrderService.getProductPerformance(startDate, endDate);
+      const response = await OrderService.getProductPerformance(startDate, endDate, clinicName);
       // Extract performance array from the nested response structure
       const performanceArray = response.data?.performance || [];
       setPerformance(Array.isArray(performanceArray) ? performanceArray : []);
@@ -488,7 +509,7 @@ export function useProductPerformance({
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, clinicName]);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -636,6 +657,67 @@ export function useOrderMutation(): UseOrderMutationReturn {
     markReadyForBilling,
     processPayment,
     cancelOrder,
+    loading,
+    error,
+    clearError
+  };
+}
+
+interface UseOrderSearchOptions {
+  clinicName?: string;
+  limit?: number;
+}
+
+interface UseOrderSearchReturn {
+  searchOrders: (searchTerm: string) => Promise<Order[]>;
+  orders: Order[];
+  loading: boolean;
+  error: string | null;
+  clearError: () => void;
+}
+
+/**
+ * Hook for searching orders by order number/ID
+ * Used in payment forms to search and select orders
+ */
+export function useOrderSearch({
+  clinicName,
+  limit = 20
+}: UseOrderSearchOptions = {}): UseOrderSearchReturn {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const searchOrders = useCallback(async (searchTerm: string): Promise<Order[]> => {
+    if (!searchTerm || searchTerm.length < 1) {
+      setOrders([]);
+      return [];
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const results = await OrderService.searchOrders(searchTerm, clinicName, limit);
+      setOrders(results);
+      return results;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to search orders';
+      setError(errorMessage);
+      setOrders([]);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [clinicName, limit]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    searchOrders,
+    orders,
     loading,
     error,
     clearError

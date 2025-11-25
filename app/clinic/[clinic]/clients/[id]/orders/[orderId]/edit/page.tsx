@@ -200,7 +200,7 @@ export default function EditClientOrderPage() {
     const product = products.find(p => p.productKey === productKey);
     if (product) {
       updateItem(index, 'productKey', productKey);
-      updateItem(index, 'productName', product.productName);
+      updateItem(index, 'productName', product.name);
       updateItem(index, 'unitPrice', product.price || 0);
       updateItem(index, 'duration', product.duration || 30);
     }
@@ -542,7 +542,7 @@ export default function EditClientOrderPage() {
                                 <SelectContent>
                                   {products.map((product) => (
                                     <SelectItem key={product.productKey} value={product.productKey.toString()}>
-                                      {product.productName} - {OrderUtils.formatCurrency(product.price || 0)}
+                                      {product.name} - {OrderUtils.formatCurrency(product.price || 0)}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>

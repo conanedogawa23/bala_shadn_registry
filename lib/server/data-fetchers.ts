@@ -27,7 +27,14 @@ export interface Client {
   status?: string;
   createdAt: string;
   updatedAt: string;
-  [key: string]: any;
+  // Enrichment data from backend
+  nextAppointment?: {
+    date: string;
+    subject: string;
+    formattedDate: string;
+  } | null;
+  totalOrders?: number;
+  [key: string]: string | number | object | null | undefined;
 }
 
 export interface Order {
@@ -42,15 +49,26 @@ export interface Order {
   [key: string]: any;
 }
 
+export interface PaymentAmounts {
+  totalPaymentAmount: number;
+  totalPaid: number;
+  totalOwed: number;
+  [key: string]: number;
+}
+
 export interface Payment {
   id: string;
-  paymentId?: number;
+  _id: string;
+  paymentId?: string;
+  paymentNumber?: string;
   clientId: number | string;
+  clientName?: string;
   orderId?: number | string;
-  amount: number;
+  amounts: PaymentAmounts;
   paymentDate: string;
   paymentMethod: string;
   status: string;
+  clinicName: string;
   [key: string]: any;
 }
 

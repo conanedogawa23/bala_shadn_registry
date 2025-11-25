@@ -157,6 +157,17 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
 
     const pathSegments = pathname.split('/');
     
+    // Skip clinic initialization for admin, settings, and other global routes
+    const isGlobalRoute = ['/admin', '/settings', '/profile', '/notifications', '/activity'].some(
+      route => pathname.startsWith(route)
+    );
+    
+    if (isGlobalRoute) {
+      console.log('🌐 Global route detected, skipping clinic initialization:', pathname);
+      setLastInitializedPath(pathname);
+      return;
+    }
+    
     // Check if URL has clinic parameter (e.g., /clinic/bodyblissphysio/dashboard)
     if (pathSegments[1] === 'clinic' && pathSegments[2]) {
       const clinicSlug = pathSegments[2];

@@ -7,8 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { generateLink } from "@/lib/route-utils";
+import { UserApiService, User } from "@/lib/api/userApiService";
+import Link from "next/link";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -18,11 +21,40 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [staffMembers, setStaffMembers] = useState<User[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(false);
 
   // Set mounted state to true after hydration
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch staff members for this clinic
+  useEffect(() => {
+    const fetchStaffMembers = async () => {
+      try {
+        setIsLoadingStaff(true);
+        // Convert clinic slug to clinic name (e.g., 'bodybliss-physio' -> 'bodybliss physio')
+        const clinicName = clinic.replace(/-/g, ' ');
+        
+        const response = await UserApiService.getAllUsers({
+          clinicName: clinicName,
+          page: 1,
+          limit: 50
+        });
+        
+        setStaffMembers(response.users);
+      } catch (error) {
+        console.error('Failed to fetch staff members:', error);
+      } finally {
+        setIsLoadingStaff(false);
+      }
+    };
+
+    if (mounted && clinic) {
+      fetchStaffMembers();
+    }
+  }, [mounted, clinic]);
 
   const handleSaveChanges = async () => {
     setIsSaving(true);
@@ -328,6 +360,8 @@ export default function SettingsPage() {
                   <Input
                     id="lateFee"
                     type="number"
+                    min="0"
+                    step="0.01"
                     placeholder="25.00"
                     defaultValue="25.00"
                   />
@@ -359,37 +393,86 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Staff Management</CardTitle>
-              <CardDescription>Manage staff roles and permissions</CardDescription>
+              <CardDescription>Manage staff roles and permissions for this clinic</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-4">
-                <h3 className="text-sm font-medium">Staff Members</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <div className="font-medium">Dr. Sarah Johnson</div>
-                      <div className="text-sm text-muted-foreground">Lead Practitioner</div>
-                    </div>
-                    <Button variant="outline" size="sm">Edit</Button>
-                  </div>
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <div className="font-medium">Michael Chen</div>
-                      <div className="text-sm text-muted-foreground">Physical Therapist</div>
-                    </div>
-                    <Button variant="outline" size="sm">Edit</Button>
-                  </div>
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
-                      <div className="font-medium">Emily Davis</div>
-                      <div className="text-sm text-muted-foreground">Receptionist</div>
-                    </div>
-                    <Button variant="outline" size="sm">Edit</Button>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">Staff Members ({staffMembers.length})</h3>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => router.push('/admin/users')}
+                  >
+                    Manage All Users
+                  </Button>
                 </div>
-                <Button variant="outline" className="w-full">
-                  Add Staff Member
-                </Button>
+                
+                {isLoadingStaff ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  </div>
+                ) : staffMembers.length === 0 ? (
+                  <div className="text-center py-8 border rounded-lg bg-gray-50">
+                    <p className="text-gray-500 mb-4">No staff members assigned to this clinic</p>
+                    <Button 
+                      variant="outline"
+                      onClick={() => router.push('/admin/users')}
+                    >
+                      Add Staff Member
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {staffMembers.map((staff) => (
+                      <div key={staff._id} className="flex items-center justify-between p-3 border rounded-lg hover:border-gray-300 transition-colors">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <div className="font-medium">
+                              {staff.fullName || `${staff.profile?.firstName || ''} ${staff.profile?.lastName || ''}`.trim()}
+                            </div>
+                            <Badge variant="outline" className="capitalize text-xs">
+                              {staff.role}
+                            </Badge>
+                            {staff.status !== 'active' && (
+                              <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+                                {staff.status}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {staff.email}
+                            {staff.profile?.phone && ` • ${staff.profile.phone}`}
+                          </div>
+                          {staff.lastLogin && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              Last login: {new Date(staff.lastLogin).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => router.push('/admin/users')}
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="pt-4 border-t">
+                  <Link href="/admin/users">
+                    <Button variant="outline" className="w-full">
+                      View All Staff & Add New Members
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
@@ -397,7 +480,7 @@ export default function SettingsPage() {
                 variant="outline"
                 onClick={() => router.push(generateLink('clinic', '', clinic))}
               >
-                Cancel
+                Back to Clinic
               </Button>
               <Button
                 onClick={handleSaveChanges}

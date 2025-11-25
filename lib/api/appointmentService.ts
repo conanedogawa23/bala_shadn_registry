@@ -495,8 +495,8 @@ export class AppointmentApiService extends BaseApiService {
           completionRate: stats.completionRate,
           cancellationRate: stats.cancellationRate,
           averageDuration: stats.averageDuration,
-          upcomingCount: stats.pendingAppointments, // Use pending as upcoming for now
-          overdueCount: 0   // Would need additional backend calculation
+          upcomingCount: stats.upcomingCount || 0,
+          overdueCount: stats.overdueCount || 0
         };
         this.setCached(cacheKey, formattedStats, this.CACHE_TTL);
         return formattedStats;
