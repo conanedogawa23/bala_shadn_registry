@@ -21,7 +21,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Save, Edit3, AlertCircle } from 'lucide-react';
 import { generateLink } from '@/lib/route-utils';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
-import { slugToClinic, getRealDataClinicName } from '@/lib/data/clinics';
+import { useClinic } from '@/lib/contexts/clinic-context';
 
 // Define the appointment schema using zod for validation
 const appointmentSchema = z.object({
@@ -104,8 +104,9 @@ export default function EditAppointmentPage() {
   const [clientName, setClientName] = useState<string>('');
   const [resourceName, setResourceName] = useState<string>('');
 
-  const clinicData = slugToClinic(clinicSlug);
-  const clinicName = clinicData ? getRealDataClinicName(clinicData) : clinicSlug;
+  const { availableClinics } = useClinic();
+  const clinicData = availableClinics.find(c => c.name === clinicSlug);
+  const clinicName = clinicData?.backendName || clinicData?.displayName || clinicSlug;
 
   // Fetch appointment data from API
   useEffect(() => {

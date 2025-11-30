@@ -469,7 +469,7 @@ export async function fetchClinicByName(
     tags = ['clinics', `clinic-${clinicName}`]
   } = options;
 
-  const endpoint = `/clinics/${encodeURIComponent(clinicName)}`;
+  const endpoint = `/clinics/find/${encodeURIComponent(clinicName)}`;
 
   const response = await ServerApiClient.get<Clinic>(endpoint, {
     revalidate,

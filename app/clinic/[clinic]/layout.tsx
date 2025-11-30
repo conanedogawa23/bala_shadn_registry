@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ClinicApiService, getFirstAvailableClinicSlug } from '@/lib/api/clinicService';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { isAuthenticated } from '@/lib/auth';
@@ -24,7 +23,8 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
     isActive: boolean;
   } | null>(null);
 
-  const clinicSlug = params.clinic as string;
+  // Decode URL-encoded clinic slug (e.g., 'My%20Cloud' -> 'My Cloud')
+  const clinicSlug = decodeURIComponent(params.clinic as string);
 
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isUserAuthenticated, setIsUserAuthenticated] = useState(false);
@@ -54,62 +54,37 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
       console.log('🔍 Validating clinic slug:', clinicSlug);
       console.log('📋 Available clinics:', availableClinics.map(c => ({ name: c.name, displayName: c.displayName, backendName: c.backendName })));
 
-      // First check with context data (case-insensitive matching)
-      const localClinic = availableClinics.find(c => 
+      // Check with context data (case-insensitive matching)
+      // All clinic data comes from MongoDB via API
+      // Need to normalize both sides for comparison (remove spaces, lowercase)
+      const normalizedSlug = clinicSlug.toLowerCase().replace(/\s+/g, '');
+      const matchedClinic = availableClinics.find(c => 
         c.name.toLowerCase() === clinicSlug.toLowerCase() ||
-        c.displayName.toLowerCase().replace(/\s+/g, '') === clinicSlug.toLowerCase() ||
-        c.backendName?.toLowerCase() === clinicSlug.toLowerCase()
+        c.name.toLowerCase().replace(/\s+/g, '') === normalizedSlug ||
+        c.displayName.toLowerCase().replace(/\s+/g, '') === normalizedSlug ||
+        c.backendName?.toLowerCase() === clinicSlug.toLowerCase() ||
+        c.backendName?.toLowerCase().replace(/\s+/g, '') === normalizedSlug
       );
 
-      if (localClinic) {
-        console.log('✅ Found clinic in context:', localClinic);
+      if (matchedClinic) {
+        console.log('✅ Found clinic in context:', matchedClinic);
         setClinicInfo({
           slug: clinicSlug,
-          name: localClinic.displayName,
-          backendName: localClinic.backendName || localClinic.displayName,
-          isActive: localClinic.status === 'active'
+          name: matchedClinic.displayName,
+          backendName: matchedClinic.backendName || matchedClinic.displayName,
+          isActive: matchedClinic.status === 'active'
         });
         setValidationError(null);
         setIsValidating(false);
         return;
       }
 
-      // If not found in context, try backend API validation
-      try {
-        console.log('🔄 Trying backend validation for:', clinicSlug);
-        const validationResult = await ClinicApiService.validateClinicSlug(clinicSlug);
-        
-        // Backend validation successful
-        setClinicInfo({
-          slug: clinicSlug,
-          name: validationResult.clinic.name,
-          backendName: validationResult.backendName,
-          isActive: validationResult.clinic.isActive
-        });
-        
-        setValidationError(null);
-      } catch (error) {
-        console.error('❌ Clinic validation failed:', error);
-        
-        // Clinic not found anywhere
-        setValidationError(
-          `Clinic "${clinicSlug}" not found. Please select from available clinics.`
-        );
-
-        // Redirect to first available clinic
-        try {
-          const firstAvailableSlug = await getFirstAvailableClinicSlug();
-          if (firstAvailableSlug && firstAvailableSlug !== clinicSlug) {
-            console.log(`🔄 Redirecting to available clinic: ${firstAvailableSlug}`);
-            router.replace(`/clinic/${firstAvailableSlug}/clients`);
-            return;
-          }
-        } catch (redirectError) {
-          console.error('Failed to redirect to available clinic:', redirectError);
-        }
-      } finally {
-        setIsValidating(false);
-      }
+      // Clinic not found in available clinics
+      console.error('❌ Clinic not found:', clinicSlug);
+      setValidationError(
+        `Clinic "${clinicSlug}" not found. Please select from available clinics.`
+      );
+      setIsValidating(false);
     };
 
     // Wait for clinic context to load before validating
@@ -119,7 +94,7 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
       setValidationError('No clinics available in the system');
       setIsValidating(false);
     }
-  }, [clinicSlug, router, availableClinics, clinicLoading]);
+  }, [clinicSlug, availableClinics, clinicLoading]);
 
   // Auth checking state - show nothing while checking
   if (isAuthChecking) {
@@ -173,12 +148,30 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
             <p className="text-gray-600 mb-4">{validationError}</p>
           </div>
 
+          {/* Show available clinics */}
+          {availableClinics.length > 0 && (
+            <div className="text-left bg-gray-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Available clinics:</p>
+              <div className="space-y-1">
+                {availableClinics.map((clinic) => (
+                  <button
+                    key={clinic.id}
+                    onClick={() => router.push(`/clinic/${clinic.name}/clients`)}
+                    className="block w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                  >
+                    {clinic.displayName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
             <button 
-              onClick={() => router.push('/clinic')}
+              onClick={() => router.push('/')}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
             >
-              View Available Clinics
+              Go to Home
             </button>
             
             <button 
@@ -209,4 +202,4 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
       </div>
     </ErrorBoundary>
   );
-} 
+}

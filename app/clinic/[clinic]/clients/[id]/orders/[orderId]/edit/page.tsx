@@ -19,7 +19,7 @@ import {
   User,
   Building
 } from 'lucide-react';
-import { slugToClinic } from '@/lib/data/clinics';
+import { useClinic } from '@/lib/contexts/clinic-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -88,8 +88,9 @@ export default function EditClientOrderPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [items, setItems] = useState<OrderItemFormValues[]>([]);
   
-  // Get clinic data for context
-  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+  // Get clinic data from context
+  const { availableClinics } = useClinic();
+  const clinicData = useMemo(() => availableClinics.find(c => c.name === clinic), [availableClinics, clinic]);
   
   // Fetch order using real API
   const { 

@@ -44,7 +44,13 @@ export default async function PaymentsPage({ params, searchParams }: PageProps) 
   let clinicData;
   try {
     const clinics = await fetchClinics({ revalidate: 3600 }); // Cache for 1 hour
-    clinicData = clinics.find(c => c.name === clinic || c.backendName === clinic);
+    // Use case-insensitive matching to handle URL slug variations
+    const clinicLower = clinic.toLowerCase();
+    clinicData = clinics.find(c => 
+      c.name?.toLowerCase() === clinicLower || 
+      c.backendName?.toLowerCase() === clinicLower ||
+      c.displayName?.toLowerCase().replace(/\s+/g, '') === clinicLower
+    );
     
     if (!clinicData) {
       notFound(); // Returns 404 if clinic doesn't exist
@@ -151,7 +157,13 @@ export async function generateMetadata({ params }: { params: Promise<{ clinic: s
   
   try {
     const clinics = await fetchClinics({ revalidate: 3600 });
-    const clinicData = clinics.find(c => c.name === clinic || c.backendName === clinic);
+    // Use case-insensitive matching for metadata generation
+    const clinicLower = clinic.toLowerCase();
+    const clinicData = clinics.find(c => 
+      c.name?.toLowerCase() === clinicLower || 
+      c.backendName?.toLowerCase() === clinicLower ||
+      c.displayName?.toLowerCase().replace(/\s+/g, '') === clinicLower
+    );
     
     if (clinicData) {
       return {

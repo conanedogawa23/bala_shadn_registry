@@ -37,18 +37,34 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
   };
 
   const slugToClinic = (slug: string): Clinic | undefined => {
-    // Use the slug provided by the API (clinic.name is already the proper slug)
-    return availableClinics.find(clinic => clinic.name === slug);
+    // Decode URL-encoded slug if needed and normalize for matching
+    const decodedSlug = decodeURIComponent(slug);
+    const normalizedSlug = decodedSlug.toLowerCase().replace(/\s+/g, '');
+    
+    return availableClinics.find(clinic => 
+      clinic.name.toLowerCase() === decodedSlug.toLowerCase() ||
+      clinic.name.toLowerCase().replace(/\s+/g, '') === normalizedSlug ||
+      clinic.displayName.toLowerCase().replace(/\s+/g, '') === normalizedSlug ||
+      clinic.backendName?.toLowerCase() === decodedSlug.toLowerCase() ||
+      clinic.backendName?.toLowerCase().replace(/\s+/g, '') === normalizedSlug
+    );
   };
 
   const getActiveClinic = (): Clinic | undefined => {
-    return availableClinics.find(clinic => clinic.status === 'active') || availableClinics[0];
+    // Return the first active clinic, or undefined if none found
+    // Don't fallback to any clinic - let the UI handle the empty state
+    return availableClinics.find(clinic => clinic.status === 'active');
   };
 
   const getClinicByName = (name: string): Clinic | undefined => {
+    const decodedName = decodeURIComponent(name);
+    const normalizedName = decodedName.toLowerCase().replace(/\s+/g, '');
+    
     return availableClinics.find(clinic => 
-      clinic.name === name || 
-      clinic.displayName === name
+      clinic.name.toLowerCase() === decodedName.toLowerCase() ||
+      clinic.name.toLowerCase().replace(/\s+/g, '') === normalizedName ||
+      clinic.displayName.toLowerCase() === decodedName.toLowerCase() ||
+      clinic.displayName.toLowerCase().replace(/\s+/g, '') === normalizedName
     );
   };
 
@@ -85,8 +101,9 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
         });
         
         const clinicsData: Clinic[] = response.clinics.map((clinic: FullClinicData) => {
-          // Ensure name is properly set - use API name or derive from displayName
-          const clinicName = clinic.name || clinic.displayName.toLowerCase().replace(/\s+/g, '');
+          // Use the exact name from the API - DO NOT transform it
+          // The backend sends the canonical name from MongoDB
+          const clinicName = clinic.name;
           
           // Debug: Log logo data for each clinic
           console.log(`🖼️ Clinic ${clinicName} logo:`, {
@@ -149,9 +166,12 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
       return;
     }
 
+    // Normalize pathname for comparison (decode URL encoding)
+    const normalizedPathname = decodeURIComponent(pathname);
+    
     // Prevent multiple initializations for the same pathname
-    if (lastInitializedPath === pathname) {
-      console.log('🚫 Already initialized for this pathname:', pathname);
+    if (lastInitializedPath === normalizedPathname) {
+      console.log('🚫 Already initialized for this pathname:', normalizedPathname);
       return;
     }
 
@@ -164,13 +184,14 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
     
     if (isGlobalRoute) {
       console.log('🌐 Global route detected, skipping clinic initialization:', pathname);
-      setLastInitializedPath(pathname);
+      setLastInitializedPath(normalizedPathname);
       return;
     }
     
     // Check if URL has clinic parameter (e.g., /clinic/bodyblissphysio/dashboard)
     if (pathSegments[1] === 'clinic' && pathSegments[2]) {
-      const clinicSlug = pathSegments[2];
+      // Decode the clinic slug from URL encoding
+      const clinicSlug = decodeURIComponent(pathSegments[2]);
       const clinic = slugToClinic(clinicSlug);
       
       console.log('🔍 Clinic lookup debug:', {
@@ -183,33 +204,22 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
       
       if (clinic) {
         setSelectedClinic(clinic);
-        setLastInitializedPath(pathname);
+        setLastInitializedPath(normalizedPathname);
       } else {
-        // Don't redirect immediately - log the issue instead
+        // Clinic not found - don't fallback or redirect
         console.warn('⚠️ Clinic not found:', clinicSlug, 'Available:', availableClinics.map(c => c.name));
+        console.log('❌ Clinic not found - letting page handle the empty state (no fallback to default clinic)');
         
-        // TEMPORARILY DISABLE REDIRECT - Let pages handle "Clinic Not Found" 
-        console.log('❌ Clinic not found but NOT redirecting - letting page handle the error');
-        
-        // TODO: Re-enable redirect logic after debugging
-        // if (availableClinics.length > 0) {
-        //   const activeClinic = getActiveClinic();
-        //   if (activeClinic) {
-        //     console.log('🔄 Redirecting to active clinic:', activeClinic.displayName, '→', activeClinic.name);
-        //     const activeSlug = activeClinic.name;
-        //     router.replace(`/clinic/${activeSlug}${pathSegments.slice(3).join('/')}`);
-        //     setSelectedClinic(activeClinic);
-        //     setLastInitializedPath(pathname);
-        //   }
-        // }
+        // Set selectedClinic to null so pages can show "no data" state
+        setSelectedClinic(null);
+        setLastInitializedPath(normalizedPathname);
       }
     } else {
-      // No clinic in URL, set default active clinic
-      const activeClinic = getActiveClinic();
-      if (activeClinic) {
-        setSelectedClinic(activeClinic);
-        setLastInitializedPath(pathname);
-      }
+      // No clinic in URL - don't automatically select any clinic
+      // Let the user choose from available clinics
+      console.log('ℹ️ No clinic in URL - no automatic selection');
+      setSelectedClinic(null);
+      setLastInitializedPath(normalizedPathname);
     }
   }, [pathname, router, loading, availableClinics, lastInitializedPath]);
 

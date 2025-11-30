@@ -23,7 +23,7 @@ import {
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
-import { slugToClinic } from '@/lib/data/clinics';
+import { useClinic } from '@/lib/contexts/clinic-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -49,8 +49,9 @@ export default function ViewClientOrderPage() {
   const clientId = parseInt(params.id as string);
   const orderId = params.orderId as string;
   
-  // Get clinic data for context
-  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+  // Get clinic data from context
+  const { availableClinics } = useClinic();
+  const clinicData = useMemo(() => availableClinics.find(c => c.name === clinic), [availableClinics, clinic]);
   
   // Fetch order using real API
   const { 

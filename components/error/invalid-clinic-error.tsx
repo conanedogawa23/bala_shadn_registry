@@ -4,7 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DEFAULT_CLINIC, generateLink } from '@/lib/route-utils';
+import { generateLink } from '@/lib/route-utils';
 import { Building2, AlertTriangle } from 'lucide-react';
 
 interface InvalidClinicErrorProps {
@@ -18,12 +18,8 @@ export default function InvalidClinicError({
 }: InvalidClinicErrorProps) {
   const router = useRouter();
 
-  const handleGoToDefaultClinic = () => {
-    router.push(generateLink('clinic', '', DEFAULT_CLINIC));
-  };
-
-  const handleGoToClinicsList = () => {
-    router.push(generateLink('global', 'clinics'));
+  const handleGoHome = () => {
+    router.push('/');
   };
 
   return (
@@ -45,12 +41,12 @@ export default function InvalidClinicError({
                 {clinicSlug}
               </div>
             )}
+            <p className="text-sm text-gray-500 mb-6">
+              Please select a valid clinic from the available options.
+            </p>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button onClick={handleGoToDefaultClinic}>
-                Go to Default Clinic
-              </Button>
-              <Button variant="outline" onClick={handleGoToClinicsList}>
-                View All Clinics
+              <Button onClick={handleGoHome}>
+                Back to Home
               </Button>
             </div>
           </div>

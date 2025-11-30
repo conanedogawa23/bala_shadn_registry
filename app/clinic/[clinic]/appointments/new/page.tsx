@@ -20,7 +20,7 @@ import { FormDatePicker } from '@/components/ui/form/FormDatePicker';
 import { ArrowLeft, Save, Plus } from 'lucide-react';
 import { generateLink } from '@/lib/route-utils';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
-import { slugToClinic, getRealDataClinicName } from '@/lib/data/clinics';
+import { useClinic } from '@/lib/contexts/clinic-context';
 
 // Define the appointment schema using zod for validation
 const appointmentSchema = z.object({
@@ -73,8 +73,9 @@ export default function NewAppointmentPage() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const clinicData = slugToClinic(clinicSlug);
-  const clinicName = clinicData ? getRealDataClinicName(clinicData) : clinicSlug;
+  const { availableClinics } = useClinic();
+  const clinicData = availableClinics.find(c => c.name === clinicSlug);
+  const clinicName = clinicData?.backendName || clinicData?.displayName || clinicSlug;
 
   // Calculate default end date based on start date and duration
   const calculateEndDate = (startDate: Date, durationMinutes: number) => {

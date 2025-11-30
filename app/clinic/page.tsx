@@ -5,18 +5,18 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getCachedAvailableClinics, RetainedClinic } from '@/lib/api/clinicService';
+import { getCachedFullClinics, FullClinicData } from '@/lib/api/clinicService';
 
 export default function ClinicSelectionPage() {
   const router = useRouter();
-  const [clinics, setClinics] = useState<RetainedClinic[]>([]);
+  const [clinics, setClinics] = useState<FullClinicData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchClinics = async () => {
       try {
-        const availableClinics = await getCachedAvailableClinics();
+        const availableClinics = await getCachedFullClinics();
         setClinics(availableClinics);
       } catch (error) {
         console.error('Failed to fetch available clinics:', error);
@@ -75,40 +75,41 @@ export default function ClinicSelectionPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {clinics.map((clinic) => (
-            <Card key={clinic.slug} className="hover:shadow-lg transition-shadow cursor-pointer">
+            <Card key={clinic.id} className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{clinic.name}</CardTitle>
-                  <Badge variant={clinic.isActive ? "default" : "secondary"}>
-                    {clinic.isActive ? "Active" : "Inactive"}
+                  <CardTitle className="text-lg">{clinic.displayName}</CardTitle>
+                  <Badge variant={clinic.status === 'active' ? "default" : "secondary"}>
+                    {clinic.status === 'active' ? "Active" : "Inactive"}
                   </Badge>
                 </div>
                 <CardDescription>
-                  Manage {clinic.name.toLowerCase()} operations and payments
+                  {clinic.address ? `${clinic.address}, ${clinic.city}` : `Manage ${clinic.displayName.toLowerCase()} operations`}
                 </CardDescription>
               </CardHeader>
               
               <CardContent>
                 <div className="space-y-3">
-                  <div className="text-sm text-gray-500">
-                    Clinic ID: {clinic.slug}
+                  <div className="text-sm text-gray-500 space-y-1">
+                    <div>Clients: {clinic.clientCount.toLocaleString()}</div>
+                    <div>Appointments: {clinic.totalAppointments.toLocaleString()}</div>
                   </div>
                   
                   <div className="flex space-x-2">
                     <Button 
-                      onClick={() => router.push(`/clinic/${clinic.slug}/payments`)}
+                      onClick={() => router.push(`/clinic/${clinic.name}/clients`)}
                       className="flex-1"
-                      disabled={!clinic.isActive}
+                      disabled={clinic.status !== 'active'}
                     >
-                      View Payments
+                      View Clients
                     </Button>
                     
                     <Button 
                       variant="outline" 
-                      onClick={() => router.push(`/clinic/${clinic.slug}`)}
-                      disabled={!clinic.isActive}
+                      onClick={() => router.push(`/clinic/${clinic.name}/payments`)}
+                      disabled={clinic.status !== 'active'}
                     >
-                      Dashboard
+                      Payments
                     </Button>
                   </div>
                 </div>
@@ -132,7 +133,7 @@ export default function ClinicSelectionPage() {
         )}
 
         <div className="mt-8 text-center text-sm text-gray-500">
-          <p>Showing {clinics.length} available clinics • Data driven by backend configuration</p>
+          <p>Showing {clinics.length} available clinics • Data driven by MongoDB</p>
         </div>
       </div>
     </div>

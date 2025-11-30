@@ -9,7 +9,8 @@ export interface Clinic {
   city: string;
   province: string;
   postalCode: string;
-  status: 'active' | 'inactive' | 'historical' | 'no-data';
+  status: 'active' | 'inactive' | 'historical' | 'archived' | 'no-data';
+  isRetained?: boolean; // Backend accessible flag - only retained clinics can access API
   lastActivity?: string;
   totalAppointments?: number;
   totalOrders?: number;

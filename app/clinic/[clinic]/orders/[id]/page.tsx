@@ -10,7 +10,7 @@ import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { ArrowLeft, Edit2, Printer, FileText, DollarSign, User, Calendar, AlertCircle, Package } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { generateLink } from "@/lib/route-utils";
-import { slugToClinic } from "@/lib/data/clinics";
+import { findClinicBySlug } from "@/lib/data/clinics";
 
 // Import real API hooks and utilities
 import { 
@@ -28,7 +28,7 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
   
   // Get clinic data for context
-  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+  const clinicData = useMemo(() => findClinicBySlug(clinic), [clinic]);
   
   // Fetch order using real API
   const { 

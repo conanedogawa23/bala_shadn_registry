@@ -1,6 +1,8 @@
+import { BaseApiService } from './baseApiService';
+
 export interface RetainedClinic {
   name: string;
-  slug: string;
+  displayName: string;
   isActive: boolean;
 }
 
@@ -29,36 +31,24 @@ export interface FullClinicData {
   } | null;
 }
 
-export interface ClinicMapping {
-  [frontendSlug: string]: string; // Maps frontend slug to backend clinic name
-}
-
-export interface ClinicApiResponse {
-  clinics: RetainedClinic[];
-  mapping: ClinicMapping;
-  total: number;
-}
-
 export interface FullClinicsApiResponse {
   clinics: FullClinicData[];
   total: number;
   retainedOnly: boolean;
 }
 
-export interface ClinicValidationResponse {
-  clinic: RetainedClinic;
-  backendName: string;
-}
-
-import { BaseApiService } from './baseApiService';
-
+/**
+ * Simplified ClinicApiService - uses MongoDB as single source of truth
+ * All clinic data comes from /clinics/frontend-compatible endpoint
+ */
 export class ClinicApiService extends BaseApiService {
   private static readonly ENDPOINT = '/clinics';
   private static readonly CACHE_TTL = 300000; // 5 minutes
 
   /**
    * Get full clinic data from backend (MongoDB)
-   * Returns complete clinic information for frontend dropdown
+   * This is the primary method for fetching clinic data
+   * Returns complete clinic information for frontend use
    */
   static async getFullClinics(): Promise<FullClinicsApiResponse> {
     const cacheKey = 'full_clinics_data';
@@ -73,119 +63,74 @@ export class ClinicApiService extends BaseApiService {
         return response.data;
       }
       
-      throw new Error('Failed to fetch full clinic data');
+      throw new Error('Failed to fetch clinic data');
     } catch (error) {
       throw this.handleError(error, 'getFullClinics');
     }
   }
 
   /**
-   * Get all available clinics from backend
-   * Data-driven approach using backend as source of truth
+   * Get clinic names only
    */
-  static async getAvailableClinics(): Promise<ClinicApiResponse> {
-    const cacheKey = 'available_clinics';
-    const cached = this.getCached<ClinicApiResponse>(cacheKey);
+  static async getClinicNames(): Promise<string[]> {
+    const cacheKey = 'clinic_names';
+    const cached = this.getCached<string[]>(cacheKey);
     if (cached) return cached;
 
     try {
-      const response = await this.request<ClinicApiResponse>(`${this.ENDPOINT}/available`);
+      const response = await this.request<{ names: string[]; total: number }>(`${this.ENDPOINT}/names`);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
+        this.setCached(cacheKey, response.data.names, this.CACHE_TTL);
+        return response.data.names;
       }
       
-      throw new Error('Failed to fetch available clinics');
+      throw new Error('Failed to fetch clinic names');
     } catch (error) {
-      throw this.handleError(error, 'getAvailableClinics');
+      throw this.handleError(error, 'getClinicNames');
     }
   }
 
   /**
-   * Get clinic mapping from backend
-   * Returns slug to clinic name mapping
+   * Find clinic by name (case-insensitive)
    */
-  static async getClinicMapping(): Promise<ClinicMapping> {
-    const cacheKey = 'clinic_mapping';
-    const cached = this.getCached<ClinicMapping>(cacheKey);
-    if (cached) return cached;
-
+  static async findClinicByName(name: string): Promise<RetainedClinic | null> {
     try {
-      const response = await this.request<{ mapping: ClinicMapping }>(`${this.ENDPOINT}/mapping`);
+      const response = await this.request<{ clinic: RetainedClinic; backendName: string }>(`${this.ENDPOINT}/find/${encodeURIComponent(name)}`);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data.mapping, this.CACHE_TTL);
-        return response.data.mapping;
+        return response.data.clinic;
       }
       
-      throw new Error('Failed to fetch clinic mapping');
+      return null;
     } catch (error) {
-      throw this.handleError(error, 'getClinicMapping');
+      // Return null for not found
+      return null;
     }
   }
 
   /**
-   * Validate clinic slug with backend
-   * Returns clinic info if valid, throws error if not
+   * Clear clinic cache
    */
-  static async validateClinicSlug(slug: string): Promise<ClinicValidationResponse> {
-    const cacheKey = `validate_slug_${slug}`;
-    const cached = this.getCached<ClinicValidationResponse>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const response = await this.request<ClinicValidationResponse>(`${this.ENDPOINT}/validate/${encodeURIComponent(slug)}`);
-      
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
-      }
-      
-      throw new Error(`Invalid clinic slug: ${slug}`);
-    } catch (error) {
-      throw this.handleError(error, 'validateClinicSlug');
-    }
-  }
-
-  /**
-   * Convert slug to clinic name using backend
-   * Returns proper backend clinic name for API calls
-   */
-  static async slugToClinicName(slug: string): Promise<string> {
-    const cacheKey = `slug_to_name_${slug}`;
-    const cached = this.getCached<string>(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const response = await this.request<{ clinicName: string }>(`${this.ENDPOINT}/slug-to-name/${encodeURIComponent(slug)}`);
-      
-      if (response.success && response.data) {
-        this.setCached(cacheKey, response.data.clinicName, this.CACHE_TTL);
-        return response.data.clinicName;
-      }
-      
-      throw new Error(`Failed to convert slug: ${slug}`);
-    } catch (error) {
-      throw this.handleError(error, 'slugToClinicName');
-    }
+  static clearCache(): void {
+    this.clearCachedItem('full_clinics_data');
+    this.clearCachedItem('clinic_names');
   }
 }
 
-// Cache for clinic data to reduce API calls
+// Cache for clinic data
 let clinicCache: {
-  clinics?: RetainedClinic[];
-  mapping?: ClinicMapping;
+  clinics?: FullClinicData[];
   timestamp?: number;
 } = {};
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Get available clinics with caching
- * Optimizes performance by reducing redundant API calls
+ * Get full clinic data with caching
+ * Primary function for fetching clinic data
  */
-export const getCachedAvailableClinics = async (): Promise<RetainedClinic[]> => {
+export const getCachedFullClinics = async (): Promise<FullClinicData[]> => {
   const now = Date.now();
   
   if (clinicCache.clinics && clinicCache.timestamp && (now - clinicCache.timestamp) < CACHE_DURATION) {
@@ -193,67 +138,39 @@ export const getCachedAvailableClinics = async (): Promise<RetainedClinic[]> => 
   }
 
   try {
-    const data = await ClinicApiService.getAvailableClinics();
+    const data = await ClinicApiService.getFullClinics();
     clinicCache = {
       clinics: data.clinics,
-      mapping: data.mapping,
       timestamp: now
     };
     return data.clinics;
   } catch (error) {
-    console.error('Failed to fetch available clinics:', error);
-    // Return cached data if available, even if stale
+    console.error('Failed to fetch clinics:', error);
     return clinicCache.clinics || [];
   }
 };
 
 /**
- * Get clinic mapping with caching
- * Reuses cached data to improve performance
+ * Find clinic by name from cached data
  */
-export const getCachedClinicMapping = async (): Promise<ClinicMapping> => {
-  const now = Date.now();
+export const findClinicFromCache = (name: string): FullClinicData | undefined => {
+  if (!clinicCache.clinics) return undefined;
   
-  if (clinicCache.mapping && clinicCache.timestamp && (now - clinicCache.timestamp) < CACHE_DURATION) {
-    return clinicCache.mapping;
-  }
-
-  try {
-    const mapping = await ClinicApiService.getClinicMapping();
-    clinicCache = {
-      ...clinicCache,
-      mapping,
-      timestamp: now
-    };
-    return mapping;
-  } catch (error) {
-    console.error('Failed to fetch clinic mapping:', error);
-    // Return cached data if available, even if stale
-    return clinicCache.mapping || {};
-  }
+  const nameLower = name.toLowerCase();
+  return clinicCache.clinics.find(c => 
+    c.name.toLowerCase() === nameLower ||
+    c.displayName.toLowerCase() === nameLower ||
+    c.backendName?.toLowerCase() === nameLower
+  );
 };
 
 /**
- * Utility function to check if slug is valid
- * Non-throwing validation for conditional logic
+ * Get first available clinic
  */
-export const isValidClinicSlug = async (slug: string): Promise<boolean> => {
+export const getFirstAvailableClinic = async (): Promise<FullClinicData | null> => {
   try {
-    await ClinicApiService.validateClinicSlug(slug);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Get first available clinic slug
- * Fallback for invalid clinic routing
- */
-export const getFirstAvailableClinicSlug = async (): Promise<string | null> => {
-  try {
-    const clinics = await getCachedAvailableClinics();
-    return clinics.length > 0 ? clinics[0].slug : null;
+    const clinics = await getCachedFullClinics();
+    return clinics.length > 0 ? clinics[0] : null;
   } catch {
     return null;
   }

@@ -20,7 +20,7 @@ import { useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertCircle } from "lucide-react";
-import { slugToClinic } from "@/lib/data/clinics";
+import { findClinicBySlug } from "@/lib/data/clinics";
 import { useOrder, usePaymentsByOrder, type Order, type Payment } from "@/lib/hooks";
 import OrderInvoiceTemplate from "@/components/ui/invoice/OrderInvoiceTemplate";
 
@@ -60,13 +60,8 @@ export default function OrderInvoicePage() {
   const clinic = params.clinic as string;
   const orderId = params.id as string;
   
-  // State management
-  const [clinicInfo, setClinicInfo] = useState<Record<string, unknown> | null>(null);
-  const [clientInfo, setClientInfo] = useState<Record<string, unknown> | null>(null);
-  const [isDataReady, setIsDataReady] = useState(false);
-
-  // Get clinic data
-  const clinicData = slugToClinic(clinic);
+  // Get clinic data using case-insensitive lookup
+  const clinicData = findClinicBySlug(clinic);
 
   // Fetch order data
   const { order, loading: orderLoading, error: orderError } = useOrder({
@@ -85,51 +80,14 @@ export default function OrderInvoicePage() {
     error: paymentsError 
   } = usePaymentsByOrder(order?.orderNumber || "");
 
-  const isLoading = orderLoading || (order?.orderNumber && paymentsLoading) || !isDataReady;
+  // Simplified loading state - only wait for order, not payments
+  const isLoading = orderLoading;
   const error = orderError || paymentsError;
-
-  // Setup clinic and client info from MongoDB data
-  const setupInvoiceData = useCallback(() => {
-    if (!clinicData || !order) return;
-
-    // MongoDB Clinic structure: address is nested object { street, city, province, postalCode }
-    const clinicAddress = clinicData.address || {};
-    
-    setClinicInfo({
-      name: clinicData.name || clinicData.displayName || '',
-      displayName: clinicData.displayName || clinicData.name || '',
-      // Handle both flat and nested address structures from MongoDB
-      address: typeof clinicAddress === 'string' ? clinicAddress : (clinicAddress.street || clinicData.address || ''),
-      city: clinicAddress.city || clinicData.city || '',
-      province: clinicAddress.province || clinicData.province || '',
-      postalCode: clinicAddress.postalCode || clinicData.postalCode || '',
-      phone: clinicData.phone || '(416) 555-0123',
-      fax: clinicData.fax || '(416) 555-0124'
-    });
-
-    // MongoDB Order structure: clientName comes from order document
-    setClientInfo({
-      name: order.clientName || 'Unknown Client',
-      address: '',
-      city: '',
-      province: '',
-      postalCode: ''
-    });
-
-    setIsDataReady(true);
-  }, [clinicData, order]);
 
   // Handle retry
   const handleRetry = () => {
-    setIsDataReady(false);
     window.location.reload();
   };
-
-
-  // Effects
-  useEffect(() => {
-    setupInvoiceData();
-  }, [setupInvoiceData]);
 
   // Error states
   if (!clinicData) {
@@ -162,26 +120,27 @@ export default function OrderInvoicePage() {
     );
   }
 
-  // Create default clinic info with proper types
+  // Create clinic info directly from clinic data
   const defaultClinicInfo = {
-    name: (clinicInfo as Record<string, string>)?.name || clinicData?.name || '',
-    displayName: (clinicInfo as Record<string, string>)?.displayName || clinicData?.displayName || '',
-    address: (clinicInfo as Record<string, string>)?.address || clinicData?.address || '',
-    city: (clinicInfo as Record<string, string>)?.city || clinicData?.city || '',
-    province: (clinicInfo as Record<string, string>)?.province || clinicData?.province || '',
-    postalCode: (clinicInfo as Record<string, string>)?.postalCode || clinicData?.postalCode || '',
-    phone: (clinicInfo as Record<string, string>)?.phone || '',
-    fax: (clinicInfo as Record<string, string>)?.fax || ''
+    name: clinicData?.name || '',
+    displayName: clinicData?.displayName || clinicData?.name || '',
+    address: clinicData?.address || '',
+    city: clinicData?.city || '',
+    province: clinicData?.province || '',
+    postalCode: clinicData?.postalCode || '',
+    phone: '',
+    fax: ''
   };
 
+  // Create client info from order data
   const defaultClientInfo = {
-    name: (clientInfo as Record<string, string>)?.name || order?.clientName || 'Unknown Client',
-    address: (clientInfo as Record<string, string>)?.address || '',
-    city: (clientInfo as Record<string, string>)?.city || '',
-    province: (clientInfo as Record<string, string>)?.province || '',
-    postalCode: (clientInfo as Record<string, string>)?.postalCode || '',
-    phone: (clientInfo as Record<string, string>)?.phone || '',
-    email: (clientInfo as Record<string, string>)?.email || ''
+    name: order?.clientName || 'Unknown Client',
+    address: '',
+    city: '',
+    province: '',
+    postalCode: '',
+    phone: '',
+    email: ''
   };
 
   return (

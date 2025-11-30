@@ -4,7 +4,6 @@ import React from 'react';
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { DEFAULT_CLINIC } from '@/lib/route-utils';
 
 export default function Error({
   error,
@@ -29,8 +28,8 @@ export default function Error({
           Try Again
         </Button>
         <Button variant="outline" asChild>
-          <Link href={`/clinic/${DEFAULT_CLINIC}`}>
-            Go to Dashboard
+          <Link href="/">
+            Back to Home
           </Link>
         </Button>
       </div>

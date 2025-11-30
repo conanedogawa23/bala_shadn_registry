@@ -24,7 +24,7 @@ import {
   Eye,
   Shield
 } from 'lucide-react';
-import { slugToClinic } from '@/lib/data/clinics';
+import { useClinic } from '@/lib/contexts/clinic-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +37,6 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { generateLink } from '@/lib/route-utils';
-import { getRealDataClinicName } from '@/lib/data/clinics';
 import { InsuranceSummaryCard } from '@/components/ui/client/InsuranceSection';
 
 // Import real API hooks and utilities
@@ -65,8 +64,9 @@ export default function ClientDetailPage() {
   const [appointmentPage, setAppointmentPage] = useState(1);
   const appointmentsPerPage = 10;
 
-  // Get clinic data for context
-  const clinicData = useMemo(() => slugToClinic(clinic), [clinic]);
+  // Get clinic data from context
+  const { availableClinics } = useClinic();
+  const clinicData = useMemo(() => availableClinics.find(c => c.name === clinic), [availableClinics, clinic]);
   
   // Fetch client data
   const { 
@@ -96,7 +96,7 @@ export default function ClientDetailPage() {
   });
 
   // Get real clinic name for API calls (maps slug to backend clinic name)
-  const clinicName = clinicData ? getRealDataClinicName(clinicData) : clinic;
+  const clinicName = clinicData?.backendName || clinicData?.displayName || clinic;
 
   // Fetch client's appointments automatically to show accurate statistics
   const {

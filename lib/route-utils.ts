@@ -1,5 +1,8 @@
 /**
  * Route utility functions for consistent link generation and route handling
+ * 
+ * IMPORTANT: Clinic data now comes from MongoDB via API.
+ * Use clinic-context.tsx for clinic lookups and validation.
  */
 import { Clinic } from '@/lib/types/clinic';
 
@@ -16,11 +19,6 @@ export interface RouteParams {
   id?: string;
   [key: string]: string | string[] | undefined;
 }
-
-/**
- * Default clinic slug used for redirects when no clinic is specified
- */
-export const DEFAULT_CLINIC = 'bodyblissphysio';
 
 /**
  * Global routes that should not be redirected to clinic-specific routes
@@ -66,9 +64,10 @@ export function generateLink(type: RouteType, path: string, clinicSlug?: string)
   if (type === 'global') {
     return `/${normalizedPath}`;
   } else {
-    // For clinic routes, ensure we have a clinic slug
+    // For clinic routes, require a clinic slug - don't fallback to default
     if (!clinicSlug) {
-      clinicSlug = DEFAULT_CLINIC;
+      console.warn('generateLink called without clinicSlug - returning home');
+      return '/';
     }
     return `/clinic/${clinicSlug}/${normalizedPath}`;
   }
@@ -102,10 +101,14 @@ export function isClinicRoute(path: string): boolean {
  * Get the clinic-specific version of a path
  * 
  * @param path - The path to convert
- * @param clinicSlug - The clinic slug
+ * @param clinicSlug - The clinic slug (REQUIRED - no default)
  * @returns The clinic-specific version of the path
  */
-export function getClinicPath(path: string, clinicSlug: string = DEFAULT_CLINIC): string {
+export function getClinicPath(path: string, clinicSlug: string): string {
+  if (!clinicSlug) {
+    console.warn('getClinicPath called without clinicSlug');
+    return '/';
+  }
   return `/clinic/${clinicSlug}${path}`;
 }
 
@@ -121,21 +124,6 @@ export function getClinicParam(params: RouteParams): string | null {
   }
   
   return Array.isArray(params.clinic) ? params.clinic[0] : params.clinic;
-}
-
-/**
- * Validate a clinic parameter
- * 
- * @param clinicSlug - The clinic slug to validate
- * @returns True if the clinic slug is valid
- */
-export function validateClinicParam(clinicSlug: string | null | undefined): boolean {
-  if (!clinicSlug) {
-    return false;
-  }
-  
-  const clinic = slugToClinic(clinicSlug);
-  return !!clinic;
 }
 
 /**
@@ -166,41 +154,20 @@ export class RouteError extends Error {
 
 /**
  * Validate clinic parameter and throw a RouteError if invalid
+ * Only checks if the param is present - actual clinic validation happens via API
  * 
  * @param clinicSlug - The clinic slug to validate
- * @throws RouteError if the clinic slug is invalid
+ * @throws RouteError if the clinic slug is missing
  */
 export function validateClinicOrThrow(clinicSlug: string | null | undefined): void {
   if (!clinicSlug) {
     throw new RouteError(
       'Missing clinic parameter', 
       RouteErrorType.MISSING_PARAM, 
-      `/${DEFAULT_CLINIC}`
+      '/'
     );
   }
-  
-  const clinic = slugToClinic(clinicSlug);
-  if (!clinic) {
-    throw new RouteError(
-      `Invalid clinic: ${clinicSlug}`, 
-      RouteErrorType.INVALID_CLINIC, 
-      `/${DEFAULT_CLINIC}`
-    );
-  }
-}
-
-/**
- * Get a clinic object from a clinic slug
- * 
- * @param clinicSlug - The clinic slug
- * @returns The clinic object or null if not found
- */
-export function getClinicFromParam(clinicSlug: string | null | undefined): Clinic | null {
-  if (!clinicSlug) {
-    return null;
-  }
-  
-  return slugToClinic(clinicSlug) || null;
+  // Note: Actual clinic validation now happens via API in clinic-context
 }
 
 /**
@@ -232,6 +199,7 @@ export function getIdParam(params: RouteParams, paramName: string = 'id'): strin
  * 
  * @param clinicSlug - The clinic slug
  * @param path - The current path (without the clinic prefix)
+ * @param clinicDisplayName - Optional display name for the clinic
  * @returns An array of breadcrumb items
  */
 export interface BreadcrumbItem {
@@ -239,15 +207,14 @@ export interface BreadcrumbItem {
   href: string;
 }
 
-export function createBreadcrumbs(clinicSlug: string, path: string): BreadcrumbItem[] {
-  const clinic = slugToClinic(clinicSlug);
+export function createBreadcrumbs(clinicSlug: string, path: string, clinicDisplayName?: string): BreadcrumbItem[] {
   const breadcrumbs: BreadcrumbItem[] = [
     {
       label: 'Home',
       href: '/'
     },
     {
-      label: clinic?.displayName || 'Clinic',
+      label: clinicDisplayName || clinicSlug,
       href: `/clinic/${clinicSlug}`
     }
   ];

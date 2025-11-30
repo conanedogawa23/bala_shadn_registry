@@ -140,7 +140,13 @@ export default function ReportsPage() {
   // Get clinic data from context (API-provided with correct backendName)
   const { availableClinics } = useClinic();
   const clinic = useMemo(() => {
-    return availableClinics.find(c => c.name === clinicSlug);
+    // Use case-insensitive matching to handle URL slug variations
+    const slugLower = clinicSlug?.toLowerCase().replace(/\s+/g, '') || '';
+    return availableClinics.find(c => 
+      c.name?.toLowerCase().replace(/\s+/g, '') === slugLower ||
+      c.backendName?.toLowerCase().replace(/\s+/g, '') === slugLower ||
+      c.displayName?.toLowerCase().replace(/\s+/g, '') === slugLower
+    );
   }, [clinicSlug, availableClinics]);
   
   const orderClinicName = useMemo(() => {
@@ -233,10 +239,14 @@ export default function ReportsPage() {
     pagination: ordersPagination
   } = useOrdersByClinic({
     clinicName: orderClinicName,
+    query: {
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate
+    },
     autoFetch: !!orderClinicName
   });
 
-  // Fetch client statistics using aggregation
+  // Fetch client statistics using aggregation (for reference metrics only)
   useEffect(() => {
     if (backendClinicName) {
       const fetchClientStats = async () => {
@@ -266,10 +276,16 @@ export default function ReportsPage() {
       o.paymentStatus === PaymentStatus.OVERDUE
     ).length || 0;
 
-    // Use client stats or default values
-    const totalClients = clientStats?.totalClients || 0;
+    // Calculate unique clients from filtered orders (clients with activity in date range)
+    const uniqueClientIds = new Set(
+      orders?.map(order => order.clientId).filter(Boolean) || []
+    );
+    const totalClients = uniqueClientIds.size || 0;
+    
+    // Use all-time client stats for reference metrics
+    const allTimeClients = clientStats?.totalClients || totalClients;
     const newClientsThisMonth = clientStats?.newClientsThisMonth || 0;
-    const activeClients = clientStats?.activeClients || totalClients;
+    const activeClients = clientStats?.activeClients || allTimeClients;
 
     // Calculate growth rates from analytics data
     const isValidAnalytics = Array.isArray(revenueAnalytics) && revenueAnalytics.length > 1;
