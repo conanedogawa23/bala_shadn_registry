@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { BaseApiService } from './baseApiService';
 
 // Report data interfaces
@@ -556,7 +557,7 @@ export class ReportApiService extends BaseApiService {
   private static exportToCSV(reportData: any, filename: string): void {
     const flattenedData = this.flattenReportData(reportData);
     if (!flattenedData.length) {
-      console.warn('No data available for export');
+      logger.warn('No data available for export');
       return;
     }
 

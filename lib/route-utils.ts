@@ -4,6 +4,7 @@
  * IMPORTANT: Clinic data now comes from MongoDB via API.
  * Use clinic-context.tsx for clinic lookups and validation.
  */
+import { logger } from './utils/logger';
 import { Clinic } from '@/lib/types/clinic';
 
 /**
@@ -66,7 +67,7 @@ export function generateLink(type: RouteType, path: string, clinicSlug?: string)
   } else {
     // For clinic routes, require a clinic slug - don't fallback to default
     if (!clinicSlug) {
-      console.warn('generateLink called without clinicSlug - returning home');
+      logger.warn('generateLink called without clinicSlug - returning home');
       return '/';
     }
     return `/clinic/${clinicSlug}/${normalizedPath}`;
@@ -106,7 +107,7 @@ export function isClinicRoute(path: string): boolean {
  */
 export function getClinicPath(path: string, clinicSlug: string): string {
   if (!clinicSlug) {
-    console.warn('getClinicPath called without clinicSlug');
+    logger.warn('getClinicPath called without clinicSlug');
     return '/';
   }
   return `/clinic/${clinicSlug}${path}`;

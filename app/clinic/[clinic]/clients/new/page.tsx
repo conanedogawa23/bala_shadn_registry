@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter, useParams } from "next/navigation";
 import { z } from "zod";
+import { logger } from "@/lib/utils/logger";
 import { 
   Card, 
   CardHeader, 
@@ -176,12 +177,12 @@ export default function NewClientPage() {
       // Call real API
       await ClientApiService.createClient(clientData);
       
-      console.log("✅ New client created successfully for clinic:", clinic);
+      logger.info("New client created successfully for clinic:", clinic);
       
       // Navigate back to clients page
       router.push(`/clinic/${clinic}/clients`);
     } catch (error) {
-      console.error("❌ Failed to create client:", error);
+      logger.error("Failed to create client:", error);
       alert(`Failed to create client: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
@@ -198,6 +199,7 @@ export default function NewClientPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div className="flex items-center gap-4">
           <Button
+            type="button"
             variant="outline"
             size="sm"
             onClick={handleBack}

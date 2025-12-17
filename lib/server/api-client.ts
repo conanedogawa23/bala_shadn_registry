@@ -8,6 +8,7 @@
  * - Type-safe API responses
  */
 
+import { logger } from '../utils/logger';
 import { cookies } from 'next/headers';
 
 interface ApiResponse<T = any> {
@@ -102,7 +103,7 @@ export class ServerApiClient {
     config.signal = controller.signal;
     
     try {
-      console.log(`[Server API] ${method} ${url}`, data ? { body: data } : '');
+      logger.debug(`[Server API] ${method} ${url}`, data ? { body: data } : '');
       
       const response = await fetch(url, config);
       clearTimeout(timeoutId);
@@ -115,20 +116,20 @@ export class ServerApiClient {
         throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
       }
       
-      console.log(`[Server API] Response ${response.status}:`, result);
+      logger.debug(`[Server API] Response ${response.status}:`, result);
       
       // Handle HTTP errors
       if (!response.ok) {
         const errorMessage = result.error?.message || result.message || `HTTP ${response.status}: ${response.statusText}`;
         const errorDetails = result.error?.details || result.details;
-        console.error(`[Server API] Error ${response.status}:`, { errorMessage, errorDetails });
+        logger.error(`[Server API] Error ${response.status}:`, { errorMessage, errorDetails });
         throw new Error(errorMessage);
       }
       
       // Handle API-level errors
       if (!result.success) {
         const errorMessage = result.error?.message || result.message || 'API request failed';
-        console.error('[Server API] Request failed:', errorMessage);
+        logger.error('[Server API] Request failed:', errorMessage);
         throw new Error(errorMessage);
       }
       
@@ -137,11 +138,11 @@ export class ServerApiClient {
       clearTimeout(timeoutId);
       
       if (error instanceof Error && error.name === 'AbortError') {
-        console.error(`[Server API] Request timeout after ${timeout}ms for ${method} ${endpoint}`);
+        logger.error(`[Server API] Request timeout after ${timeout}ms for ${method} ${endpoint}`);
         throw new Error(`Request timeout after ${timeout}ms`);
       }
       
-      console.error(`[Server API] Request failed for ${method} ${endpoint}:`, error);
+      logger.error(`[Server API] Request failed for ${method} ${endpoint}:`, error);
       throw error;
     }
   }

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { z } from "zod";
+import { logger } from "@/lib/utils/logger";
 import { 
   Card, 
   CardHeader, 
@@ -217,7 +218,7 @@ export default function EditClientPage() {
           insurance2CoverageTotalAmountPerYear: insurance2?.coverage?.totalAmountPerYear || 0,
         });
       } catch (err) {
-        console.error("❌ Failed to fetch client:", err);
+        logger.error("Failed to fetch client:", err);
         setError(err instanceof Error ? err.message : 'Failed to load client');
       } finally {
         setIsLoading(false);
@@ -346,12 +347,12 @@ export default function EditClientPage() {
       // Call real API
       const result = await ClientApiService.updateClient(clientId, updateData);
       
-      console.log("✅ Client updated successfully for clinic:", clinic, "Client ID:", clientId, result);
+      logger.info("Client updated successfully for clinic:", clinic, "Client ID:", clientId, result);
       
       // Navigate back to client detail page
       router.push(generateLink('clinic', `clients/${clientId}`, clinic));
     } catch (error) {
-      console.error("❌ Failed to update client:", error);
+      logger.error("Failed to update client:", error);
       alert(`Failed to update client: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
@@ -411,6 +412,7 @@ export default function EditClientPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div className="flex items-center gap-4">
           <Button
+            type="button"
             variant="outline"
             size="sm"
             onClick={handleBack}

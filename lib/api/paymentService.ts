@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { BaseApiService } from './baseApiService';
 
 // Payment Enums (matching backend)
@@ -322,7 +323,7 @@ export class PaymentApiService extends BaseApiService {
       const response = await this.getAllPayments({ orderNumber });
       return response;
     } catch (error) {
-      console.error('[getPaymentsByOrder] Error:', error);
+      logger.error('[getPaymentsByOrder] Error:', error);
       throw error instanceof Error ? error : new Error('Failed to fetch payments for order');
     }
   }
@@ -769,7 +770,7 @@ export class PaymentApiService extends BaseApiService {
         clientName: payment.clientName
       }));
     } catch (error) {
-      console.error('Error fetching payment IDs:', error);
+      logger.error('Error fetching payment IDs:', error);
       return [];
     }
   }

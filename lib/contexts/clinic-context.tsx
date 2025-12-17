@@ -1,5 +1,6 @@
 'use client';
 
+import { logger } from '../utils/logger';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Clinic, ClinicContextType, ClinicStats } from '@/lib/types/clinic';
@@ -82,13 +83,13 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
         const response = await ClinicApiService.getFullClinics();
         
         // DEBUG: Log raw API response
-        console.log('=== CLINIC API DEBUG ===');
-        console.log('📡 Raw API Response:', response);
-        console.log('Total clinics from API:', response.clinics?.length);
+        logger.debug('=== CLINIC API DEBUG ===');
+        logger.debug('📡 Raw API Response:', response);
+        logger.debug('Total clinics from API:', response.clinics?.length);
         
         // Log each clinic's location data
         response.clinics?.forEach((clinic: FullClinicData, index: number) => {
-          console.log(`Clinic ${index + 1} (${clinic.displayName}):`, {
+          logger.debug(`Clinic ${index + 1} (${clinic.displayName}):`, {
             id: clinic.id,
             name: clinic.name,
             displayName: clinic.displayName,
@@ -106,7 +107,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
           const clinicName = clinic.name;
           
           // Debug: Log logo data for each clinic
-          console.log(`🖼️ Clinic ${clinicName} logo:`, {
+          logger.debug(`🖼️ Clinic ${clinicName} logo:`, {
             hasLogo: !!clinic.logo,
             hasData: !!clinic.logo?.data,
             dataLength: clinic.logo?.data?.length || 0,
@@ -133,13 +134,13 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
         });
         
         // DEBUG: Log transformed data
-        console.log('✅ Transformed clinics data:', clinicsData);
-        console.log('📋 Clinic names available:', clinicsData.map(c => ({ name: c.name, displayName: c.displayName })));
+        logger.debug('✅ Transformed clinics data:', clinicsData);
+        logger.debug('📋 Clinic names available:', clinicsData.map(c => ({ name: c.name, displayName: c.displayName })));
         
         setAvailableClinics(clinicsData);
       } catch (err) {
-        console.error('❌ Failed to fetch clinics:', err);
-        console.error('Error details:', {
+        logger.error('❌ Failed to fetch clinics:', err);
+        logger.error('Error details:', {
           errorType: err instanceof Error ? err.constructor.name : typeof err,
           errorMessage: err instanceof Error ? err.message : String(err),
           errorStack: err instanceof Error ? err.stack : undefined
@@ -162,7 +163,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
   useEffect(() => {
     // Wait for clinics to be loaded before initializing
     if (loading || availableClinics.length === 0) {
-      console.log('⏳ Waiting for clinics to load...', { loading, availableClinicsCount: availableClinics.length });
+      logger.debug('⏳ Waiting for clinics to load...', { loading, availableClinicsCount: availableClinics.length });
       return;
     }
 
@@ -171,7 +172,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
     
     // Prevent multiple initializations for the same pathname
     if (lastInitializedPath === normalizedPathname) {
-      console.log('🚫 Already initialized for this pathname:', normalizedPathname);
+      logger.debug('🚫 Already initialized for this pathname:', normalizedPathname);
       return;
     }
 
@@ -183,7 +184,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
     );
     
     if (isGlobalRoute) {
-      console.log('🌐 Global route detected, skipping clinic initialization:', pathname);
+      logger.debug('🌐 Global route detected, skipping clinic initialization:', pathname);
       setLastInitializedPath(normalizedPathname);
       return;
     }
@@ -194,7 +195,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
       const clinicSlug = decodeURIComponent(pathSegments[2]);
       const clinic = slugToClinic(clinicSlug);
       
-      console.log('🔍 Clinic lookup debug:', {
+      logger.debug('🔍 Clinic lookup debug:', {
         clinicSlug,
         foundClinic: !!clinic,
         clinicDisplayName: clinic?.displayName,
@@ -207,8 +208,8 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
         setLastInitializedPath(normalizedPathname);
       } else {
         // Clinic not found - don't fallback or redirect
-        console.warn('⚠️ Clinic not found:', clinicSlug, 'Available:', availableClinics.map(c => c.name));
-        console.log('❌ Clinic not found - letting page handle the empty state (no fallback to default clinic)');
+        logger.warn('⚠️ Clinic not found:', clinicSlug, 'Available:', availableClinics.map(c => c.name));
+        logger.debug('❌ Clinic not found - letting page handle the empty state (no fallback to default clinic)');
         
         // Set selectedClinic to null so pages can show "no data" state
         setSelectedClinic(null);
@@ -217,7 +218,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
     } else {
       // No clinic in URL - don't automatically select any clinic
       // Let the user choose from available clinics
-      console.log('ℹ️ No clinic in URL - no automatic selection');
+      logger.debug('ℹ️ No clinic in URL - no automatic selection');
       setSelectedClinic(null);
       setLastInitializedPath(normalizedPathname);
     }
@@ -228,7 +229,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
       // Validate clinic exists in available clinics
       const clinicExists = availableClinics.some(c => c.id === clinic.id);
       if (!clinicExists) {
-        console.error('Cannot switch to invalid clinic:', clinic);
+        logger.error('Cannot switch to invalid clinic:', clinic);
         return;
       }
 
@@ -255,7 +256,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
         router.push(generateLink('clinic', '', clinicSlug));
       }
     } catch (error) {
-      console.error('Error switching clinics:', error);
+      logger.error('Error switching clinics:', error);
       // Don't crash, just log the error and keep current clinic
     }
   };

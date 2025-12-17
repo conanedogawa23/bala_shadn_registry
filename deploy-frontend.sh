@@ -44,7 +44,7 @@ echo ""
 
 # Step 4: Extract on EC2
 echo -e "${BLUE}[4/8]${NC} Extracting build on EC2..."
-ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "cd $DEPLOY_DIR && sudo rm -rf .next && sudo tar -xzf ~/$BUILD_FILE && sudo chown -R $EC2_USER:$EC2_USER $DEPLOY_DIR"
+ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "cd $DEPLOY_DIR && sudo rm -rf .next && sudo tar -xzf /home/$EC2_USER/$BUILD_FILE && sudo chown -R $EC2_USER:$EC2_USER $DEPLOY_DIR"
 echo -e "${GREEN}✓ Extraction completed${NC}"
 echo ""
 
@@ -56,7 +56,7 @@ echo ""
 
 # Step 6: Restart PM2
 echo -e "${BLUE}[6/8]${NC} Restarting PM2 process..."
-ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "cd $DEPLOY_DIR && pm2 restart $PM2_APP_NAME && pm2 save"
+ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "cd $DEPLOY_DIR/.next/standalone && pm2 restart $PM2_APP_NAME || (PORT=3000 pm2 start server.js --name $PM2_APP_NAME && pm2 save)"
 echo -e "${GREEN}✓ PM2 restarted${NC}"
 echo ""
 
@@ -68,7 +68,7 @@ echo ""
 
 # Step 8: Cleanup
 echo -e "${BLUE}[8/8]${NC} Cleaning up..."
-ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "rm -f ~/$BUILD_FILE"
+ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "rm -f /home/$EC2_USER/$BUILD_FILE"
 rm -f $BUILD_FILE
 echo -e "${GREEN}✓ Cleanup completed${NC}"
 echo ""

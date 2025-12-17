@@ -9,6 +9,7 @@
  * - See app/clinic/[clinic]/payments/page.tsx for reference implementation
  */
 
+import { logger } from '../utils/logger';
 import { useState, useEffect, useCallback } from 'react';
 import { 
   PaymentApiService, 
@@ -89,7 +90,7 @@ export function usePayments(filters: PaymentFilters = {}): UsePaymentsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch payments';
       setError(errorMessage);
-      console.error('Error fetching payments:', err);
+      logger.error('Error fetching payments:', err);
     } finally {
       setLoading(false);
     }
@@ -230,7 +231,7 @@ export function usePaymentsByClinic(
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch clinic payments';
       setError(errorMessage);
-      console.error('Error fetching clinic payments:', err);
+      logger.error('Error fetching clinic payments:', err);
     } finally {
       setLoading(false);
     }
@@ -361,11 +362,11 @@ export function usePayment(paymentId: string | null): UsePaymentResult {
       setLoading(true);
       setError(null);
       
-      console.log('usePayment: Fetching payment with ID:', paymentId);
+      logger.debug('usePayment: Fetching payment with ID:', paymentId);
       
       const response = await PaymentApiService.getPaymentById(paymentId);
       
-      console.log('usePayment: Response received:', response);
+      logger.debug('usePayment: Response received:', response);
       
       if (response.success && response.data) {
         setPayment(response.data);
@@ -375,7 +376,7 @@ export function usePayment(paymentId: string | null): UsePaymentResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch payment';
       setError(errorMessage);
-      console.error('usePayment: Error fetching payment:', {
+      logger.error('usePayment: Error fetching payment:', {
         paymentId,
         error: err,
         errorMessage
@@ -426,7 +427,7 @@ export function usePaymentsByClient(clientId: number | null): UsePaymentsResult 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch client payments';
       setError(errorMessage);
-      console.error('Error fetching client payments:', err);
+      logger.error('Error fetching client payments:', err);
     } finally {
       setLoading(false);
     }
@@ -475,7 +476,7 @@ export function usePaymentStats(clinicName: string): UsePaymentStatsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch payment statistics';
       setError(errorMessage);
-      console.error('Error fetching payment stats:', err);
+      logger.error('Error fetching payment stats:', err);
     } finally {
       setLoading(false);
     }
@@ -524,7 +525,7 @@ export function usePaymentsByOrder(orderNumber: string): UsePaymentsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch order payments';
       setError(errorMessage);
-      console.error('Error fetching order payments:', err);
+      logger.error('Error fetching order payments:', err);
     } finally {
       setLoading(false);
     }
@@ -579,7 +580,7 @@ export function useOutstandingPayments(
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch outstanding payments';
       setError(errorMessage);
-      console.error('Error fetching outstanding payments:', err);
+      logger.error('Error fetching outstanding payments:', err);
     } finally {
       setLoading(false);
     }
@@ -632,7 +633,7 @@ export function useRevenueData(
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch revenue data';
       setError(errorMessage);
-      console.error('Error fetching revenue data:', err);
+      logger.error('Error fetching revenue data:', err);
     } finally {
       setLoading(false);
     }

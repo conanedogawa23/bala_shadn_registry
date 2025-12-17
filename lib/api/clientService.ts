@@ -1,5 +1,6 @@
 import { BaseApiService } from './baseApiService';
 import type { Client } from '../data/mockDataService';
+import { logger } from '../utils/logger';
 
 interface ClientQueryOptions {
   page?: number;
@@ -214,16 +215,20 @@ export class ClientApiService extends BaseApiService {
    * Get client by ID with frontend-compatible format
    */
   static async getClientById(clientId: string): Promise<Client> {
-    const cacheKey = `client_${clientId}`;
-    const cached = this.getCached<Client>(cacheKey);
-    if (cached) return cached;
+    // TEMPORARILY DISABLED CACHING - Debug issue where wrong client is returned
+    // TODO: Re-enable caching once issue is resolved
+    // const cacheKey = `client_${clientId}`;
+    // const cached = this.getCached<Client>(cacheKey);
+    // if (cached) return cached;
 
     try {
       const endpoint = `${this.ENDPOINT}/${encodeURIComponent(clientId)}/frontend-compatible`;
+      logger.debug('[ClientService] Fetching client by ID:', clientId, 'Endpoint:', endpoint);
       const response = await this.request<Client>(endpoint);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
+        // CACHING DISABLED
+        // this.setCached(cacheKey, response.data, this.CACHE_TTL);
         return response.data;
       }
       
@@ -237,6 +242,7 @@ export class ClientApiService extends BaseApiService {
    * Transform frontend data to backend-compatible format
    */
   private static transformClientData(clientData: CreateClientRequest | UpdateClientRequest): TransformedClientData {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const transformedData = { ...clientData } as any;
 
     // Safely transform dateOfBirth to birthday format if provided

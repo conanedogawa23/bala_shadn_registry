@@ -1,5 +1,6 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { AlertCircle, User, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -144,7 +145,7 @@ export default async function ClientsPage({ params, searchParams }: PageProps) {
       tags: ['clients', `clinic-${backendClinicName}`]
     });
   } catch (err) {
-    console.error('Error fetching clients:', err);
+    // Server component - error is handled via error state
     error = err instanceof Error ? err.message : 'Failed to fetch clients';
     clientsData = {
       data: [],
@@ -215,15 +216,11 @@ export default async function ClientsPage({ params, searchParams }: PageProps) {
                     No clients match your search for &quot;{search}&quot;. Try adjusting your search terms.
                   </p>
                   <div className="flex gap-3 justify-center">
-                    <Button 
-                      variant="outline"
-                      onClick={() => {
-                        // This will need to be a Client Component wrapper or form
-                        window.location.href = `/clinic/${clinic}/clients`;
-                      }}
-                    >
-                      Clear Search
-                    </Button>
+                    <Link href={`/clinic/${clinic}/clients`}>
+                      <Button variant="outline">
+                        Clear Search
+                      </Button>
+                    </Link>
                   </div>
                 </>
               ) : (
@@ -232,12 +229,12 @@ export default async function ClientsPage({ params, searchParams }: PageProps) {
                   <p className="text-gray-600 mb-4">
                     Get started by adding your first client to this clinic.
                   </p>
-                  <Button onClick={() => {
-                    window.location.href = `/clinic/${clinic}/clients/new`;
-                  }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Client
-                  </Button>
+                  <Link href={`/clinic/${clinic}/clients/new`}>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Client
+                    </Button>
+                  </Link>
                 </>
               )}
             </div>

@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
@@ -74,18 +76,18 @@ export abstract class BaseApiService {
     config.signal = controller.signal;
     
     try {
-      console.log(`[API] ${method} ${this.API_BASE_URL}${endpoint}`, data ? { body: data } : '');
+      logger.api.request(method, `${this.API_BASE_URL}${endpoint}`, data);
       
       const response = await fetch(`${this.API_BASE_URL}${endpoint}`, config);
       clearTimeout(timeoutId);
       
-      console.log(`[API] Response status: ${response.status} for ${endpoint}`);
+      logger.api.response(response.status, endpoint);
       
       let result;
       try {
         result = await response.json();
       } catch (parseError) {
-        console.error(`[API] Failed to parse response:`, { 
+        logger.error(`[API] Failed to parse response:`, { 
           status: response.status, 
           statusText: response.statusText,
           contentType: response.headers.get('content-type'),
@@ -94,19 +96,19 @@ export abstract class BaseApiService {
         throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
       }
       
-      console.log(`[API] Response ${response.status}:`, result);
+      logger.debug(`[API] Response ${response.status}:`, result);
       
       if (!response.ok) {
         const errorMessage = result.error?.message || result.message || `HTTP ${response.status}: ${response.statusText}`;
         const errorDetails = result.error?.details || result.details;
-        console.error(`[API] Error ${response.status}:`, { errorMessage, errorDetails, result });
+        logger.api.error(response.status, endpoint, { errorMessage, errorDetails, result });
         throw new Error(errorMessage);
       }
       
       if (!result.success) {
         const errorMessage = result.error?.message || result.message || 'API request failed';
         const errorDetails = result.error?.details || result.details;
-        console.error('[API] Request failed:', { errorMessage, errorDetails, result });
+        logger.error('[API] Request failed:', { errorMessage, errorDetails, result });
         throw new Error(errorMessage);
       }
       
@@ -115,11 +117,11 @@ export abstract class BaseApiService {
       clearTimeout(timeoutId);
       
       if (error instanceof Error && error.name === 'AbortError') {
-        console.error(`[API] Request timeout after ${timeout}ms for ${method} ${endpoint}`);
+        logger.error(`[API] Request timeout after ${timeout}ms for ${method} ${endpoint}`);
         throw new Error(`Request timeout after ${timeout}ms`);
       }
       
-      console.error(`[API] Request failed for ${method} ${endpoint}:`, error);
+      logger.error(`[API] Request failed for ${method} ${endpoint}:`, error);
       throw error;
     }
   }
@@ -199,6 +201,6 @@ export abstract class BaseApiService {
    */
   public static clearAllCache(): void {
     this.cache.clear();
-    console.log('[API] All cache cleared');
+    logger.info('[API] All cache cleared');
   }
 }

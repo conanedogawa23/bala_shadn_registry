@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger';
 import { BaseApiService } from './baseApiService';
 
 export interface RetainedClinic {
@@ -145,7 +146,7 @@ export const getCachedFullClinics = async (): Promise<FullClinicData[]> => {
     };
     return data.clinics;
   } catch (error) {
-    console.error('Failed to fetch clinics:', error);
+    logger.error('Failed to fetch clinics:', error);
     return clinicCache.clinics || [];
   }
 };

@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ClientApiService } from '../api/clientService';
 import type { Client } from '../data/mockDataService';
+import { logger } from '../utils/logger';
 
 interface UseClientsOptions {
   clinicName: string;
@@ -124,7 +125,14 @@ export function useClient({
     setError(null);
 
     try {
+      // Debug: Log what we're requesting
+      logger.debug('[useClient] Fetching client with ID:', clientId);
       const clientData = await ClientApiService.getClientById(clientId);
+      logger.debug('[useClient] Received client data:', {
+        requestedId: clientId,
+        receivedClientId: clientData.clientId,
+        receivedName: `${clientData.personalInfo?.firstName || ''} ${clientData.personalInfo?.lastName || ''}`.trim()
+      });
       setClient(clientData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch client');

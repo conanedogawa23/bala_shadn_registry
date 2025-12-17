@@ -1,5 +1,6 @@
 "use client";
 
+import { logger } from './utils/logger';
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { currentUserData } from "@/lib/mock-data";
@@ -191,7 +192,7 @@ export const getUser = (): User | null => {
     
     return basicUserData as User;
   } catch (error) {
-    console.error("Error parsing user data:", error);
+    logger.error("Error parsing user data:", error);
     return null;
   }
 };
@@ -212,7 +213,7 @@ export const updateUserProfile = (userData: Partial<User>): boolean => {
     localStorage.setItem("user", JSON.stringify(updatedUser));
     return true;
   } catch (error) {
-    console.error("Error updating user profile:", error);
+    logger.error("Error updating user profile:", error);
     return false;
   }
 };
@@ -222,7 +223,7 @@ export const updateUserProfile = (userData: Partial<User>): boolean => {
 export const login = (userData: User, token?: string, refreshToken?: string) => {
   if (typeof window === "undefined") return;
   
-  console.log('[Auth] Logging in user, storing tokens in localStorage');
+  logger.debug('[Auth] Logging in user, storing tokens in localStorage');
   
   // Store in localStorage (primary storage)
   localStorage.setItem("isAuthenticated", "true");
@@ -232,13 +233,13 @@ export const login = (userData: User, token?: string, refreshToken?: string) => 
     localStorage.setItem("authToken", token);
     // Also set non-HttpOnly cookie for Next.js Server Components
     setServerReadableCookie("accessToken", token, 1/96); // 15 minutes
-    console.log('[Auth] Access token stored in localStorage + cookie for SSR');
+    logger.debug('[Auth] Access token stored in localStorage + cookie for SSR');
   }
   
   if (refreshToken) {
     localStorage.setItem("refreshToken", refreshToken);
     setServerReadableCookie("refreshToken", refreshToken, 7); // 7 days
-    console.log('[Auth] Refresh token stored in localStorage + cookie for SSR');
+    logger.debug('[Auth] Refresh token stored in localStorage + cookie for SSR');
   }
 };
 
@@ -250,7 +251,7 @@ const callBackendLogout = async (): Promise<boolean> => {
     const refreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
     const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : null;
     
-    console.log('[Auth] Calling backend logout at:', endpoint);
+    logger.debug('[Auth] Calling backend logout at:', endpoint);
     
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -264,14 +265,14 @@ const callBackendLogout = async (): Promise<boolean> => {
     });
     
     if (response.ok) {
-      console.log('[Auth] Backend logout successful - tokens revoked');
+      logger.debug('[Auth] Backend logout successful - tokens revoked');
       return true;
     } else {
-      console.warn(`[Auth] Backend logout failed:`, response.status, response.statusText);
+      logger.warn(`[Auth] Backend logout failed:`, response.status, response.statusText);
       return false;
     }
   } catch (error) {
-    console.warn('[Auth] Backend logout error:', error);
+    logger.warn('[Auth] Backend logout error:', error);
     return false;
   }
 };
@@ -280,8 +281,8 @@ const callBackendLogout = async (): Promise<boolean> => {
 export const logout = async () => {
   if (typeof window === "undefined") return;
   
-  console.log('[Auth] ========== LOGOUT START ==========');
-  console.log('[Auth] localStorage keys BEFORE:', Object.keys(localStorage));
+  logger.debug('[Auth] ========== LOGOUT START ==========');
+  logger.debug('[Auth] localStorage keys BEFORE:', Object.keys(localStorage));
   
   // 1. Call backend to revoke tokens in database
   await callBackendLogout();
@@ -289,17 +290,17 @@ export const logout = async () => {
   // 2. CLEAR localStorage completely (where tokens are stored)
   try { 
     localStorage.clear(); 
-    console.log('[Auth] ✓ localStorage cleared (tokens removed)');
+    logger.debug('[Auth] ✓ localStorage cleared (tokens removed)');
   } catch (e) { 
-    console.error('[Auth] ✗ Could not clear localStorage:', e);
+    logger.error('[Auth] ✗ Could not clear localStorage:', e);
   }
   
   // 3. CLEAR sessionStorage
   try { 
     sessionStorage.clear(); 
-    console.log('[Auth] ✓ sessionStorage cleared');
+    logger.debug('[Auth] ✓ sessionStorage cleared');
   } catch (e) {
-    console.error('[Auth] ✗ Could not clear sessionStorage:', e);
+    logger.error('[Auth] ✗ Could not clear sessionStorage:', e);
   }
   
   // 4. Clear any remaining cookies (just session cookies, not auth tokens)
@@ -308,20 +309,20 @@ export const logout = async () => {
   // 5. Clear API cache
   try { 
     BaseApiService.clearAllCache(); 
-    console.log('[Auth] ✓ API cache cleared');
+    logger.debug('[Auth] ✓ API cache cleared');
   } catch (e) {
-    console.error('[Auth] ✗ Could not clear API cache:', e);
+    logger.error('[Auth] ✗ Could not clear API cache:', e);
   }
   
-  console.log('[Auth] localStorage keys AFTER:', Object.keys(localStorage));
-  console.log('[Auth] ========== LOGOUT COMPLETE ==========');
+  logger.debug('[Auth] localStorage keys AFTER:', Object.keys(localStorage));
+  logger.debug('[Auth] ========== LOGOUT COMPLETE ==========');
 };
 
 // Synchronous logout for cases where async isn't practical
 export const logoutSync = () => {
   if (typeof window === "undefined") return;
   
-  console.log('[Auth] Sync logout - clearing local data');
+  logger.debug('[Auth] Sync logout - clearing local data');
   
   // Fire and forget backend call
   callBackendLogout().catch(() => {});
@@ -366,7 +367,7 @@ export function usePublicRoute(redirectIfAuthenticated = "/clinic/bodyblissphysi
     // Only access localStorage when in browser environment
     if (typeof window !== "undefined") {
       if (isAuthenticated()) {
-        console.log('[Auth] User already authenticated, redirecting to:', redirectIfAuthenticated);
+        logger.debug('[Auth] User already authenticated, redirecting to:', redirectIfAuthenticated);
         router.push(redirectIfAuthenticated);
       }
     }
