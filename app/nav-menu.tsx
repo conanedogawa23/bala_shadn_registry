@@ -22,6 +22,8 @@ import { isAuthenticated, getUser, logout, User } from "@/lib/auth";
 import { ClinicSelector } from "@/components/clinic/clinic-selector";
 import { useClinic } from "@/lib/contexts/clinic-context";
 import { generateLink } from "@/lib/route-utils";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import { useNotifications } from "@/lib/hooks/useNotifications";
 
 export default function NavMenu() {
   const pathname = usePathname();
@@ -33,6 +35,17 @@ export default function NavMenu() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Get clinic name for notifications
+  const clinicName = selectedClinic?.name || 'bodyblissphysio';
+  
+  // Use notifications hook for unread count
+  const { unreadCount } = useNotifications({
+    clinicName,
+    pollingInterval: 30000,
+    enablePolling: userAuthenticated,
+    limit: 2
+  });
 
   // Handle hydration mismatch and setup auth listener
   useEffect(() => {
@@ -238,34 +251,19 @@ export default function NavMenu() {
                       className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-50 focus:outline-none transition-colors"
                     >
                       <Bell className="h-5 w-5" />
-                      <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
+                      {unreadCount > 0 && (
+                        <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-xs font-medium ring-2 ring-white">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      )}
                     </button>
                     
                     {/* Notifications dropdown */}
-                    {notificationsOpen && (
-                      <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 z-10 ring-1 ring-black ring-opacity-5">
-                        <div className="px-4 py-2 border-b border-gray-100">
-                          <h3 className="text-sm font-medium text-gray-900">Notifications</h3>
-                        </div>
-                        <div className="max-h-96 overflow-y-auto">
-                          <div className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                            <p className="text-sm font-medium text-gray-900">Appointment Reminder</p>
-                            <p className="text-xs text-gray-500">Your appointment with Dr. Emma Wilson is tomorrow at 10:30 AM</p>
-                            <p className="text-xs text-gray-400 mt-1">1 hour ago</p>
-                          </div>
-                          <div className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
-                            <p className="text-sm font-medium text-gray-900">Payment Processed</p>
-                            <p className="text-xs text-gray-500">Your payment of $75.00 has been processed successfully</p>
-                            <p className="text-xs text-gray-400 mt-1">Yesterday</p>
-                          </div>
-                        </div>
-                        <div className="px-4 py-2 text-center border-t border-gray-100">
-                          <Link href={generateLink('clinic', 'notifications', getClinicSlug())} className="text-xs text-blue-600 hover:text-blue-800">
-                            View all notifications
-                          </Link>
-                        </div>
-                      </div>
-                    )}
+                    <NotificationDropdown
+                      clinicName={clinicName}
+                      isOpen={notificationsOpen}
+                      onClose={() => setNotificationsOpen(false)}
+                    />
                   </div>
                 )}
                 

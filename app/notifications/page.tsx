@@ -1,120 +1,55 @@
 "use client";
 
 import React, { useState } from "react";
-import { Bell, CheckCircle, AlertCircle, Info, Trash2, Mail } from "lucide-react";
+import { Bell, CheckCircle, Trash2, Mail } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-
-interface Notification {
-  id: string;
-  type: 'info' | 'warning' | 'success' | 'error';
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-}
-
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "info",
-    title: "System Update",
-    message: "System maintenance scheduled for tonight at 2:00 AM EST",
-    timestamp: "2024-01-15T10:30:00Z",
-    read: false
-  },
-  {
-    id: "2",
-    type: "success",
-    title: "Payment Received",
-    message: "Payment of $250.00 received from John Smith",
-    timestamp: "2024-01-15T09:15:00Z",
-    read: false
-  },
-  {
-    id: "3",
-    type: "warning",
-    title: "Appointment Reminder",
-    message: "Appointment with Sarah Johnson tomorrow at 3:00 PM",
-    timestamp: "2024-01-14T16:45:00Z",
-    read: true
-  },
-  {
-    id: "4",
-    type: "error",
-    title: "Failed Payment",
-    message: "Payment attempt failed for order #12345",
-    timestamp: "2024-01-14T14:20:00Z",
-    read: true
-  },
-  {
-    id: "5",
-    type: "info",
-    title: "New Client Registration",
-    message: "New client David Wilson has registered",
-    timestamp: "2024-01-14T11:00:00Z",
-    read: true
-  }
-];
+import { useNotifications } from "@/lib/hooks/useNotifications";
+import { useClinic } from "@/lib/contexts/clinic-context";
+import { formatNotificationTime, getNotificationIcon, getNotificationColor, getCategoryName } from "@/lib/utils/notificationHelpers";
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const { selectedClinic } = useClinic();
+  const clinicName = selectedClinic?.name || 'bodyblissphysio';
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 1) return "Today";
-    if (diffDays === 2) return "Yesterday";
-    if (diffDays <= 7) return `${diffDays - 1} days ago`;
-    
-    return date.toLocaleDateString();
-  };
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    error,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    refreshNotifications
+  } = useNotifications({
+    clinicName,
+    pollingInterval: 30000,
+    enablePolling: true,
+    page: 1,
+    limit: 50,
+    filters: filter === 'unread' ? { read: false } : undefined
+  });
 
-  const getNotificationIcon = (type: Notification['type']) => {
-    switch (type) {
-      case 'success': return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case 'warning': return <AlertCircle className="h-5 w-5 text-yellow-500" />;
-      case 'error': return <AlertCircle className="h-5 w-5 text-red-500" />;
-      case 'info': return <Info className="h-5 w-5 text-blue-500" />;
-      default: return <Bell className="h-5 w-5 text-gray-500" />;
+  const handleToggleRead = async (notificationId: string, isRead: boolean) => {
+    if (!isRead) {
+      await markAsRead(notificationId);
     }
   };
 
-  const getNotificationBadgeColor = (type: Notification['type']) => {
-    switch (type) {
-      case 'success': return 'bg-green-100 text-green-800';
-      case 'warning': return 'bg-yellow-100 text-yellow-800';
-      case 'error': return 'bg-red-100 text-red-800';
-      case 'info': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const handleDelete = async (notificationId: string) => {
+    if (confirm('Are you sure you want to delete this notification?')) {
+      await deleteNotification(notificationId);
     }
   };
 
-  const toggleRead = (id: string) => {
-    setNotifications(notifications.map(notif => 
-      notif.id === id ? { ...notif, read: !notif.read } : notif
-    ));
+  const handleMarkAllRead = async () => {
+    await markAllAsRead();
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications(notifications.filter(notif => notif.id !== id));
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, read: true })));
-  };
-
-  const filteredNotifications = notifications.filter(notif => 
-    filter === 'all' || !notif.read
-  );
-
-  const unreadCount = notifications.filter(notif => !notif.read).length;
+  const filteredNotifications = notifications;
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
@@ -140,8 +75,8 @@ export default function NotificationsPage() {
           
           <Button 
             variant="outline" 
-            onClick={markAllAsRead}
-            disabled={unreadCount === 0}
+            onClick={handleMarkAllRead}
+            disabled={unreadCount === 0 || loading}
             className="flex items-center gap-2"
           >
             <CheckCircle className="h-4 w-4" />
@@ -171,83 +106,119 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <div className="space-y-4">
-        {filteredNotifications.length === 0 ? (
-          <Card className="shadow-sm">
-            <CardContent className="py-12 text-center">
-              <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">
-                {filter === 'unread' ? 'No unread notifications' : 'No notifications'}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredNotifications.map((notification) => (
-            <Card 
-              key={notification.id}
-              className={`shadow-sm transition-all hover:shadow-md ${
-                !notification.read ? 'ring-2 ring-blue-100 bg-blue-50/30' : ''
-              }`}
+      {error && (
+        <Card className="mb-6 border-red-200 bg-red-50">
+          <CardContent className="py-4">
+            <p className="text-red-600 text-sm">{error}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={refreshNotifications}
+              className="mt-2"
             >
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 mt-1">
-                    {getNotificationIcon(notification.type)}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-gray-900">
-                            {notification.title}
-                          </h3>
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs ${getNotificationBadgeColor(notification.type)}`}
-                          >
-                            {notification.type}
-                          </Badge>
-                        </div>
-                        <p className="text-gray-600 text-sm mb-2">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatTimestamp(notification.timestamp)}
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleRead(notification.id)}
-                          className="h-8 w-8 p-0"
-                        >
-                          {notification.read ? (
-                            <Mail className="h-4 w-4 text-gray-500" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4 text-gray-500" />
-                          )}
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteNotification(notification.id)}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading && notifications.length === 0 ? (
+        <Card className="shadow-sm">
+          <CardContent className="py-12 text-center">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading notifications...</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {filteredNotifications.length === 0 ? (
+            <Card className="shadow-sm">
+              <CardContent className="py-12 text-center">
+                <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">
+                  {filter === 'unread' ? 'No unread notifications' : 'No notifications'}
+                </p>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ) : (
+            filteredNotifications.map((notification) => {
+              const IconComponent = getNotificationIcon(notification.type);
+              const colors = getNotificationColor(notification.type);
+              const isUnread = !notification.read;
+
+              return (
+                <Card 
+                  key={notification._id}
+                  className={`shadow-sm transition-all hover:shadow-md ${
+                    isUnread ? 'ring-2 ring-blue-100 bg-blue-50/30' : ''
+                  }`}
+                >
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 mt-1">
+                        <IconComponent className={`h-5 w-5 ${colors.icon}`} />
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <h3 className="font-semibold text-gray-900">
+                                {notification.title}
+                              </h3>
+                              <Badge 
+                                variant="secondary" 
+                                className={`text-xs ${colors.badge}`}
+                              >
+                                {notification.type}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {getCategoryName(notification.category)}
+                              </Badge>
+                            </div>
+                            <p className="text-gray-600 text-sm mb-2">
+                              {notification.message}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {formatNotificationTime(notification.createdAt)}
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleToggleRead(notification._id, notification.read)}
+                              className="h-8 w-8 p-0"
+                              title={notification.read ? 'Mark as unread' : 'Mark as read'}
+                            >
+                              {notification.read ? (
+                                <Mail className="h-4 w-4 text-gray-500" />
+                              ) : (
+                                <CheckCircle className="h-4 w-4 text-gray-500" />
+                              )}
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(notification._id)}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                              title="Delete notification"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 } 

@@ -181,8 +181,15 @@ export default function OrderInvoiceTemplate({
     router.push(`/clinic/${params.clinic}/orders/${orderId}`);
   };
 
+  const handlePrint = () => {
+    // Add a small delay to ensure styles are applied
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 print:bg-white">
       {/* Header Actions */}
       <div className="no-print bg-white border-b px-4 py-3">
         <div className="container mx-auto flex justify-between items-center">
@@ -194,9 +201,13 @@ export default function OrderInvoiceTemplate({
             <ArrowLeft size={16} />
             Back to Order
           </Button>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-gray-600 max-w-md">
+              <span className="font-semibold">Print Tip:</span> To remove URL/date from printout, 
+              open print dialog → More settings → Uncheck "Headers and footers"
+            </div>
             <Button
-              onClick={() => window.print()}
+              onClick={handlePrint}
               className="flex items-center gap-2"
             >
               <Printer size={16} />
@@ -207,12 +218,12 @@ export default function OrderInvoiceTemplate({
       </div>
 
       {/* Invoice Content */}
-      <div className="container mx-auto py-8 px-4 sm:px-6">
-        <Card className="max-w-5xl mx-auto invoice-container">
-          <CardContent className="p-8">
+      <div className="container mx-auto py-8 px-4 sm:px-6 print:p-0">
+        <Card className="max-w-5xl mx-auto invoice-container print:shadow-none print:border-0">
+          <CardContent className="p-8 print:p-0">
             <InvoiceHeader order={order} clinicInfo={clinicInfo} clientInfo={clientInfo} />
             <ServiceDetailsTable order={order} />
-            <Separator className="my-6" />
+            <Separator className="my-6 print:hidden" />
             <PaymentInformation payments={payments} orderTotal={orderTotal} />
           </CardContent>
         </Card>
@@ -230,19 +241,34 @@ export default function OrderInvoiceTemplate({
         }
         
         @media print {
-          .no-print {
+          /* Hide all non-printable elements */
+          .no-print,
+          nav,
+          header,
+          footer {
             display: none !important;
+            visibility: hidden !important;
+          }
+          
+          /* Reset page to white background */
+          html, body {
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           
           .invoice-container {
             max-width: none !important;
             box-shadow: none !important;
             border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           
           .container {
             max-width: none !important;
             padding: 0 !important;
+            margin: 0 !important;
           }
           
           body {
@@ -282,9 +308,22 @@ export default function OrderInvoiceTemplate({
             font-size: 1.125rem !important;
           }
           
+          /* Hide browser-added headers and footers */
           @page {
-            margin: 0.75in;
-            size: letter;
+            margin: 0.75in 0.5in;
+            size: letter portrait;
+          }
+          
+          /* Try to override browser default headers/footers - these may not work in all browsers */
+          @page :first {
+            margin-top: 0.5in;
+          }
+          
+          /* Additional attempt to hide browser elements */
+          body::before,
+          body::after {
+            display: none !important;
+            content: none !important;
           }
         }
       `}</style>

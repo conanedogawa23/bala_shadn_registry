@@ -312,7 +312,24 @@ export class PaymentApiService extends BaseApiService {
   }
 
   /**
-   * Get payments by order number
+   * Get payments by order ID (MongoDB _id)
+   */
+  static async getPaymentsByOrderId(orderId: string): Promise<PaymentListResponse> {
+    try {
+      if (!orderId || orderId.trim().length === 0) {
+        throw new Error('Order ID is required');
+      }
+
+      const response = await this.getAllPayments({ orderId });
+      return response;
+    } catch (error) {
+      logger.error('[getPaymentsByOrderId] Error:', error);
+      throw error instanceof Error ? error : new Error('Failed to fetch payments for order');
+    }
+  }
+
+  /**
+   * Get payments by order number (for backward compatibility)
    */
   static async getPaymentsByOrder(orderNumber: string): Promise<PaymentListResponse> {
     try {

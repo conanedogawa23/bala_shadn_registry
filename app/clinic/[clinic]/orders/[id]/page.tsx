@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { ArrowLeft, Edit2, Printer, FileText, DollarSign, User, Calendar, AlertCircle, Package } from "lucide-react";
+import { ArrowLeft, Edit2, FileText, DollarSign, User, Calendar, AlertCircle, Package } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { generateLink } from "@/lib/route-utils";
 import { findClinicBySlug } from "@/lib/data/clinics";
@@ -64,11 +64,6 @@ export default function OrderDetailPage() {
   // Handle edit order
   const handleEdit = () => {
     router.push(generateLink('clinic', `orders/${orderId}/edit`, clinic));
-  };
-
-  // Handle print invoice
-  const handlePrint = () => {
-    window.print();
   };
 
   // Get status badge with our real enums
@@ -180,7 +175,7 @@ export default function OrderDetailPage() {
           {formatDate(order.serviceDate)} - {clinicData?.displayName || clinicData?.name || clinic}
         </p>
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
           {(order.status === OrderStatus.SCHEDULED || order.status === OrderStatus.IN_PROGRESS) && (
             <Button
               variant="outline"
@@ -198,14 +193,6 @@ export default function OrderDetailPage() {
           >
             <FileText size={16} />
             View Invoice
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handlePrint}
-            className="flex items-center gap-2"
-          >
-            <Printer size={16} />
-            Print
           </Button>
         </div>
       </div>

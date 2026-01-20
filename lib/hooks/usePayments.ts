@@ -555,6 +555,61 @@ export function usePaymentsByOrder(orderNumber: string): UsePaymentsResult {
 }
 
 /**
+ * Hook for payments by order ID (MongoDB _id)
+ */
+export function usePaymentsByOrderId(orderId: string): UsePaymentsResult {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<UsePaymentsResult['pagination']>(null);
+
+  const fetchPayments = useCallback(async () => {
+    if (!orderId) {
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await PaymentApiService.getPaymentsByOrderId(orderId);
+      
+      setPayments(response.data);
+      setPagination(response.pagination);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch order payments';
+      setError(errorMessage);
+      logger.error('Error fetching order payments by ID:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
+
+  return {
+    payments,
+    loading,
+    error,
+    pagination,
+    refetch: fetchPayments,
+    createPayment: async () => { throw new Error('Not implemented for order payments'); },
+    updatePayment: async () => { throw new Error('Not implemented for order payments'); },
+    deletePayment: async () => { throw new Error('Not implemented for order payments'); },
+    addPaymentAmount: async () => { throw new Error('Not implemented for order payments'); },
+    processRefund: async () => { throw new Error('Not implemented for order payments'); },
+    clearError
+  };
+}
+
+/**
  * Hook for outstanding payments
  */
 export function useOutstandingPayments(

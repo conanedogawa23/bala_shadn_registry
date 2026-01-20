@@ -13,6 +13,10 @@ export default function NavigationWrapper() {
     return null;
   }
   
-  return <NavMenu />;
+  return (
+    <div className="no-print">
+      <NavMenu />
+    </div>
+  );
 }
 

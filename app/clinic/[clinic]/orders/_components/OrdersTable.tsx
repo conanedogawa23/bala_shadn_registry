@@ -9,8 +9,7 @@ import {
   FileText,
   Eye,
   Edit2,
-  Trash2,
-  Printer
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,10 +56,6 @@ export function OrdersTable({
 
   const handleEditOrder = useCallback((orderId: string) => {
     router.push(`/clinic/${clinicName}/orders/${orderId}/edit`);
-  }, [router, clinicName]);
-
-  const handlePrintInvoice = useCallback((orderId: string) => {
-    router.push(`/clinic/${clinicName}/orders/${orderId}`);
   }, [router, clinicName]);
 
   const getOrderStatusColor = (status: string) => {
@@ -207,14 +202,6 @@ export function OrdersTable({
                         <Trash2 size={14} />
                       </Button>
                     )}
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className="h-8 w-8"
-                      onClick={() => handlePrintInvoice(order._id)}
-                    >
-                      <Printer size={14} />
-                    </Button>
                   </div>
                 </TableCell>
               </TableRow>

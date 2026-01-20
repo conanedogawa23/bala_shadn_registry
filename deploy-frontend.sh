@@ -25,49 +25,55 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 
 # Step 1: Build the frontend
-echo -e "${BLUE}[1/8]${NC} Building Next.js frontend..."
+echo -e "${BLUE}[1/9]${NC} Building Next.js frontend..."
 npm run build
 echo -e "${GREEN}✓ Build completed${NC}"
 echo ""
 
 # Step 2: Create deployment package
-echo -e "${BLUE}[2/8]${NC} Creating deployment package..."
+echo -e "${BLUE}[2/9]${NC} Creating deployment package..."
 tar -czf $BUILD_FILE .next package.json package-lock.json public next.config.js .env.production
 echo -e "${GREEN}✓ Package created${NC}"
 echo ""
 
 # Step 3: Upload to EC2
-echo -e "${BLUE}[3/8]${NC} Uploading to EC2..."
+echo -e "${BLUE}[3/9]${NC} Uploading to EC2..."
 scp -i $PEM_FILE $BUILD_FILE $EC2_USER@$EC2_HOST:~/$BUILD_FILE
 echo -e "${GREEN}✓ Upload completed${NC}"
 echo ""
 
 # Step 4: Extract on EC2
-echo -e "${BLUE}[4/8]${NC} Extracting build on EC2..."
+echo -e "${BLUE}[4/9]${NC} Extracting build on EC2..."
 ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "cd $DEPLOY_DIR && sudo rm -rf .next && sudo tar -xzf /home/$EC2_USER/$BUILD_FILE && sudo chown -R $EC2_USER:$EC2_USER $DEPLOY_DIR"
 echo -e "${GREEN}✓ Extraction completed${NC}"
 echo ""
 
-# Step 5: Install dependencies
-echo -e "${BLUE}[5/8]${NC} Installing production dependencies..."
+# Step 5: Copy static assets to standalone directory
+echo -e "${BLUE}[5/9]${NC} Copying static assets to standalone directory..."
+ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "cd $DEPLOY_DIR && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/"
+echo -e "${GREEN}✓ Static assets copied${NC}"
+echo ""
+
+# Step 6: Install dependencies
+echo -e "${BLUE}[6/9]${NC} Installing production dependencies..."
 ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "cd $DEPLOY_DIR && npm install --omit=dev --legacy-peer-deps"
 echo -e "${GREEN}✓ Dependencies installed${NC}"
 echo ""
 
-# Step 6: Restart PM2
-echo -e "${BLUE}[6/8]${NC} Restarting PM2 process..."
+# Step 7: Restart PM2
+echo -e "${BLUE}[7/9]${NC} Restarting PM2 process..."
 ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "cd $DEPLOY_DIR/.next/standalone && pm2 restart $PM2_APP_NAME || (PORT=3000 pm2 start server.js --name $PM2_APP_NAME && pm2 save)"
 echo -e "${GREEN}✓ PM2 restarted${NC}"
 echo ""
 
-# Step 7: Reload Nginx
-echo -e "${BLUE}[7/8]${NC} Reloading Nginx..."
+# Step 8: Reload Nginx
+echo -e "${BLUE}[8/9]${NC} Reloading Nginx..."
 ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "sudo nginx -t && sudo systemctl reload nginx"
 echo -e "${GREEN}✓ Nginx reloaded${NC}"
 echo ""
 
-# Step 8: Cleanup
-echo -e "${BLUE}[8/8]${NC} Cleaning up..."
+# Step 9: Cleanup
+echo -e "${BLUE}[9/9]${NC} Cleaning up..."
 ssh -i $PEM_FILE $EC2_USER@$EC2_HOST "rm -f /home/$EC2_USER/$BUILD_FILE"
 rm -f $BUILD_FILE
 echo -e "${GREEN}✓ Cleanup completed${NC}"

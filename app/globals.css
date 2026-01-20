@@ -137,21 +137,40 @@
 
 /* Invoice Print Styles */
 @media print {
-  .no-print {
+  /* Hide all elements that shouldn't be printed */
+  .no-print,
+  header,
+  nav,
+  footer,
+  .nav-menu,
+  .navigation-wrapper {
     display: none !important;
   }
   
+  /* Hide browser print headers and footers */
+  @page {
+    margin: 0.75in;
+    size: letter;
+  }
+  
+  /* Reset body and html for print */
+  html, body {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+  
+  /* Invoice container adjustments */
   .invoice-container {
     max-width: none !important;
     box-shadow: none !important;
     border: none !important;
     margin: 0 !important;
-    padding: 20px !important;
-  }
-  
-  body {
+    padding: 0 !important;
     background: white !important;
-    color: black !important;
   }
   
   /* Ensure proper page breaks */
@@ -167,5 +186,16 @@
   table td, table th {
     border: 1px solid #333 !important;
     padding: 8px !important;
+  }
+  
+  /* Remove any background colors that might interfere */
+  * {
+    background: transparent !important;
+  }
+  
+  /* Preserve invoice content background */
+  .invoice-container,
+  .invoice-container * {
+    background: white !important;
   }
 }

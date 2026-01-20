@@ -20,8 +20,8 @@ import { useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertCircle } from "lucide-react";
-import { findClinicBySlug } from "@/lib/data/clinics";
-import { useOrder, usePaymentsByOrder, type Order, type Payment } from "@/lib/hooks";
+import { useClinic } from "@/lib/contexts/clinic-context";
+import { useOrder, usePaymentsByOrderId, type Order, type Payment } from "@/lib/hooks";
 import OrderInvoiceTemplate from "@/components/ui/invoice/OrderInvoiceTemplate";
 
 // Loading component
@@ -60,8 +60,8 @@ export default function OrderInvoicePage() {
   const clinic = params.clinic as string;
   const orderId = params.id as string;
   
-  // Get clinic data using case-insensitive lookup
-  const clinicData = findClinicBySlug(clinic);
+  // Get clinic data from context
+  const { selectedClinic, loading: clinicLoading } = useClinic();
 
   // Fetch order data
   const { order, loading: orderLoading, error: orderError } = useOrder({
@@ -69,19 +69,19 @@ export default function OrderInvoicePage() {
     autoFetch: !!orderId
   });
 
-  // Fetch payments for this order from MongoDB
+  // Fetch payments for this order from MongoDB by orderId
   // MongoDB Payment structure: { 
-  //   _id, paymentNumber, orderNumber, clientId, paymentDate, paymentMethod, 
+  //   _id, paymentNumber, orderId (ObjectId ref), clientId, paymentDate, paymentMethod, 
   //   amounts: { totalPaymentAmount, totalPaid, totalOwed, popAmount, dpaAmount, ... }
   // }
   const { 
     payments, 
     loading: paymentsLoading, 
     error: paymentsError 
-  } = usePaymentsByOrder(order?.orderNumber || "");
+  } = usePaymentsByOrderId(orderId);
 
-  // Simplified loading state - only wait for order, not payments
-  const isLoading = orderLoading;
+  // Simplified loading state - wait for both clinic and order
+  const isLoading = clinicLoading || orderLoading;
   const error = orderError || paymentsError;
 
   // Handle retry
@@ -89,8 +89,8 @@ export default function OrderInvoicePage() {
     window.location.reload();
   };
 
-  // Error states
-  if (!clinicData) {
+  // Error states - check for clinic after loading completes
+  if (!clinicLoading && !selectedClinic) {
     return (
       <ErrorDisplay 
         error="Clinic not found" 
@@ -120,14 +120,14 @@ export default function OrderInvoicePage() {
     );
   }
 
-  // Create clinic info directly from clinic data
+  // Create clinic info directly from selected clinic
   const defaultClinicInfo = {
-    name: clinicData?.name || '',
-    displayName: clinicData?.displayName || clinicData?.name || '',
-    address: clinicData?.address || '',
-    city: clinicData?.city || '',
-    province: clinicData?.province || '',
-    postalCode: clinicData?.postalCode || '',
+    name: selectedClinic?.name || '',
+    displayName: selectedClinic?.displayName || selectedClinic?.name || '',
+    address: selectedClinic?.address || '',
+    city: selectedClinic?.city || '',
+    province: selectedClinic?.province || '',
+    postalCode: selectedClinic?.postalCode || '',
     phone: '',
     fax: ''
   };

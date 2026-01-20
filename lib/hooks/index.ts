@@ -21,6 +21,7 @@ export {
   usePaymentStats,
   useOutstandingPayments,
   usePaymentsByOrder,
+  usePaymentsByOrderId,
   useRevenueData
 } from './usePayments';
 
@@ -83,3 +84,15 @@ export {
   type Event,
   type EventFilters
 } from '../api/eventService';
+
+// Notification hooks
+export {
+  useNotifications
+} from './useNotifications';
+
+// Notification types
+export {
+  type Notification,
+  type NotificationMetadata,
+  type NotificationFilters
+} from '../types/notification';
