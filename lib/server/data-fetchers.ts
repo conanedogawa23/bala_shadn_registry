@@ -107,6 +107,10 @@ interface FetchOptions {
   limit?: number;
   search?: string;
   status?: string;
+  paymentMethod?: string;
+  startDate?: string;
+  endDate?: string;
+  outstanding?: string;
   revalidate?: number | false;
   tags?: string[];
 }
@@ -311,6 +315,10 @@ export async function fetchPaymentsByClinic(
     limit = 20,
     search,
     status,
+    paymentMethod,
+    startDate,
+    endDate,
+    outstanding,
     revalidate = 180, // 3 minutes for payments
     tags = ['payments', `clinic-${clinicName}`]
   } = options;
@@ -319,7 +327,11 @@ export async function fetchPaymentsByClinic(
     page,
     limit,
     search,
-    status
+    status,
+    paymentMethod,
+    startDate,
+    endDate,
+    outstanding
   });
 
   const queryString = query ? `?${query}` : '';

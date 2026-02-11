@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
 import { findClinicBySlug } from '@/lib/route-utils';
@@ -12,6 +12,9 @@ export const dynamic = 'force-dynamic';
 // Client Components
 import { PaymentsHeader } from './_components/PaymentsHeader';
 import { PaymentsTable } from './_components/PaymentsTable';
+import { PaymentsSearch } from './_components/PaymentsSearch';
+import { PaymentsFilters } from './_components/PaymentsFilters';
+import { PaymentsPagination } from './_components/PaymentsPagination';
 
 interface PageProps {
   params: Promise<{
@@ -19,7 +22,12 @@ interface PageProps {
   }>;
   searchParams: Promise<{
     page?: string;
+    search?: string;
     status?: string;
+    paymentMethod?: string;
+    startDate?: string;
+    endDate?: string;
+    outstanding?: string;
   }>;
 }
 
@@ -36,7 +44,15 @@ interface PageProps {
 export default async function PaymentsPage({ params, searchParams }: PageProps) {
   // Await params and searchParams (Next.js 15 requirement)
   const { clinic } = await params;
-  const { page: pageParam, status } = await searchParams;
+  const { 
+    page: pageParam, 
+    search, 
+    status, 
+    paymentMethod, 
+    startDate, 
+    endDate, 
+    outstanding 
+  } = await searchParams;
   
   const currentPage = pageParam ? parseInt(pageParam, 10) : 1;
   const pageSize = 20;
@@ -77,7 +93,12 @@ export default async function PaymentsPage({ params, searchParams }: PageProps) 
     paymentsData = await fetchPaymentsByClinic(backendClinicName, {
       page: currentPage,
       limit: pageSize,
+      search,
       status,
+      paymentMethod,
+      startDate,
+      endDate,
+      outstanding,
       revalidate: 0, // No caching - always fetch fresh data
       tags: ['payments', `clinic-${backendClinicName}`]
     });
@@ -118,6 +139,9 @@ export default async function PaymentsPage({ params, searchParams }: PageProps) 
     );
   }
 
+  // Determine if any filters are active (for empty state messaging)
+  const hasActiveFilters = !!(search || status || paymentMethod || startDate || endDate || outstanding);
+
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6">
       {/* Header */}
@@ -126,18 +150,39 @@ export default async function PaymentsPage({ params, searchParams }: PageProps) 
         clinicDisplayName={clinicData.displayName || clinicData.name}
       />
       
+      {/* Search and Filters */}
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <Suspense fallback={<div className="h-10 w-full max-w-md bg-gray-100 animate-pulse rounded-md" />}>
+            <PaymentsSearch initialValue={search || ''} />
+          </Suspense>
+        </div>
+        <Suspense fallback={<div className="h-10 w-full bg-gray-100 animate-pulse rounded-md" />}>
+          <PaymentsFilters />
+        </Suspense>
+      </div>
+
       {/* Payments Table/Grid */}
       {payments.length > 0 ? (
-        <PaymentsTable 
-          payments={payments}
-          clinicName={clinic}
-        />
+        <>
+          <PaymentsTable 
+            payments={payments}
+            clinicName={clinic}
+          />
+          
+          {/* Pagination */}
+          <Suspense fallback={null}>
+            <PaymentsPagination pagination={paymentsData.pagination} />
+          </Suspense>
+        </>
       ) : (
         <div className="text-center py-12">
           <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No payments found</h3>
           <p className="text-gray-600">
-            No payments have been recorded for this clinic yet.
+            {hasActiveFilters
+              ? 'No payments match your search criteria. Try adjusting your filters.'
+              : 'No payments have been recorded for this clinic yet.'}
           </p>
         </div>
       )}
