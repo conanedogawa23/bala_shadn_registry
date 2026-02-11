@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/table/Table";
 import { ArrowLeft, Search, Plus, User, AlertCircle } from "lucide-react";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { generateLink } from "@/lib/route-utils";
+import { generateLink, findClinicBySlug } from "@/lib/route-utils";
 import { useClinic } from "@/lib/contexts/clinic-context";
 
 // Import real API hooks
@@ -42,7 +42,7 @@ export default function ClinicOrdersNewPage() {
   
   // Find the current clinic from URL slug (using API-provided slugs)
   const clinicData = useMemo(() => {
-    return availableClinics.find(c => c.name === clinic);
+    return findClinicBySlug(availableClinics, clinic);
   }, [clinic, availableClinics]);
   
   // Get the proper backend clinic name for API calls

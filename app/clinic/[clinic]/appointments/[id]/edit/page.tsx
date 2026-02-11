@@ -19,7 +19,7 @@ import { FormResourceSelect } from '@/components/ui/form/FormResourceSelect';
 import { FormDatePicker } from '@/components/ui/form/FormDatePicker';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Save, Edit3, AlertCircle } from 'lucide-react';
-import { generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink } from '@/lib/route-utils';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { useClinic } from '@/lib/contexts/clinic-context';
 
@@ -105,7 +105,7 @@ export default function EditAppointmentPage() {
   const [resourceName, setResourceName] = useState<string>('');
 
   const { availableClinics } = useClinic();
-  const clinicData = availableClinics.find(c => c.name === clinicSlug);
+  const clinicData = findClinicBySlug(availableClinics, clinicSlug);
   const clinicName = clinicData?.backendName || clinicData?.displayName || clinicSlug;
 
   // Fetch appointment data from API

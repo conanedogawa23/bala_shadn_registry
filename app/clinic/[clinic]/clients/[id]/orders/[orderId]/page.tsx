@@ -28,7 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { generateLink } from '@/lib/route-utils';
+import { generateLink, findClinicBySlug } from '@/lib/route-utils';
 
 // Import real API hooks and utilities
 import { 
@@ -51,7 +51,7 @@ export default function ViewClientOrderPage() {
   
   // Get clinic data from context
   const { availableClinics } = useClinic();
-  const clinicData = useMemo(() => availableClinics.find(c => c.name === clinic), [availableClinics, clinic]);
+  const clinicData = useMemo(() => findClinicBySlug(availableClinics, clinic), [availableClinics, clinic]);
   
   // Fetch order using real API
   const { 

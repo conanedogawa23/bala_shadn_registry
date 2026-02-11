@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertCircle } from "lucide-react";
+import { findClinicBySlug } from "@/lib/route-utils";
 import { useClinic } from "@/lib/contexts/clinic-context";
 import { PaymentApiService, type Payment } from "@/lib/hooks";
 import InvoiceTemplate from "@/components/ui/invoice/InvoiceTemplate";
@@ -47,7 +48,7 @@ export default function InvoicePage() {
   
   // Get clinic data from context
   const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
-  const clinicData = availableClinics.find(c => c.name === clinic);
+  const clinicData = findClinicBySlug(availableClinics, clinic);
   
   // State management
   const [payment, setPayment] = useState<Payment | null>(null);

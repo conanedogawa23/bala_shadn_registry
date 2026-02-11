@@ -19,7 +19,7 @@ import {
   Hash,
   RefreshCw
 } from 'lucide-react';
-import { generateLink } from '@/lib/route-utils';
+import { generateLink, findClinicBySlug } from '@/lib/route-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -82,7 +82,7 @@ export default function PaymentDetailsPage() {
   
   // Get clinic data from context
   const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
-  const clinic = availableClinics.find(c => c.name === clinicSlug);
+  const clinic = findClinicBySlug(availableClinics, clinicSlug);
   const { payment, loading, error, refetch } = usePayment(paymentId);
 
   const handleBack = () => {

@@ -5,7 +5,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter, usePathname } from 'next/navigation';
 import { Clinic, ClinicContextType, ClinicStats } from '@/lib/types/clinic';
 import { ClinicApiService, FullClinicData } from '@/lib/api/clinicService';
-import { generateLink } from '@/lib/route-utils';
+import { generateLink, toUrlSlug, findClinicBySlug, normalizeClinicName } from '@/lib/route-utils';
 
 const ClinicContext = createContext<ClinicContextType | undefined>(undefined);
 
@@ -32,23 +32,13 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
 
   // Utility functions to work with clinic data
   const clinicToSlug = (clinicDisplayName: string): string => {
-    // Find the clinic by displayName and return its API-provided slug (name field)
+    // Find the clinic by displayName and return its slug field
     const clinic = availableClinics.find(c => c.displayName === clinicDisplayName);
-    return clinic ? clinic.name : clinicDisplayName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    return clinic ? clinic.slug : toUrlSlug(clinicDisplayName);
   };
 
   const slugToClinic = (slug: string): Clinic | undefined => {
-    // Decode URL-encoded slug if needed and normalize for matching
-    const decodedSlug = decodeURIComponent(slug);
-    const normalizedSlug = decodedSlug.toLowerCase().replace(/\s+/g, '');
-    
-    return availableClinics.find(clinic => 
-      clinic.name.toLowerCase() === decodedSlug.toLowerCase() ||
-      clinic.name.toLowerCase().replace(/\s+/g, '') === normalizedSlug ||
-      clinic.displayName.toLowerCase().replace(/\s+/g, '') === normalizedSlug ||
-      clinic.backendName?.toLowerCase() === decodedSlug.toLowerCase() ||
-      clinic.backendName?.toLowerCase().replace(/\s+/g, '') === normalizedSlug
-    );
+    return findClinicBySlug(availableClinics, slug);
   };
 
   const getActiveClinic = (): Clinic | undefined => {
@@ -58,15 +48,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
   };
 
   const getClinicByName = (name: string): Clinic | undefined => {
-    const decodedName = decodeURIComponent(name);
-    const normalizedName = decodedName.toLowerCase().replace(/\s+/g, '');
-    
-    return availableClinics.find(clinic => 
-      clinic.name.toLowerCase() === decodedName.toLowerCase() ||
-      clinic.name.toLowerCase().replace(/\s+/g, '') === normalizedName ||
-      clinic.displayName.toLowerCase() === decodedName.toLowerCase() ||
-      clinic.displayName.toLowerCase().replace(/\s+/g, '') === normalizedName
-    );
+    return findClinicBySlug(availableClinics, name);
   };
 
   const getClinicById = (id: number): Clinic | undefined => {
@@ -117,6 +99,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
           return {
             id: clinic.id,
             name: clinicName,
+            slug: toUrlSlug(clinicName),
             displayName: clinic.displayName,
             backendName: clinic.backendName,
             address: clinic.address,
@@ -235,8 +218,8 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
 
       setSelectedClinic(clinic);
       
-      // Update URL with new clinic
-      const clinicSlug = clinicToSlug(clinic.displayName);
+      // Update URL with new clinic (use the slug field for clean URLs)
+      const clinicSlug = clinic.slug || clinicToSlug(clinic.displayName);
       const pathSegments = pathname.split('/');
       
       if (pathSegments[1] === 'clinic') {

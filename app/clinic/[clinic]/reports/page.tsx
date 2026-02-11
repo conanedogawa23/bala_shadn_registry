@@ -29,7 +29,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useClinic } from '@/lib/contexts/clinic-context';
-import { generateLink } from '@/lib/route-utils';
+import { generateLink, findClinicBySlug } from '@/lib/route-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Import chart components
@@ -140,13 +140,7 @@ export default function ReportsPage() {
   // Get clinic data from context (API-provided with correct backendName)
   const { availableClinics } = useClinic();
   const clinic = useMemo(() => {
-    // Use case-insensitive matching to handle URL slug variations
-    const slugLower = clinicSlug?.toLowerCase().replace(/\s+/g, '') || '';
-    return availableClinics.find(c => 
-      c.name?.toLowerCase().replace(/\s+/g, '') === slugLower ||
-      c.backendName?.toLowerCase().replace(/\s+/g, '') === slugLower ||
-      c.displayName?.toLowerCase().replace(/\s+/g, '') === slugLower
-    );
+    return findClinicBySlug(availableClinics, clinicSlug || '');
   }, [clinicSlug, availableClinics]);
   
   const orderClinicName = useMemo(() => {

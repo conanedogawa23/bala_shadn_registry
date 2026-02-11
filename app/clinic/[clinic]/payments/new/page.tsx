@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Plus, Trash2, DollarSign, User, CreditCard, AlertCircle, Clock } from 'lucide-react';
-import { generateLink } from '@/lib/route-utils';
+import { generateLink, findClinicBySlug } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { 
   PaymentApiService, 
@@ -62,7 +62,7 @@ export default function NewPaymentPage() {
   
   // Get clinic data from context
   const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
-  const clinic = availableClinics.find(c => c.name === clinicSlug);
+  const clinic = findClinicBySlug(availableClinics, clinicSlug);
   const realClinicName = clinic?.backendName || clinic?.displayName || "";
 
   // Optimized: Use clinic-specific hook to reduce API calls

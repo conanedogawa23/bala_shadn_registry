@@ -97,7 +97,7 @@ export default function ClinicSelectionPage() {
                   
                   <div className="flex space-x-2">
                     <Button 
-                      onClick={() => router.push(`/clinic/${clinic.name}/clients`)}
+                      onClick={() => router.push(`/clinic/${clinic.slug}/clients`)}
                       className="flex-1"
                       disabled={clinic.status !== 'active'}
                     >
@@ -106,7 +106,7 @@ export default function ClinicSelectionPage() {
                     
                     <Button 
                       variant="outline" 
-                      onClick={() => router.push(`/clinic/${clinic.name}/payments`)}
+                      onClick={() => router.push(`/clinic/${clinic.slug}/payments`)}
                       disabled={clinic.status !== 'active'}
                     >
                       Payments

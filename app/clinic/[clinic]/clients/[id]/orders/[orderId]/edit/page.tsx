@@ -33,7 +33,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { generateLink } from '@/lib/route-utils';
+import { generateLink, findClinicBySlug } from '@/lib/route-utils';
 import { 
   Form,
   FormControl,
@@ -90,7 +90,7 @@ export default function EditClientOrderPage() {
   
   // Get clinic data from context
   const { availableClinics } = useClinic();
-  const clinicData = useMemo(() => availableClinics.find(c => c.name === clinic), [availableClinics, clinic]);
+  const clinicData = useMemo(() => findClinicBySlug(availableClinics, clinic), [availableClinics, clinic]);
   
   // Fetch order using real API
   const { 

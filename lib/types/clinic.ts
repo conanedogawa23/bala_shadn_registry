@@ -3,6 +3,7 @@
 export interface Clinic {
   id: number;
   name: string;
+  slug?: string; // URL-safe kebab-case slug derived from name (e.g. "century-care")
   displayName: string;
   backendName?: string;
   address: string;

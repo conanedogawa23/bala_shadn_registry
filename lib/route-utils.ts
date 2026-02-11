@@ -8,6 +8,45 @@ import { logger } from './utils/logger';
 import { Clinic } from '@/lib/types/clinic';
 
 /**
+ * Convert a clinic name to a URL-safe slug.
+ * Handles: "Century Care" -> "century-care", "BodyBlissOneCare" -> "bodyblissonecare"
+ * Preserves existing kebab-case slugs: "century-care" -> "century-care"
+ */
+export function toUrlSlug(name: string): string {
+  return decodeURIComponent(name)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')       // spaces to hyphens
+    .replace(/[^a-z0-9-]/g, '') // remove non-alphanumeric except hyphens
+    .replace(/-+/g, '-')        // collapse multiple hyphens
+    .replace(/^-|-$/g, '');     // trim leading/trailing hyphens
+}
+
+/**
+ * Normalize a clinic name or slug for comparison purposes.
+ * Strips all spaces and hyphens so "Century Care", "century-care", and "centurycare" all match.
+ */
+export function normalizeClinicName(name: string): string {
+  return decodeURIComponent(name).toLowerCase().replace(/[\s-]+/g, '');
+}
+
+/**
+ * Find a clinic from a list by matching a URL slug against name, slug, displayName, or backendName.
+ * Uses normalized comparison to handle "Century Care" vs "century-care" vs "Century%20Care".
+ */
+export function findClinicBySlug(clinics: { name: string; slug?: string; displayName: string; backendName?: string }[], slug: string): typeof clinics[number] | undefined {
+  const normalizedSlug = normalizeClinicName(slug);
+
+  return clinics.find(c =>
+    c.slug === slug ||
+    c.name === slug ||
+    normalizeClinicName(c.name) === normalizedSlug ||
+    normalizeClinicName(c.displayName) === normalizedSlug ||
+    (c.backendName && normalizeClinicName(c.backendName) === normalizedSlug)
+  );
+}
+
+/**
  * Route types
  */
 export type RouteType = 'global' | 'clinic';

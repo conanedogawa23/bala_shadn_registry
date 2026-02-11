@@ -29,7 +29,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Plus, User, Calendar, Clock, DollarSign, AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { generateLink } from "@/lib/route-utils";
+import { generateLink, findClinicBySlug } from "@/lib/route-utils";
 import { useClinic } from "@/lib/contexts/clinic-context";
 
 // Import API services
@@ -46,7 +46,7 @@ export default function ClientOrderNewPage() {
   // Get clinic data from context
   const { availableClinics } = useClinic();
   const clinicData = useMemo(() => {
-    return availableClinics.find(c => c.name === clinic);
+    return findClinicBySlug(availableClinics, clinic);
   }, [clinic, availableClinics]);
   
   // Fetch client data using real API hook

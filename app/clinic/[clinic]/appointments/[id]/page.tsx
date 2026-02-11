@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { formatDate, formatTime } from '@/lib/utils';
@@ -80,7 +80,7 @@ export default function AppointmentDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const { availableClinics } = useClinic();
-  const clinicData = useMemo(() => availableClinics.find(c => c.name === clinicSlug), [availableClinics, clinicSlug]);
+  const clinicData = useMemo(() => findClinicBySlug(availableClinics, clinicSlug), [availableClinics, clinicSlug]);
   const clinicName = useMemo(() => {
     return clinicData?.backendName || clinicData?.displayName || clinicSlug;
   }, [clinicData, clinicSlug]);

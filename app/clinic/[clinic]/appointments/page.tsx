@@ -24,7 +24,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { useAppointments, useAppointmentStats } from '@/lib/hooks';
 
@@ -115,7 +115,7 @@ export default function AppointmentsPage() {
   const { availableClinics, loading: clinicLoading, error: clinicError } = useClinic();
   
   // Find clinic from dynamic data
-  const clinic = availableClinics.find(c => c.name === clinicSlug);
+  const clinic = findClinicBySlug(availableClinics, clinicSlug);
   const clinicName = clinic?.backendName || clinic?.displayName || clinicSlug;
 
   // State for filtering and pagination

@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import InvalidClinicError from '@/components/error/invalid-clinic-error';
-import { generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
 
 const formatNumber = (num: number = 0): string => {
@@ -32,7 +32,7 @@ export default function ClinicPage() {
   const { availableClinics, loading, error } = useClinic();
   
   // Find clinic from dynamic data
-  const clinic = availableClinics.find(c => c.name === clinicSlug);
+  const clinic = findClinicBySlug(availableClinics, clinicSlug);
 
   // Handle loading state
   if (loading) {

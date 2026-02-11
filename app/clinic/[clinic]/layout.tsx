@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { isAuthenticated } from '@/lib/auth';
+import { findClinicBySlug } from '@/lib/route-utils';
 
 interface ClinicLayoutProps {
   children: React.ReactNode;
@@ -54,17 +55,9 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
       console.log('🔍 Validating clinic slug:', clinicSlug);
       console.log('📋 Available clinics:', availableClinics.map(c => ({ name: c.name, displayName: c.displayName, backendName: c.backendName })));
 
-      // Check with context data (case-insensitive matching)
-      // All clinic data comes from MongoDB via API
-      // Need to normalize both sides for comparison (remove spaces, lowercase)
-      const normalizedSlug = clinicSlug.toLowerCase().replace(/\s+/g, '');
-      const matchedClinic = availableClinics.find(c => 
-        c.name.toLowerCase() === clinicSlug.toLowerCase() ||
-        c.name.toLowerCase().replace(/\s+/g, '') === normalizedSlug ||
-        c.displayName.toLowerCase().replace(/\s+/g, '') === normalizedSlug ||
-        c.backendName?.toLowerCase() === clinicSlug.toLowerCase() ||
-        c.backendName?.toLowerCase().replace(/\s+/g, '') === normalizedSlug
-      );
+      // Match clinic using normalized comparison that handles
+      // spaces, hyphens, and URL-encoding (e.g. "Century Care", "century-care", "Century%20Care")
+      const matchedClinic = findClinicBySlug(availableClinics, clinicSlug);
 
       if (matchedClinic) {
         console.log('✅ Found clinic in context:', matchedClinic);
@@ -156,7 +149,7 @@ export default function ClinicLayout({ children }: ClinicLayoutProps) {
                 {availableClinics.map((clinic) => (
                   <button
                     key={clinic.id}
-                    onClick={() => router.push(`/clinic/${clinic.name}/clients`)}
+                    onClick={() => router.push(`/clinic/${clinic.slug}/clients`)}
                     className="block w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
                   >
                     {clinic.displayName}

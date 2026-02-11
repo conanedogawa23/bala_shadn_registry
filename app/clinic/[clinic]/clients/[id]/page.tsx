@@ -36,7 +36,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { generateLink } from '@/lib/route-utils';
+import { generateLink, findClinicBySlug } from '@/lib/route-utils';
 import { InsuranceSummaryCard } from '@/components/ui/client/InsuranceSection';
 
 // Import real API hooks and utilities
@@ -66,7 +66,7 @@ export default function ClientDetailPage() {
 
   // Get clinic data from context
   const { availableClinics } = useClinic();
-  const clinicData = useMemo(() => availableClinics.find(c => c.name === clinic), [availableClinics, clinic]);
+  const clinicData = useMemo(() => findClinicBySlug(availableClinics, clinic), [availableClinics, clinic]);
   
   // Fetch client data
   const { 

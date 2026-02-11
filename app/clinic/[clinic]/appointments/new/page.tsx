@@ -18,7 +18,7 @@ import { FormClientSelect } from '@/components/ui/form/FormClientSelect';
 import { FormResourceSelect } from '@/components/ui/form/FormResourceSelect';
 import { FormDatePicker } from '@/components/ui/form/FormDatePicker';
 import { ArrowLeft, Save, Plus } from 'lucide-react';
-import { generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink } from '@/lib/route-utils';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { useClinic } from '@/lib/contexts/clinic-context';
 
@@ -74,7 +74,7 @@ export default function NewAppointmentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { availableClinics } = useClinic();
-  const clinicData = availableClinics.find(c => c.name === clinicSlug);
+  const clinicData = findClinicBySlug(availableClinics, clinicSlug);
   const clinicName = clinicData?.backendName || clinicData?.displayName || clinicSlug;
 
   // Calculate default end date based on start date and duration

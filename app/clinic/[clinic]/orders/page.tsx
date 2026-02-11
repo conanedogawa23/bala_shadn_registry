@@ -2,6 +2,7 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { findClinicBySlug } from '@/lib/route-utils';
 
 // Server-side data fetchers
 import { fetchOrdersByClinic, fetchClinics } from '@/lib/server/data-fetchers';
@@ -44,13 +45,8 @@ export default async function OrdersPage({ params, searchParams }: PageProps) {
   let clinicData;
   try {
     const clinics = await fetchClinics({ revalidate: 3600 }); // Cache for 1 hour
-    // Use case-insensitive matching to handle URL slug variations
-    const clinicLower = clinic.toLowerCase();
-    clinicData = clinics.find(c => 
-      c.name?.toLowerCase() === clinicLower || 
-      c.backendName?.toLowerCase() === clinicLower ||
-      c.displayName?.toLowerCase().replace(/\s+/g, '') === clinicLower
-    );
+    // Use normalized matching to handle URL slug variations (spaces, hyphens, URL-encoding)
+    clinicData = findClinicBySlug(clinics, clinic);
     
     if (!clinicData) {
       notFound(); // Returns 404 if clinic doesn't exist
@@ -166,13 +162,8 @@ export async function generateMetadata({ params }: { params: Promise<{ clinic: s
   
   try {
     const clinics = await fetchClinics({ revalidate: 3600 });
-    // Use case-insensitive matching for metadata generation
-    const clinicLower = clinic.toLowerCase();
-    const clinicData = clinics.find(c => 
-      c.name?.toLowerCase() === clinicLower || 
-      c.backendName?.toLowerCase() === clinicLower ||
-      c.displayName?.toLowerCase().replace(/\s+/g, '') === clinicLower
-    );
+    // Use normalized matching for metadata generation
+    const clinicData = findClinicBySlug(clinics, clinic);
     
     if (clinicData) {
       return {
