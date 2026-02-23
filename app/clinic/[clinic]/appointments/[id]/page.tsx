@@ -28,6 +28,16 @@ import { useClinic } from '@/lib/contexts/clinic-context';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { formatDate, formatTime } from '@/lib/utils';
 
+interface ClientInfo {
+  id: string;
+  clientKey?: number;
+  firstName: string;
+  lastName: string;
+  name: string;
+  email?: string;
+  phone?: string;
+}
+
 interface Appointment {
   id: string;
   appointmentId?: number;
@@ -44,6 +54,7 @@ interface Appointment {
   duration: number;
   clientId: string;
   clientKey?: number;
+  clientInfo?: ClientInfo;
   readyToBill: boolean;
   clinicName: string;
   resourceName?: string;
@@ -262,24 +273,60 @@ export default function AppointmentDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {appointment.clientInfo && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="flex items-center gap-3">
+                      <User className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-sm text-gray-500">Client</p>
+                        <p className="font-medium">{appointment.clientInfo.name}</p>
+                      </div>
+                    </div>
+
+                    {appointment.clientInfo.email && (
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="text-sm text-gray-500">Email</p>
+                          <p className="font-medium">{appointment.clientInfo.email}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {appointment.clientInfo.phone && (
+                      <div className="flex items-center gap-3">
+                        <Phone className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="text-sm text-gray-500">Phone</p>
+                          <p className="font-medium">{appointment.clientInfo.phone}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!appointment.clientInfo && (
+                  <div>
+                    <p className="text-sm text-gray-500">Client ID</p>
+                    <p className="font-medium">{appointment.clientId}</p>
+                  </div>
+                )}
+
+                <Separator />
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <p className="text-sm text-gray-500">Duration</p>
                     <p className="font-medium">{appointment.duration} minutes</p>
                   </div>
-                  
-                  <div>
-                    <p className="text-sm text-gray-500">Client ID</p>
-                    <p className="font-medium">{appointment.clientId}</p>
-                  </div>
-                  
+
                   <div>
                     <p className="text-sm text-gray-500">Ready to Bill</p>
                     <Badge variant={appointment.readyToBill ? "default" : "secondary"}>
                       {appointment.readyToBill ? "Yes" : "No"}
                     </Badge>
                   </div>
-                  
+
                   <div>
                     <p className="text-sm text-gray-500">Active</p>
                     <Badge variant={appointment.isActive ? "default" : "destructive"}>

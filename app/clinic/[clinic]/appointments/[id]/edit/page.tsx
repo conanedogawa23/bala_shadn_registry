@@ -46,6 +46,16 @@ const appointmentSchema = z.object({
 // Type definitions
 type AppointmentFormValues = z.infer<typeof appointmentSchema>;
 
+interface ClientInfo {
+  id: string;
+  clientKey?: number;
+  firstName: string;
+  lastName: string;
+  name: string;
+  email?: string;
+  phone?: string;
+}
+
 interface Appointment {
   id: string;
   appointmentId?: number;
@@ -60,6 +70,7 @@ interface Appointment {
   resourceId: number;
   duration: number;
   clientId: string;
+  clientInfo?: ClientInfo;
   readyToBill: boolean;
   clinicName: string;
   resourceName?: string;
@@ -129,8 +140,11 @@ export default function EditAppointmentPage() {
           setResourceName(appointment.resourceName);
         }
 
-        // Store subject as client name (subject usually contains client name in appointments)
-        setClientName(appointment.subject);
+        if (appointment.clientInfo?.name) {
+          setClientName(appointment.clientInfo.name);
+        } else {
+          setClientName(appointment.subject);
+        }
 
         setAppointmentData({
           startDate: formatDateTimeLocal(appointment.startDate),

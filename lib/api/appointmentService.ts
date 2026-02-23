@@ -1,5 +1,15 @@
 import { BaseApiService } from './baseApiService';
 
+interface ClientInfo {
+  id: string;
+  clientKey?: number;
+  firstName: string;
+  lastName: string;
+  name: string;
+  email?: string;
+  phone?: string;
+}
+
 interface Appointment {
   id: string;
   appointmentId?: number;
@@ -16,6 +26,8 @@ interface Appointment {
   duration: number;
   clientId: string;
   clientKey?: number;
+  clientInfo?: ClientInfo;
+  clientName?: string;
   productKey?: number;
   billDate?: string;
   invoiceDate?: string;
