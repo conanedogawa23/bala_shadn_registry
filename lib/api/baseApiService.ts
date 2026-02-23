@@ -67,7 +67,7 @@ export abstract class BaseApiService {
       ...fetchOptions,
     };
     
-    if (data && (method === 'POST' || method === 'PUT')) {
+    if (data && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
       config.body = JSON.stringify(data);
     }
     
@@ -196,6 +196,22 @@ export abstract class BaseApiService {
     }
   }
 
+  public static async get<T>(endpoint: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, 'GET', undefined, options);
+  }
+
+  public static async post<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, 'POST', data, options);
+  }
+
+  public static async put<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, 'PUT', data, options);
+  }
+
+  public static async delete<T>(endpoint: string, options?: RequestOptions): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, 'DELETE', undefined, options);
+  }
+
   /**
    * Public method to clear all cached data - called during logout
    */
@@ -204,3 +220,6 @@ export abstract class BaseApiService {
     logger.info('[API] All cache cleared');
   }
 }
+
+class ApiService extends BaseApiService {}
+export const baseApiService = ApiService;

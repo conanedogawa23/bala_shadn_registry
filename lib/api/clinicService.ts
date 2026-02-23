@@ -113,9 +113,9 @@ export class ClinicApiService extends BaseApiService {
   /**
    * Clear clinic cache
    */
-  static clearCache(): void {
-    this.clearCachedItem('full_clinics_data');
-    this.clearCachedItem('clinic_names');
+  static clearClinicCache(): void {
+    super.clearCache('full_clinics_data');
+    super.clearCache('clinic_names');
   }
 }
 

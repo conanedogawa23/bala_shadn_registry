@@ -404,12 +404,6 @@ export default function PaymentDetailsPage() {
                           <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.cob2Amount)}</span>
                         </div>
                       )}
-                      {(payment.amounts?.cob3Amount || 0) > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-sm">COB Tertiary:</span>
-                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.cob3Amount)}</span>
-                        </div>
-                      )}
                       {(payment.amounts?.insurance1stAmount || 0) > 0 && (
                         <div className="flex justify-between">
                           <span className="text-sm">1st Insurance:</span>
@@ -420,12 +414,6 @@ export default function PaymentDetailsPage() {
                         <div className="flex justify-between">
                           <span className="text-sm">2nd Insurance:</span>
                           <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.insurance2ndAmount)}</span>
-                        </div>
-                      )}
-                      {(payment.amounts?.insurance3rdAmount || 0) > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-sm">3rd Insurance:</span>
-                          <span className="text-sm font-medium">{PaymentApiService.formatCurrency(payment.amounts.insurance3rdAmount)}</span>
                         </div>
                       )}
                       {(payment.amounts?.refundAmount || 0) > 0 && (

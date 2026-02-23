@@ -18,10 +18,8 @@ export enum PaymentType {
   DPAFP = 'DPAFP',               // DPA Final Payment
   COB_1 = 'COB_1',               // Coordination of Benefits - Primary
   COB_2 = 'COB_2',               // Coordination of Benefits - Secondary
-  COB_3 = 'COB_3',               // Coordination of Benefits - Tertiary
   INSURANCE_1ST = 'INSURANCE_1ST', // 1st Insurance Payment
   INSURANCE_2ND = 'INSURANCE_2ND', // 2nd Insurance Payment
-  INSURANCE_3RD = 'INSURANCE_3RD', // 3rd Insurance Payment
   SALES_REFUND = 'SALES_REFUND',   // Sales Refund
   WRITEOFF = 'WRITEOFF',           // Write-off Amount
   NO_INSUR_FP = 'NO_INSUR_FP'     // No Insurance Final Payment
@@ -52,12 +50,10 @@ export interface PaymentAmounts {
   // Coordination of Benefits
   cob1Amount: number;
   cob2Amount: number;
-  cob3Amount: number;
   
   // Insurance Payments
   insurance1stAmount: number;
   insurance2ndAmount: number;
-  insurance3rdAmount: number;
   
   // Other Amounts
   refundAmount: number;
@@ -299,10 +295,21 @@ export class PaymentApiService extends BaseApiService {
       if (filters.outstanding !== undefined) params.append('outstanding', filters.outstanding.toString());
 
       const url = params.toString() ? `${this.baseUrl}?${params}` : this.baseUrl;
-      const response = await this.request<PaymentListResponse>(url);
+      const response = await this.request<Payment[]>(url);
       
-      if (response.success && response.data) {
-        return response.data;
+      if (response.success && response.data !== undefined) {
+        return {
+          success: true,
+          data: Array.isArray(response.data) ? response.data : [],
+          pagination: {
+            currentPage: response.pagination?.page || 1,
+            totalPages: response.pagination?.pages || 1,
+            totalItems: response.pagination?.total || 0,
+            itemsPerPage: filters.limit || 10,
+            hasNextPage: response.pagination?.hasNext || false,
+            hasPrevPage: response.pagination?.hasPrev || false
+          }
+        };
       }
       
       throw new Error('Failed to fetch payments');
@@ -568,25 +575,57 @@ export class PaymentApiService extends BaseApiService {
   }
 
   /**
+   * Batch create payments for multiple invoices/orders
+   */
+  static async batchCreatePayments(payments: CreatePaymentRequest[]): Promise<{
+    created: any[];
+    errors: any[];
+  }> {
+    try {
+      const response = await this.request<{
+        success: boolean;
+        data: { created: any[]; errors: any[] };
+        message: string;
+      }>(`${this.baseUrl}/batch`, 'POST', { payments });
+      
+      if (response.success && response.data) {
+        return response.data;
+      }
+      
+      throw new Error('Failed to batch create payments');
+    } catch (error) {
+      throw this.handleError(error, 'batchCreatePayments');
+    }
+  }
+
+  /**
    * Update payment
    */
   static async updatePayment(id: string, paymentData: UpdatePaymentRequest): Promise<PaymentResponse> {
-    const response = await this.request<PaymentResponse>(`${this.baseUrl}/${id}`, 'PUT', paymentData);
-    if (response.success && response.data) {
-      return response.data;
+    try {
+      const response = await this.request<PaymentResponse>(`${this.baseUrl}/${id}`, 'PUT', paymentData);
+      if (response.success && response.data) {
+        return response.data;
+      }
+      throw new Error('Failed to update payment');
+    } catch (error) {
+      throw this.handleError(error, 'updatePayment');
     }
-    throw new Error('Failed to update payment');
   }
 
   /**
    * Delete payment (soft delete)
    */
   static async deletePayment(id: string): Promise<{ success: boolean; message: string }> {
-    const response = await this.request<{ success: boolean; message: string }>(`${this.baseUrl}/${id}`, 'DELETE');
-    if (response.success && response.data) {
-      return response.data;
+    try {
+      const response = await this.request<{ success: boolean; message: string }>(`${this.baseUrl}/${id}`, 'DELETE');
+      if (response.success && response.data) {
+        return response.data;
+      }
+      throw new Error('Failed to delete payment');
+    } catch (error) {
+      throw this.handleError(error, 'deletePayment');
     }
-    throw new Error('Failed to delete payment');
   }
 
   /**
@@ -687,14 +726,10 @@ export class PaymentApiService extends BaseApiService {
         return 'Coordination of Benefits - Primary';
       case PaymentType.COB_2:
         return 'Coordination of Benefits - Secondary';
-      case PaymentType.COB_3:
-        return 'Coordination of Benefits - Tertiary';
       case PaymentType.INSURANCE_1ST:
         return '1st Insurance Payment';
       case PaymentType.INSURANCE_2ND:
         return '2nd Insurance Payment';
-      case PaymentType.INSURANCE_3RD:
-        return '3rd Insurance Payment';
       case PaymentType.SALES_REFUND:
         return 'Sales Refund';
       case PaymentType.WRITEOFF:

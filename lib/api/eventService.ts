@@ -144,7 +144,7 @@ export class EventApiService extends BaseApiService {
       )
     });
 
-    return this.get(`${this.BASE_PATH}?${params.toString()}`);
+    return this.get(`${this.BASE_PATH}?${params.toString()}`) as unknown as EventListResponse;
   }
 
   /**

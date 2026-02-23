@@ -27,7 +27,10 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2, Search, Check, ChevronsUpDown, User, Wrench, Building } from 'lucide-react';
 import { ResourceApiService } from '@/lib/api/resourceService';
+import { baseApiService } from '@/lib/api/baseApiService';
 import { cn } from '@/lib/utils';
+
+const DOCTOR_ID_OFFSET = 100000;
 
 interface Resource {
   id: string;
@@ -47,6 +50,7 @@ interface Resource {
   clinics: string[];
   isActive: boolean;
   isBookable: boolean;
+  _source?: 'resource' | 'doctor';
 }
 
 interface FormResourceSelectProps {
@@ -59,7 +63,8 @@ interface FormResourceSelectProps {
   required?: boolean;
   disabled?: boolean;
   type?: 'practitioner' | 'service' | 'equipment' | 'room';
-  defaultResourceName?: string; // For pre-populated edit forms
+  defaultResourceName?: string;
+  includeDoctors?: boolean;
 }
 
 /**
@@ -76,7 +81,8 @@ export function FormResourceSelect({
   required = false,
   disabled = false,
   type,
-  defaultResourceName
+  defaultResourceName,
+  includeDoctors = true
 }: FormResourceSelectProps) {
   const { control, getValues } = useFormContext();
   const [open, setOpen] = useState(false);
@@ -96,7 +102,6 @@ export function FormResourceSelect({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch resources for the clinic - show 20 by default, filter when user searches
   const fetchResources = async () => {
     if (!clinicName) {
       setResources([]);
@@ -107,39 +112,65 @@ export function FormResourceSelect({
     setError(null);
 
     try {
-      // Remove clinic filtering since all resources have empty clinic arrays
-      const response = await ResourceApiService.getAllResources({
-        // clinicName, // Skip clinic filtering for now
-        type,
-        isActive: true,
-        isBookable: true,
-        limit: 100
-      });
+      const [resourceResponse, doctorResponse] = await Promise.all([
+        ResourceApiService.getAllResources({
+          clinicName,
+          type,
+          isActive: true,
+          isBookable: true,
+          limit: 100
+        }),
+        includeDoctors && (!type || type === 'practitioner')
+          ? baseApiService.get('/referring-doctors?limit=100').catch(() => null)
+          : Promise.resolve(null)
+      ]);
 
-      // Filter resources by debounced search term if provided (client-side filtering)
-      let filteredResources = response.resources || [];
-      
+      let allResources: Resource[] = (resourceResponse.resources || []).map(r => ({
+        ...r,
+        _source: 'resource' as const
+      }));
+
+      if (doctorResponse && (doctorResponse as any).data) {
+        const doctors: Resource[] = ((doctorResponse as any).data || [])
+          .filter((doc: any) => doc.isActive !== false)
+          .map((doc: any) => ({
+            id: doc._id,
+            resourceId: (doc.doctorId || 0) + DOCTOR_ID_OFFSET,
+            resourceName: `Dr. ${doc.fullName || `${doc.firstName || ''} ${doc.lastName || ''}`.trim()}`,
+            type: 'practitioner' as const,
+            practitioner: {
+              firstName: doc.firstName,
+              lastName: doc.lastName,
+              credentials: 'MD',
+              specialties: doc.specialty ? [doc.specialty] : []
+            },
+            clinics: doc.clinicName ? [doc.clinicName] : [],
+            isActive: true,
+            isBookable: true,
+            _source: 'doctor' as const
+          }));
+        allResources = [...allResources, ...doctors];
+      }
+
       if (debouncedSearchTerm) {
-        filteredResources = filteredResources.filter(resource => {
-          const searchLower = debouncedSearchTerm.toLowerCase();
+        const searchLower = debouncedSearchTerm.toLowerCase();
+        allResources = allResources.filter(resource => {
           const resourceName = resource.resourceName?.toLowerCase() || '';
-          const practitionerName = resource.practitioner 
+          const practitionerName = resource.practitioner
             ? `${resource.practitioner.firstName || ''} ${resource.practitioner.lastName || ''}`.toLowerCase()
             : '';
           const serviceCategory = resource.service?.category?.toLowerCase() || '';
-          
-          return resourceName.includes(searchLower) || 
-                 practitionerName.includes(searchLower) || 
+          return resourceName.includes(searchLower) ||
+                 practitionerName.includes(searchLower) ||
                  serviceCategory.includes(searchLower);
         });
       }
-      
-      // Limit to first 20 if no search term
+
       if (!debouncedSearchTerm) {
-        filteredResources = filteredResources.slice(0, 20);
+        allResources = allResources.slice(0, 30);
       }
 
-      setResources(filteredResources);
+      setResources(allResources);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch resources');
       setResources([]);
@@ -150,7 +181,7 @@ export function FormResourceSelect({
 
   useEffect(() => {
     fetchResources();
-  }, [clinicName, type, debouncedSearchTerm]);
+  }, [clinicName, type, debouncedSearchTerm, includeDoctors]);
 
   // Set initial selected resource info from defaultResourceName
   useEffect(() => {
@@ -196,7 +227,10 @@ export function FormResourceSelect({
         const practitionerName = `${firstName || ''} ${lastName || ''}`.trim();
         displayName = practitionerName || resourceName;
         if (credentials) displayName += `, ${credentials}`;
-        subtitle = specialties?.join(', ') || '';
+        const parts: string[] = [];
+        if (specialties?.length) parts.push(specialties.join(', '));
+        if (resource._source === 'doctor') parts.push('Referring Doctor');
+        subtitle = parts.join(' - ');
       } else if (resource.type === 'service' && resource.service) {
         subtitle = `${resource.service.category} • ${resource.service.duration} min`;
       }

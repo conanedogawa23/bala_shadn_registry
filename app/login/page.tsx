@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Lock, Mail, AlertCircle } from "lucide-react";
 import { usePublicRoute, login } from "@/lib/auth";
+import { logger } from "@/lib/utils/logger";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -205,7 +206,7 @@ export default function LoginPage() {
           }
         }, accessToken, refreshToken);
         
-        console.log("Login successful, access token:", accessToken.substring(0, 20) + "...");
+        logger.debug('[Auth] Login successful, token stored');
         
         // Check if there's a redirect URL from query params
         const urlParams = new URLSearchParams(window.location.search);

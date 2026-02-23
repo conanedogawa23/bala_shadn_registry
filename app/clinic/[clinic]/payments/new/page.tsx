@@ -310,12 +310,10 @@ export default function NewPaymentPage() {
         // Coordination of Benefits
         cob1Amount: 0,
         cob2Amount: 0,
-        cob3Amount: 0,
         
         // Insurance Payments
         insurance1stAmount: 0,
         insurance2ndAmount: 0,
-        insurance3rdAmount: 0,
         
         // Other Amounts
         refundAmount: 0,
@@ -515,10 +513,8 @@ export default function NewPaymentPage() {
                     <SelectItem value={PaymentType.DPAFP}>DPA Final Payment</SelectItem>
                     <SelectItem value={PaymentType.COB_1}>Coordination of Benefits - Primary</SelectItem>
                     <SelectItem value={PaymentType.COB_2}>Coordination of Benefits - Secondary</SelectItem>
-                    <SelectItem value={PaymentType.COB_3}>Coordination of Benefits - Tertiary</SelectItem>
                     <SelectItem value={PaymentType.INSURANCE_1ST}>1st Insurance Payment</SelectItem>
                     <SelectItem value={PaymentType.INSURANCE_2ND}>2nd Insurance Payment</SelectItem>
-                    <SelectItem value={PaymentType.INSURANCE_3RD}>3rd Insurance Payment</SelectItem>
                     <SelectItem value={PaymentType.NO_INSUR_FP}>No Insurance Final Payment</SelectItem>
                   </SelectContent>
                 </Select>

@@ -18,6 +18,8 @@ import Link from 'next/link';
 import InvalidClinicError from '@/components/error/invalid-clinic-error';
 import { findClinicBySlug, generateLink } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
+import { TodaysAppointments } from '@/components/dashboard/todays-appointments';
+import { BulletinFeed } from '@/components/dashboard/bulletin-feed';
 
 const formatNumber = (num: number = 0): string => {
   if (num >= 1000) {
@@ -171,6 +173,14 @@ export default function ClinicPage() {
           ))}
         </div>
       </div>
+
+      {/* Dashboard Widgets: Today's Appointments + Bulletin */}
+      {clinic.status === 'active' && (
+        <div className="grid gap-6 md:grid-cols-2">
+          <TodaysAppointments clinicName={clinic.name} />
+          <BulletinFeed />
+        </div>
+      )}
 
       {/* Clinic Summary */}
       {clinic.status === 'active' && (

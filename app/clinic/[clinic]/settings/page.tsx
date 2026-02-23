@@ -12,6 +12,7 @@ import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { generateLink } from "@/lib/route-utils";
 import { UserApiService, User } from "@/lib/api/userApiService";
 import Link from "next/link";
+import { Stethoscope, Building2, MapPin, Shield, ArrowRight } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -150,6 +151,7 @@ export default function SettingsPage() {
           <TabsTrigger value="clinic">Clinic Information</TabsTrigger>
           <TabsTrigger value="billing">Billing & Payments</TabsTrigger>
           <TabsTrigger value="staff">Staff Management</TabsTrigger>
+          <TabsTrigger value="admin">Admin Data</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
@@ -493,6 +495,74 @@ export default function SettingsPage() {
                 {isSaving ? "Saving..." : "Save Changes"}
               </Button>
             </CardFooter>
+          </Card>
+        </TabsContent>
+        <TabsContent value="admin" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Admin Data Management</CardTitle>
+              <CardDescription>Manage reference data used across the clinic system</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Link href={`/clinic/${clinic}/settings/doctors`}>
+                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                    <CardContent className="flex items-center justify-between p-6">
+                      <div className="flex items-center gap-4">
+                        <Stethoscope className="h-8 w-8 text-primary" />
+                        <div>
+                          <h3 className="font-semibold">Referring Doctors</h3>
+                          <p className="text-sm text-muted-foreground">Manage referring physician directory</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </Link>
+                <Link href={`/clinic/${clinic}/settings/companies`}>
+                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                    <CardContent className="flex items-center justify-between p-6">
+                      <div className="flex items-center gap-4">
+                        <Building2 className="h-8 w-8 text-primary" />
+                        <div>
+                          <h3 className="font-semibold">Companies</h3>
+                          <p className="text-sm text-muted-foreground">Manage client companies</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </Link>
+                <Link href={`/clinic/${clinic}/settings/cities`}>
+                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                    <CardContent className="flex items-center justify-between p-6">
+                      <div className="flex items-center gap-4">
+                        <MapPin className="h-8 w-8 text-primary" />
+                        <div>
+                          <h3 className="font-semibold">Cities</h3>
+                          <p className="text-sm text-muted-foreground">Manage city directory</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </Link>
+                <Link href={`/clinic/${clinic}/settings/insurance/group-numbers`}>
+                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                    <CardContent className="flex items-center justify-between p-6">
+                      <div className="flex items-center gap-4">
+                        <Shield className="h-8 w-8 text-primary" />
+                        <div>
+                          <h3 className="font-semibold">Insurance Group Numbers</h3>
+                          <p className="text-sm text-muted-foreground">Manage insurance group number plans</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </Link>
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

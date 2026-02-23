@@ -3,7 +3,6 @@
 import { logger } from './utils/logger';
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { currentUserData } from "@/lib/mock-data";
 import { BaseApiService } from "@/lib/api/baseApiService";
 
 // Enhanced User interface with comprehensive profile information
@@ -180,17 +179,8 @@ export const getUser = (): User | null => {
   if (!userJson) return null;
   
   try {
-    // Get basic user data from localStorage
-    const basicUserData = JSON.parse(userJson);
-    
-    // If this is just basic auth data (from login), fetch the full user profile
-    if (!basicUserData.id && basicUserData.email) {
-      // In a real app, this would be an API call using the email to get user details
-      // For this demo, we'll use the mock data directly
-      return currentUserData as User;
-    }
-    
-    return basicUserData as User;
+    const userData = JSON.parse(userJson);
+    return userData as User;
   } catch (error) {
     logger.error("Error parsing user data:", error);
     return null;
@@ -246,8 +236,8 @@ export const login = (userData: User, token?: string, refreshToken?: string) => 
 // Call backend logout API to revoke tokens
 const callBackendLogout = async (): Promise<boolean> => {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    const endpoint = `${apiUrl}/api/v1/auth/logout`;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/v1';
+    const endpoint = `${apiUrl}/auth/logout`;
     const refreshToken = typeof localStorage !== 'undefined' ? localStorage.getItem('refreshToken') : null;
     const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('authToken') : null;
     

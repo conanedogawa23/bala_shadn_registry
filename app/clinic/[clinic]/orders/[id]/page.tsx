@@ -9,8 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { ArrowLeft, Edit2, FileText, DollarSign, User, Calendar, AlertCircle, Package } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { generateLink } from "@/lib/route-utils";
-import { findClinicBySlug } from "@/lib/data/clinics";
+import { generateLink, findClinicBySlug } from "@/lib/route-utils";
+import { useClinic } from "@/lib/contexts/clinic-context";
 
 // Import real API hooks and utilities
 import { 
@@ -27,8 +27,8 @@ export default function OrderDetailPage() {
   const clinic = params.clinic as string;
   const orderId = params.id as string;
   
-  // Get clinic data for context
-  const clinicData = useMemo(() => findClinicBySlug(clinic), [clinic]);
+  const { availableClinics } = useClinic();
+  const clinicData = useMemo(() => findClinicBySlug(availableClinics, clinic), [availableClinics, clinic]);
   
   // Fetch order using real API
   const { 

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { Plus, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { themeColors } from '@/registry/new-york/theme-config/theme-config';
 
@@ -23,13 +23,23 @@ export function PaymentsHeader({ clinicName, clinicDisplayName }: PaymentsHeader
         <p className="text-gray-600">
           View and manage all payments for {clinicDisplayName}
         </p>
-        <Button 
-          onClick={() => router.push(`/clinic/${clinicName}/payments/new`)}
-          className="flex items-center gap-2 whitespace-nowrap"
-        >
-          <Plus size={16} />
-          Record Payment
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => router.push(`/clinic/${clinicName}/payments/batch`)}
+            className="flex items-center gap-2 whitespace-nowrap"
+          >
+            <CreditCard size={16} />
+            Batch Payment
+          </Button>
+          <Button 
+            onClick={() => router.push(`/clinic/${clinicName}/payments/new`)}
+            className="flex items-center gap-2 whitespace-nowrap"
+          >
+            <Plus size={16} />
+            Record Payment
+          </Button>
+        </div>
       </div>
     </div>
   );

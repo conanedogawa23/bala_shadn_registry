@@ -100,6 +100,8 @@ export function getCategoryName(category: string): string {
       return 'Order';
     case 'appointment':
       return 'Appointment';
+    case 'todo':
+      return 'To-Do';
     default:
       return category.charAt(0).toUpperCase() + category.slice(1);
   }

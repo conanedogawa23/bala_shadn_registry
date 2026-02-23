@@ -1,19 +1,70 @@
 "use client";
 
-import React, { useState } from "react";
-import { Bell, CheckCircle, Trash2, Mail } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Bell, CheckCircle, Trash2, Mail, ListTodo, DollarSign, ShoppingCart, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { useNotifications } from "@/lib/hooks/useNotifications";
 import { useClinic } from "@/lib/contexts/clinic-context";
 import { formatNotificationTime, getNotificationIcon, getNotificationColor, getCategoryName } from "@/lib/utils/notificationHelpers";
+import { baseApiService } from "@/lib/api/baseApiService";
+
+interface TodoItem {
+  id: string;
+  type: 'payment' | 'order' | 'followup';
+  title: string;
+  description: string;
+  date: string;
+  done: boolean;
+}
 
 export default function NotificationsPage() {
   const { selectedClinic } = useClinic();
   const clinicName = selectedClinic?.name || 'bodyblissphysio';
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [activeTab, setActiveTab] = useState('notifications');
+  const [todoItems, setTodoItems] = useState<TodoItem[]>([]);
+  const [todoLoading, setTodoLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'todos' && clinicName) {
+      setTodoLoading(true);
+      Promise.all([
+        baseApiService.get(`/payments?outstanding=true&clinicName=${encodeURIComponent(clinicName)}&limit=20`).catch(() => ({ data: [] })),
+        baseApiService.get(`/orders?status=pending&clinicName=${encodeURIComponent(clinicName)}&limit=20`).catch(() => ({ data: [] }))
+      ]).then(([paymentsRes, ordersRes]) => {
+        const items: TodoItem[] = [];
+        const payments = (paymentsRes as any).data || [];
+        payments.forEach((p: any) => {
+          items.push({
+            id: `pay-${p._id}`,
+            type: 'payment',
+            title: `Outstanding Payment: ${p.clientName || 'Client #' + p.clientId}`,
+            description: `$${(p.amounts?.totalOwed || 0).toFixed(2)} outstanding - Order #${p.orderNumber || 'N/A'}`,
+            date: p.paymentDate || p.createdAt,
+            done: false
+          });
+        });
+        const orders = (ordersRes as any).data || [];
+        orders.forEach((o: any) => {
+          items.push({
+            id: `ord-${o._id}`,
+            type: 'order',
+            title: `Pending Order: ${o.clientName || 'Client #' + o.clientId}`,
+            description: `Order #${o.orderNumber || 'N/A'} - ${o.status}`,
+            date: o.createdAt,
+            done: false
+          });
+        });
+        items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTodoItems(items);
+      }).finally(() => setTodoLoading(false));
+    }
+  }, [activeTab, clinicName]);
 
   const {
     notifications,
@@ -85,6 +136,54 @@ export default function NotificationsPage() {
         </div>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notifications
+            {unreadCount > 0 && <Badge variant="secondary" className="ml-1 h-5 text-xs">{unreadCount}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="todos" className="flex items-center gap-2">
+            <ListTodo className="h-4 w-4" />
+            To-Do
+            {todoItems.filter(t => !t.done).length > 0 && <Badge variant="secondary" className="ml-1 h-5 text-xs">{todoItems.filter(t => !t.done).length}</Badge>}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="todos" className="mt-6">
+          {todoLoading ? (
+            <Card><CardContent className="py-12 text-center"><div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" /><p className="text-gray-500">Loading to-do items...</p></CardContent></Card>
+          ) : todoItems.length === 0 ? (
+            <Card><CardContent className="py-12 text-center"><ListTodo className="h-12 w-12 text-gray-400 mx-auto mb-4" /><p className="text-gray-500">No actionable items right now</p></CardContent></Card>
+          ) : (
+            <div className="space-y-3">
+              {todoItems.map(item => (
+                <Card key={item.id} className={`shadow-sm transition-all ${item.done ? 'opacity-50' : ''}`}>
+                  <CardContent className="p-4 flex items-start gap-4">
+                    <Checkbox
+                      checked={item.done}
+                      onCheckedChange={() => setTodoItems(prev => prev.map(t => t.id === item.id ? { ...t, done: !t.done } : t))}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {item.type === 'payment' && <DollarSign className="h-4 w-4 text-red-500" />}
+                        {item.type === 'order' && <ShoppingCart className="h-4 w-4 text-blue-500" />}
+                        {item.type === 'followup' && <Clock className="h-4 w-4 text-yellow-500" />}
+                        <h3 className={`font-medium text-sm ${item.done ? 'line-through text-gray-400' : ''}`}>{item.title}</h3>
+                      </div>
+                      <p className="text-xs text-gray-500">{item.description}</p>
+                      {item.date && <p className="text-xs text-gray-400 mt-1">{new Date(item.date).toLocaleDateString()}</p>}
+                    </div>
+                    <Badge variant={item.type === 'payment' ? 'destructive' : 'outline'} className="text-xs">{item.type}</Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-6">
       <div className="mb-6">
         <div className="flex gap-2">
           <Button
@@ -173,7 +272,7 @@ export default function NotificationsPage() {
                                 {notification.type}
                               </Badge>
                               <Badge variant="outline" className="text-xs">
-                                {getCategoryName(notification.category)}
+                                {getCategoryName(notification.category || 'general')}
                               </Badge>
                             </div>
                             <p className="text-gray-600 text-sm mb-2">
@@ -219,6 +318,8 @@ export default function NotificationsPage() {
           )}
         </div>
       )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 } 
