@@ -170,6 +170,20 @@ export default function ViewClientOrderPage() {
     totalDuration: order.totalDuration || order.items.reduce((sum, item) => sum + item.duration, 0)
   };
 
+  const canProcessPayment = totals.due > 0 && order.status === OrderStatus.COMPLETED;
+
+  const handleProcessPayment = () => {
+    const fallbackClientName = `${client?.firstName || ''} ${client?.lastName || ''}`.trim();
+    const queryParams = new URLSearchParams({
+      clientId: String(order.clientId || clientId),
+      clientName: order.clientName || fallbackClientName,
+      orderNumber: order.orderNumber,
+      amount: totals.due.toString()
+    });
+
+    router.push(generateLink('clinic', `payments/new?${queryParams.toString()}`, clinic));
+  };
+
   // Get status colors and icons
   const getStatusIcon = (status: OrderStatus) => {
     switch (status) {
@@ -228,6 +242,17 @@ export default function ViewClientOrderPage() {
         </div>
         
         <div className="flex gap-2 w-full sm:w-auto">
+          {canProcessPayment && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleProcessPayment}
+              className="flex items-center gap-2 flex-1 sm:flex-none"
+            >
+              <DollarSign size={16} />
+              Process Payment
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -564,6 +589,15 @@ export default function ViewClientOrderPage() {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={handleProcessPayment}
+                disabled={!canProcessPayment}
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Process Payment
+              </Button>
               <Button
                 variant="outline"
                 className="w-full justify-start"

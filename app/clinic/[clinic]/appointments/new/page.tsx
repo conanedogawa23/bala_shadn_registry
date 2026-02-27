@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { z } from 'zod';
 import { 
   Card, 
@@ -21,6 +21,7 @@ import { ArrowLeft, Save, Plus } from 'lucide-react';
 import { findClinicBySlug, generateLink } from '@/lib/route-utils';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { useClinic } from '@/lib/contexts/clinic-context';
+import { useClient } from '@/lib/hooks';
 
 // Define the appointment schema using zod for validation
 const appointmentSchema = z.object({
@@ -69,13 +70,41 @@ const labelOptions = [
 export default function NewAppointmentPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const clinicSlug = params.clinic as string;
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [prefilledClientId, setPrefilledClientId] = useState('');
+  const [prefilledClientName, setPrefilledClientName] = useState('');
 
   const { availableClinics } = useClinic();
   const clinicData = findClinicBySlug(availableClinics, clinicSlug);
   const clinicName = clinicData?.backendName || clinicData?.displayName || clinicSlug;
+
+  // Read pre-filled client details from URL params.
+  useEffect(() => {
+    const clientIdFromUrl = searchParams.get('clientId')?.trim() || '';
+    const clientNameFromUrl = searchParams.get('clientName')?.trim() || '';
+    setPrefilledClientId(clientIdFromUrl);
+    setPrefilledClientName(clientNameFromUrl);
+  }, [searchParams]);
+
+  const { client: prefilledClient } = useClient({
+    clientId: prefilledClientId,
+    autoFetch: !!prefilledClientId
+  });
+
+  // If only clientId is provided, resolve a display name for FormClientSelect.
+  useEffect(() => {
+    if (prefilledClientName || !prefilledClient) {
+      return;
+    }
+
+    const resolvedName = `${prefilledClient.firstName || ''} ${prefilledClient.lastName || ''}`.trim() || prefilledClient.name || '';
+    if (resolvedName) {
+      setPrefilledClientName(resolvedName);
+    }
+  }, [prefilledClient, prefilledClientName]);
 
   // Calculate default end date based on start date and duration
   const calculateEndDate = (startDate: Date, durationMinutes: number) => {
@@ -101,7 +130,7 @@ export default function NewAppointmentPage() {
     status: 0,
     label: 0,
     subject: '',
-    clientId: '',
+    clientId: prefilledClientId,
     resourceId: 1,
     location: '',
     description: '',
@@ -184,6 +213,7 @@ export default function NewAppointmentPage() {
         </CardHeader>
         
         <FormWrapper
+          key={`appointment-form-${prefilledClientId || 'new'}`}
           schema={appointmentSchema}
           defaultValues={defaultValues}
           onSubmit={handleSubmit}
@@ -208,6 +238,7 @@ export default function NewAppointmentPage() {
                   label="Client"
                   placeholder="Select a client"
                   clinicName={clinicName}
+                  defaultClientName={prefilledClientName || undefined}
                   required
                 />
               </div>
@@ -218,6 +249,7 @@ export default function NewAppointmentPage() {
                   label="Resource"
                   placeholder="Select a practitioner..."
                   clinicName={clinicName}
+                  includeDoctors={false}
                   required
                 />
                 

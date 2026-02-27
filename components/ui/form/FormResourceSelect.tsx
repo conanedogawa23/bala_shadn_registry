@@ -347,8 +347,9 @@ export function FormResourceSelect({
                               key={option.value}
                               value={option.resource.resourceName || ''}
                               onSelect={() => {
-                                field.onChange(parseInt(option.value, 10));
-                                setSelectedResourceInfo({ id: parseInt(option.value, 10), name: option.label });
+                                const selectedValue = parseInt(option.value, 10);
+                                field.onChange(selectedValue);
+                                setSelectedResourceInfo({ id: selectedValue, name: option.label });
                                 setOpen(false);
                               }}
                               className="cursor-pointer py-3"

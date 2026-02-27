@@ -36,6 +36,7 @@ export abstract class BaseApiService {
     return this.getApiBaseUrl();
   }
   protected static readonly DEFAULT_TIMEOUT = 30000; // 30 seconds
+  private static inFlightGetRequests = new Map<string, Promise<ApiResponse<unknown>>>();
   
   /**
    * Optimized request handler with comprehensive error management
@@ -52,6 +53,7 @@ export abstract class BaseApiService {
     // Get auth token if available (for future authentication integration)
     const authToken = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
     
+    const requestUrl = `${this.API_BASE_URL}${endpoint}`;
     const config: RequestInit = {
       method,
       headers: {
@@ -74,55 +76,80 @@ export abstract class BaseApiService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
     config.signal = controller.signal;
-    
-    try {
-      logger.api.request(method, `${this.API_BASE_URL}${endpoint}`, data);
-      
-      const response = await fetch(`${this.API_BASE_URL}${endpoint}`, config);
-      clearTimeout(timeoutId);
-      
-      logger.api.response(response.status, endpoint);
-      
-      let result;
+
+    const isGetRequest = method === 'GET';
+    const inFlightKey = isGetRequest ? `${requestUrl}|${authToken || 'anon'}` : null;
+
+    if (inFlightKey) {
+      const existingRequest = BaseApiService.inFlightGetRequests.get(inFlightKey);
+      if (existingRequest) {
+        return existingRequest as Promise<ApiResponse<T>>;
+      }
+    }
+
+    const executeRequest = async (): Promise<ApiResponse<T>> => {
       try {
-        result = await response.json();
-      } catch (parseError) {
-        logger.error(`[API] Failed to parse response:`, { 
-          status: response.status, 
-          statusText: response.statusText,
-          contentType: response.headers.get('content-type'),
-          error: parseError
-        });
-        throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
+        logger.api.request(method, requestUrl, data);
+
+        const response = await fetch(requestUrl, config);
+        clearTimeout(timeoutId);
+
+        logger.api.response(response.status, endpoint);
+
+        let result;
+        try {
+          result = await response.json();
+        } catch (parseError) {
+          logger.error(`[API] Failed to parse response:`, {
+            status: response.status,
+            statusText: response.statusText,
+            contentType: response.headers.get('content-type'),
+            error: parseError
+          });
+          throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
+        }
+
+        logger.debug(`[API] Response ${response.status}:`, result);
+
+        if (!response.ok) {
+          const errorMessage = result.error?.message || result.message || `HTTP ${response.status}: ${response.statusText}`;
+          const errorDetails = result.error?.details || result.details;
+          logger.api.error(response.status, endpoint, { errorMessage, errorDetails, result });
+          throw new Error(errorMessage);
+        }
+
+        if (!result.success) {
+          const errorMessage = result.error?.message || result.message || 'API request failed';
+          const errorDetails = result.error?.details || result.details;
+          logger.error('[API] Request failed:', { errorMessage, errorDetails, result });
+          throw new Error(errorMessage);
+        }
+
+        return result;
+      } catch (error) {
+        clearTimeout(timeoutId);
+
+        if (error instanceof Error && error.name === 'AbortError') {
+          logger.error(`[API] Request timeout after ${timeout}ms for ${method} ${endpoint}`);
+          throw new Error(`Request timeout after ${timeout}ms`);
+        }
+
+        logger.error(`[API] Request failed for ${method} ${endpoint}:`, error);
+        throw error;
       }
-      
-      logger.debug(`[API] Response ${response.status}:`, result);
-      
-      if (!response.ok) {
-        const errorMessage = result.error?.message || result.message || `HTTP ${response.status}: ${response.statusText}`;
-        const errorDetails = result.error?.details || result.details;
-        logger.api.error(response.status, endpoint, { errorMessage, errorDetails, result });
-        throw new Error(errorMessage);
+    };
+
+    const requestPromise = executeRequest();
+    if (inFlightKey) {
+      BaseApiService.inFlightGetRequests.set(inFlightKey, requestPromise as Promise<ApiResponse<unknown>>);
+    }
+
+    try {
+      return await requestPromise;
+    } finally {
+      if (inFlightKey) {
+        BaseApiService.inFlightGetRequests.delete(inFlightKey);
       }
-      
-      if (!result.success) {
-        const errorMessage = result.error?.message || result.message || 'API request failed';
-        const errorDetails = result.error?.details || result.details;
-        logger.error('[API] Request failed:', { errorMessage, errorDetails, result });
-        throw new Error(errorMessage);
-      }
-      
-      return result;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (error instanceof Error && error.name === 'AbortError') {
-        logger.error(`[API] Request timeout after ${timeout}ms for ${method} ${endpoint}`);
-        throw new Error(`Request timeout after ${timeout}ms`);
-      }
-      
-      logger.error(`[API] Request failed for ${method} ${endpoint}:`, error);
-      throw error;
     }
   }
   

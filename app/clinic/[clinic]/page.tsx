@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import InvalidClinicError from '@/components/error/invalid-clinic-error';
-import { findClinicBySlug, generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink, getBackendClinicName } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { TodaysAppointments } from '@/components/dashboard/todays-appointments';
 import { BulletinFeed } from '@/components/dashboard/bulletin-feed';
@@ -51,6 +51,8 @@ export default function ClinicPage() {
   if (error || !clinic) {
     return <InvalidClinicError clinicSlug={clinicSlug} />;
   }
+
+  const backendClinicName = getBackendClinicName(clinic);
 
   const quickActions = [
     {
@@ -177,7 +179,7 @@ export default function ClinicPage() {
       {/* Dashboard Widgets: Today's Appointments + Bulletin */}
       {clinic.status === 'active' && (
         <div className="grid gap-6 md:grid-cols-2">
-          <TodaysAppointments clinicName={clinic.name} />
+          <TodaysAppointments clinicName={backendClinicName} />
           <BulletinFeed />
         </div>
       )}

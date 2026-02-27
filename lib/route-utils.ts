@@ -47,6 +47,26 @@ export function findClinicBySlug(clinics: { name: string; slug?: string; display
 }
 
 /**
+ * Resolve the canonical clinic name for backend API calls.
+ * Prefers backendName when provided by the API, then falls back to name.
+ */
+export function getBackendClinicName(
+  clinic: Pick<Clinic, 'name' | 'backendName'> | null | undefined,
+  fallback: string = ''
+): string {
+  if (!clinic) {
+    return fallback;
+  }
+
+  const backendName = clinic.backendName?.trim();
+  if (backendName) {
+    return backendName;
+  }
+
+  return clinic.name?.trim() || fallback;
+}
+
+/**
  * Route types
  */
 export type RouteType = 'global' | 'clinic';

@@ -329,6 +329,7 @@ export default function EditAppointmentPage() {
                   label="Resource"
                   placeholder="Select a practitioner or resource"
                   clinicName={clinicName}
+                  includeDoctors={false}
                   required
                   defaultResourceName={resourceName}
                 />

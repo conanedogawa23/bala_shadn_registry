@@ -29,7 +29,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useClinic } from '@/lib/contexts/clinic-context';
-import { generateLink, findClinicBySlug } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink, getBackendClinicName } from '@/lib/route-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Import chart components
@@ -43,12 +43,10 @@ import {
   useRevenueAnalytics, 
   useProductPerformance, 
   useOrdersByClinic,
-  useClients,
-  OrderUtils,
-  OrderStatus
+  OrderUtils
 } from '@/lib/hooks';
 import { PaymentStatus } from '@/lib/api/orderService';
-import { ReportApiService, type ClientStatisticsData } from '@/lib/api/reportService';
+import { ReportApiService, type ClientStatisticsData, type PaymentSummaryData } from '@/lib/api/reportService';
 
 interface ReportMetrics {
   totalClients: number;
@@ -143,12 +141,8 @@ export default function ReportsPage() {
     return findClinicBySlug(availableClinics, clinicSlug || '');
   }, [clinicSlug, availableClinics]);
   
-  const orderClinicName = useMemo(() => {
-    return clinic?.name || "";
-  }, [clinic]);
-
   const backendClinicName = useMemo(() => {
-    return clinic?.backendName || clinic?.name || "";
+    return getBackendClinicName(clinic);
   }, [clinic]);
 
   const [selectedPeriod, setSelectedPeriod] = useState('last6months');
@@ -162,6 +156,8 @@ export default function ReportsPage() {
   const [selectedQuickPreset, setSelectedQuickPreset] = useState<string | null>(null);
   const [clientStats, setClientStats] = useState<ClientStatisticsData | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummaryData | null>(null);
+  const [paymentSummaryLoading, setPaymentSummaryLoading] = useState(false);
 
   // Calculate date ranges based on selected period or custom dates
   const dateRange = useMemo(() => {
@@ -208,10 +204,10 @@ export default function ReportsPage() {
     avgOrderValue,
     refetch: refetchRevenue
   } = useRevenueAnalytics({
-    clinicName: orderClinicName,
+    clinicName: backendClinicName,
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
-    autoFetch: !!orderClinicName
+    autoFetch: !!backendClinicName
   });
 
   const { 
@@ -222,22 +218,23 @@ export default function ReportsPage() {
   } = useProductPerformance({
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
-    clinicName: orderClinicName,
-    autoFetch: !!orderClinicName
+    clinicName: backendClinicName,
+    autoFetch: !!backendClinicName
   });
 
   const { 
     orders, 
     loading: ordersLoading, 
     error: ordersError,
-    pagination: ordersPagination
+    pagination: ordersPagination,
+    refetch: refetchOrders
   } = useOrdersByClinic({
-    clinicName: orderClinicName,
+    clinicName: backendClinicName,
     query: {
       startDate: dateRange.startDate,
       endDate: dateRange.endDate
     },
-    autoFetch: !!orderClinicName
+    autoFetch: !!backendClinicName
   });
 
   // Fetch client statistics using aggregation (for reference metrics only)
@@ -259,27 +256,51 @@ export default function ReportsPage() {
     }
   }, [backendClinicName]);
 
+  // Fetch payment method breakdown from report API.
+  useEffect(() => {
+    if (!backendClinicName) {
+      setPaymentSummary(null);
+      return;
+    }
+
+    const fetchPaymentSummary = async () => {
+      setPaymentSummaryLoading(true);
+      try {
+        const summary = await ReportApiService.getPaymentSummary(backendClinicName, {
+          startDate: new Date(dateRange.startDate),
+          endDate: new Date(dateRange.endDate)
+        });
+        setPaymentSummary(summary);
+      } catch (error) {
+        console.error('Failed to fetch payment summary:', error);
+        setPaymentSummary(null);
+      } finally {
+        setPaymentSummaryLoading(false);
+      }
+    };
+
+    fetchPaymentSummary();
+  }, [backendClinicName, dateRange.startDate, dateRange.endDate]);
+
   // Calculate comprehensive metrics from real data
   const metrics = useMemo((): ReportMetrics => {
-    // Use order pagination total for accurate count, fallback to orders array length
-    const totalOrdersCount = ordersPagination?.total || orders?.length || 0;
-    const completedOrders = orders?.filter(o => o.status === OrderStatus.COMPLETED).length || 0;
-    const pendingOrders = orders?.filter(o => 
-      o.paymentStatus === PaymentStatus.PENDING || 
-      o.paymentStatus === PaymentStatus.PARTIAL ||
-      o.paymentStatus === PaymentStatus.OVERDUE
-    ).length || 0;
+    // Prefer backend analytics totals (full dataset), then fallback to paginated list totals.
+    const totalOrdersCount = analyticsOrderCount || ordersPagination?.total || orders?.length || 0;
+    const completedOrders = Array.isArray(revenueAnalytics)
+      ? revenueAnalytics.reduce((sum, item) => sum + (item.completedOrders || 0), 0)
+      : 0;
+    const pendingOrders = Math.max(totalOrdersCount - completedOrders, 0);
 
-    // Calculate unique clients from filtered orders (clients with activity in date range)
+    // Fallback to unique clients from filtered orders when aggregated stats are unavailable.
     const uniqueClientIds = new Set(
       orders?.map(order => order.clientId).filter(Boolean) || []
     );
-    const totalClients = uniqueClientIds.size || 0;
+    const rangedClients = uniqueClientIds.size || 0;
     
-    // Use all-time client stats for reference metrics
-    const allTimeClients = clientStats?.totalClients || totalClients;
+    // Use client statistics endpoint for all-time cards.
+    const totalClients = clientStats?.totalClients ?? rangedClients;
     const newClientsThisMonth = clientStats?.newClientsThisMonth || 0;
-    const activeClients = clientStats?.activeClients || allTimeClients;
+    const activeClients = clientStats?.activeClients ?? totalClients;
 
     // Calculate growth rates from analytics data
     const isValidAnalytics = Array.isArray(revenueAnalytics) && revenueAnalytics.length > 1;
@@ -299,7 +320,7 @@ export default function ReportsPage() {
       }
     }
 
-    const orderCompletionRate = totalOrdersCount > 0 ? (completedOrders / Math.min(totalOrdersCount, orders?.length || 1)) * 100 : 0;
+    const orderCompletionRate = totalOrdersCount > 0 ? (completedOrders / totalOrdersCount) * 100 : 0;
 
     // Calculate monthly revenue average
     const monthlyRevenue = isValidAnalytics ? 
@@ -320,7 +341,7 @@ export default function ReportsPage() {
       orderCompletionRate,
       revenueGrowthRate
     };
-  }, [revenueAnalytics, orders, ordersPagination, clientStats, totalRevenue, avgOrderValue]);
+  }, [revenueAnalytics, orders, ordersPagination, clientStats, totalRevenue, avgOrderValue, analyticsOrderCount]);
 
   // Transform analytics data for charts
   const revenueChartData = useMemo((): RevenueDataPoint[] => {
@@ -355,30 +376,19 @@ export default function ReportsPage() {
     }));
   }, [productPerformance]);
 
-  // Payment method data (derived from orders)
+  // Payment method data from payment summary report.
   const paymentMethodData = useMemo((): PaymentMethodDataPoint[] => {
-    if (!orders || orders.length === 0) return [];
+    if (!paymentSummary?.paymentMethods || paymentSummary.paymentMethods.length === 0) {
+      return [];
+    }
 
-    const methodCounts: Record<string, { count: number; amount: number }> = {};
-    
-    orders.forEach(order => {
-      const status = order.paymentStatus || 'pending';
-      if (!methodCounts[status]) {
-        methodCounts[status] = { count: 0, amount: 0 };
-      }
-      methodCounts[status].count += 1;
-      methodCounts[status].amount += order.totalAmount || 0;
-    });
-
-    const totalAmount = Object.values(methodCounts).reduce((sum, m) => sum + m.amount, 0);
-
-    return Object.entries(methodCounts).map(([name, data]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      value: data.amount,
-      count: data.count,
-      percentage: totalAmount > 0 ? (data.amount / totalAmount) * 100 : 0
+    return paymentSummary.paymentMethods.map((method) => ({
+      name: method.method || 'Unknown',
+      value: method.amount || 0,
+      count: method.count || 0,
+      percentage: method.percentage || 0
     }));
-  }, [orders]);
+  }, [paymentSummary]);
 
   const handleBack = () => {
     router.push(generateLink('clinic', '', clinicSlug));
@@ -421,20 +431,8 @@ export default function ReportsPage() {
     setSelectedQuickPreset(preset);
   }, []);
 
-  // Force data refresh when date range changes
-  useEffect(() => {
-    if (orderClinicName) {
-      const timeoutId = setTimeout(() => {
-        refetchRevenue();
-        refetchPerformance();
-      }, 300);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [dateRange.startDate, dateRange.endDate, orderClinicName, refetchRevenue, refetchPerformance]);
-
   const handleExportAllReports = async () => {
-    if (!orderClinicName || isExporting) return;
+    if (!backendClinicName || isExporting) return;
     
     setIsExporting(true);
     const reportTypes = ['account-summary', 'payment-summary', 'timesheet', 'order-status', 'copay-summary', 'marketing-budget'];
@@ -443,7 +441,7 @@ export default function ReportsPage() {
       const exportPromises = reportTypes.map(reportType => 
         ReportApiService.exportReport(
           reportType,
-          orderClinicName,
+          backendClinicName,
           selectedExportFormat,
           {
             startDate: new Date(dateRange.startDate),
@@ -463,12 +461,13 @@ export default function ReportsPage() {
   const handleRefresh = () => {
     refetchRevenue();
     refetchPerformance();
+    refetchOrders();
   };
 
   // Loading state
   const isLoading = useMemo(() => 
-    revenueLoading || performanceLoading || ordersLoading || statsLoading,
-    [revenueLoading, performanceLoading, ordersLoading, statsLoading]
+    revenueLoading || performanceLoading || ordersLoading || statsLoading || paymentSummaryLoading,
+    [revenueLoading, performanceLoading, ordersLoading, statsLoading, paymentSummaryLoading]
   );
 
   // Error state
@@ -958,7 +957,7 @@ export default function ReportsPage() {
                           variant="outline"
                           onClick={() => ReportApiService.exportReport(
                             report.id,
-                            orderClinicName,
+                            backendClinicName,
                             selectedExportFormat,
                             { startDate: new Date(dateRange.startDate), endDate: new Date(dateRange.endDate) }
                           )}

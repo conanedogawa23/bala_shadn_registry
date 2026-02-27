@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,15 +9,39 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { themeColors } from "@/registry/new-york/theme-config/theme-config";
-import { generateLink } from "@/lib/route-utils";
+import { findClinicBySlug, generateLink, getBackendClinicName } from "@/lib/route-utils";
 import { UserApiService, User } from "@/lib/api/userApiService";
 import Link from "next/link";
 import { Stethoscope, Building2, MapPin, Shield, ArrowRight } from "lucide-react";
+import { useClinic } from "@/lib/contexts/clinic-context";
 
 export default function SettingsPage() {
   const router = useRouter();
   const params = useParams();
-  const clinic = params.clinic as string;
+  const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
+  const safeClinicSlug = clinicSlug || "";
+  const { availableClinics } = useClinic();
+
+  const clinic = useMemo(() => {
+    if (!clinicSlug) {
+      return undefined;
+    }
+    return findClinicBySlug(availableClinics, clinicSlug);
+  }, [availableClinics, clinicSlug]);
+
+  const backendClinicName = useMemo(() => {
+    return getBackendClinicName(clinic);
+  }, [clinic]);
+
+  const clinicDisplayName = useMemo(() => {
+    if (clinic?.displayName) {
+      return clinic.displayName;
+    }
+    if (clinic?.name) {
+      return clinic.name;
+    }
+    return safeClinicSlug.replace(/-/g, " ");
+  }, [clinic, safeClinicSlug]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -35,11 +59,13 @@ export default function SettingsPage() {
     const fetchStaffMembers = async () => {
       try {
         setIsLoadingStaff(true);
-        // Convert clinic slug to clinic name (e.g., 'bodybliss-physio' -> 'bodybliss physio')
-        const clinicName = clinic.replace(/-/g, ' ');
+        if (!backendClinicName) {
+          setStaffMembers([]);
+          return;
+        }
         
         const response = await UserApiService.getAllUsers({
-          clinicName: clinicName,
+          clinicName: backendClinicName,
           page: 1,
           limit: 50
         });
@@ -52,10 +78,12 @@ export default function SettingsPage() {
       }
     };
 
-    if (mounted && clinic) {
+    if (mounted && backendClinicName) {
       fetchStaffMembers();
+    } else if (mounted) {
+      setStaffMembers([]);
     }
-  }, [mounted, clinic]);
+  }, [mounted, backendClinicName]);
 
   const handleSaveChanges = async () => {
     setIsSaving(true);
@@ -130,9 +158,9 @@ export default function SettingsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: themeColors.primary }}>
-            Settings - {clinic.replace('-', ' ')}
+            Settings - {clinicDisplayName}
           </h1>
-          <p className="text-gray-600 mt-1">Manage clinic settings and preferences for {clinic.replace('-', ' ')}</p>
+          <p className="text-gray-600 mt-1">Manage clinic settings and preferences for {clinicDisplayName}</p>
         </div>
       </div>
 
@@ -167,7 +195,7 @@ export default function SettingsPage() {
                   <Input
                     id="clinicName"
                     placeholder="Clinic name"
-                    defaultValue={clinic.replace('-', ' ')}
+                    defaultValue={clinicDisplayName}
                   />
                 </div>
                 <div className="space-y-2">
@@ -254,7 +282,7 @@ export default function SettingsPage() {
             <CardFooter className="flex justify-between">
               <Button
                 variant="outline"
-                onClick={() => router.push(generateLink('clinic', '', clinic))}
+                onClick={() => router.push(generateLink('clinic', '', safeClinicSlug))}
               >
                 Cancel
               </Button>
@@ -312,7 +340,7 @@ export default function SettingsPage() {
             <CardFooter className="flex justify-between">
               <Button
                 variant="outline"
-                onClick={() => router.push(generateLink('clinic', '', clinic))}
+                onClick={() => router.push(generateLink('clinic', '', safeClinicSlug))}
               >
                 Cancel
               </Button>
@@ -373,7 +401,7 @@ export default function SettingsPage() {
             <CardFooter className="flex justify-between">
               <Button
                 variant="outline"
-                onClick={() => router.push(generateLink('clinic', '', clinic))}
+                onClick={() => router.push(generateLink('clinic', '', safeClinicSlug))}
               >
                 Cancel
               </Button>
@@ -480,7 +508,7 @@ export default function SettingsPage() {
             <CardFooter className="flex justify-between">
               <Button
                 variant="outline"
-                onClick={() => router.push(generateLink('clinic', '', clinic))}
+                onClick={() => router.push(generateLink('clinic', '', safeClinicSlug))}
               >
                 Back to Clinic
               </Button>
@@ -505,7 +533,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
-                <Link href={`/clinic/${clinic}/settings/doctors`}>
+                <Link href={`/clinic/${safeClinicSlug}/settings/doctors`}>
                   <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
                     <CardContent className="flex items-center justify-between p-6">
                       <div className="flex items-center gap-4">
@@ -519,7 +547,7 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
                 </Link>
-                <Link href={`/clinic/${clinic}/settings/companies`}>
+                <Link href={`/clinic/${safeClinicSlug}/settings/companies`}>
                   <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
                     <CardContent className="flex items-center justify-between p-6">
                       <div className="flex items-center gap-4">
@@ -533,7 +561,7 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
                 </Link>
-                <Link href={`/clinic/${clinic}/settings/cities`}>
+                <Link href={`/clinic/${safeClinicSlug}/settings/cities`}>
                   <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
                     <CardContent className="flex items-center justify-between p-6">
                       <div className="flex items-center gap-4">
@@ -547,7 +575,7 @@ export default function SettingsPage() {
                     </CardContent>
                   </Card>
                 </Link>
-                <Link href={`/clinic/${clinic}/settings/insurance/group-numbers`}>
+                <Link href={`/clinic/${safeClinicSlug}/settings/insurance/group-numbers`}>
                   <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
                     <CardContent className="flex items-center justify-between p-6">
                       <div className="flex items-center gap-4">

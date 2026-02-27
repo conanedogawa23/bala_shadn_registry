@@ -370,7 +370,7 @@ export default function AppointmentsPage() {
                 
                 return (
                   <div
-                    key={getAppointmentId(appointment) || `appointment-${index}-${appointment.startDate}`}
+                    key={getAppointmentId(appointment) || `appointment-${index}`}
                     className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

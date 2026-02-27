@@ -21,7 +21,7 @@ import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { isAuthenticated, getUser, logout, User } from "@/lib/auth";
 import { ClinicSelector } from "@/components/clinic/clinic-selector";
 import { useClinic } from "@/lib/contexts/clinic-context";
-import { generateLink } from "@/lib/route-utils";
+import { generateLink, getBackendClinicName, toUrlSlug } from "@/lib/route-utils";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import { useNotifications } from "@/lib/hooks/useNotifications";
 
@@ -37,7 +37,7 @@ export default function NavMenu() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Get clinic name for notifications
-  const clinicName = selectedClinic?.name || 'bodyblissphysio';
+  const clinicName = getBackendClinicName(selectedClinic, 'bodyblissphysio');
   
   // Use notifications hook for unread count
   const { unreadCount } = useNotifications({
@@ -118,8 +118,7 @@ export default function NavMenu() {
   // Generate clinic-aware navigation items using the route utility
   const getClinicSlug = (): string => {
     if (!selectedClinic) return 'bodyblissphysio';
-    // Use the clinic name directly to match MongoDB
-    return selectedClinic.name;
+    return selectedClinic.slug || toUrlSlug(selectedClinic.name);
   };
 
   const navItems = [

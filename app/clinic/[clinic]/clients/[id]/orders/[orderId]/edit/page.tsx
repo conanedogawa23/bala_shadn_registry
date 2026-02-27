@@ -50,11 +50,10 @@ import {
   useOrderMutation,
   useProducts,
   OrderUtils,
-  OrderStatus,
-  PaymentStatus,
   type Order,
   type OrderLineItem
 } from "@/lib/hooks";
+import { OrderStatus, PaymentStatus } from "@/lib/api/orderService";
 
 // Form validation schemas
 const orderItemSchema = z.object({

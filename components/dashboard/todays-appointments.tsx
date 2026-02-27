@@ -8,11 +8,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 
 interface TodayAppointment {
-  _id: string;
+  id?: string;
+  appointmentId?: number;
+  _id?: string;
   startDate: string;
   endDate?: string;
   subject?: string;
-  status: string;
+  status: number;
+  statusText?: string;
   clientId: number;
   clientName?: string;
   type?: string;
@@ -59,11 +62,13 @@ export function TodaysAppointments({ clinicName }: TodaysAppointmentsProps) {
     }
   };
 
-  const statusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'confirmed': return 'default';
-      case 'completed': return 'secondary';
-      case 'cancelled': return 'destructive';
+  const statusColor = (status: number) => {
+    switch (status) {
+      case 0: return 'outline';      // Scheduled
+      case 1: return 'secondary';    // Completed
+      case 2: return 'destructive';  // Cancelled
+      case 3: return 'destructive';  // No Show
+      case 4: return 'outline';      // Rescheduled
       default: return 'outline';
     }
   };
@@ -91,8 +96,8 @@ export function TodaysAppointments({ clinicName }: TodaysAppointmentsProps) {
         ) : (
           <ScrollArea className="max-h-[300px]">
             <div className="space-y-3">
-              {appointments.slice(0, 10).map(apt => (
-                <div key={apt._id} className="flex items-center justify-between p-3 rounded-lg border">
+              {appointments.slice(0, 10).map((apt, index) => (
+                <div key={apt.id || apt.appointmentId || apt._id || `appointment-${index}`} className="flex items-center justify-between p-3 rounded-lg border">
                   <div className="flex items-center gap-3">
                     <div className="text-sm font-medium text-primary">
                       <Clock className="h-4 w-4 inline mr-1" />
@@ -108,7 +113,7 @@ export function TodaysAppointments({ clinicName }: TodaysAppointmentsProps) {
                       )}
                     </div>
                   </div>
-                  <Badge variant={statusColor(apt.status) as any}>{apt.status}</Badge>
+                  <Badge variant={statusColor(apt.status) as any}>{apt.statusText || 'Scheduled'}</Badge>
                 </div>
               ))}
               {appointments.length > 10 && (

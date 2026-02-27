@@ -122,7 +122,7 @@ export default function ClientDetailPage() {
   };
 
   const handleCreateOrder = () => {
-    router.push(generateLink('clinic', 'orders/new', clinic));
+    router.push(generateLink('clinic', `clients/${clientId}/orders/new`, clinic));
   };
 
   const handleViewOrder = (orderId: string) => {
@@ -135,7 +135,23 @@ export default function ClientDetailPage() {
 
   // Appointment handlers
   const handleNewAppointment = () => {
-    router.push(generateLink('clinic', 'appointments/new', clinic) + `?clientId=${clientId}`);
+    const clientName = `${client?.firstName || ''} ${client?.lastName || ''}`.trim();
+    const queryParams = new URLSearchParams({ clientId });
+    if (clientName) {
+      queryParams.set('clientName', clientName);
+    }
+
+    router.push(generateLink('clinic', 'appointments/new', clinic) + `?${queryParams.toString()}`);
+  };
+
+  const handleRecordPayment = () => {
+    const clientName = `${client?.firstName || ''} ${client?.lastName || ''}`.trim();
+    const queryParams = new URLSearchParams({ clientId });
+    if (clientName) {
+      queryParams.set('clientName', clientName);
+    }
+
+    router.push(generateLink('clinic', `payments/new?${queryParams.toString()}`, clinic));
   };
 
   const handleViewAppointment = (appointmentId: string | number) => {
@@ -325,7 +341,7 @@ export default function ClientDetailPage() {
           {clinicData?.name || clinic} • Client ID: {client.clientId}
         </p>
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-4">
           <Button
             variant="outline"
             size="sm"
@@ -352,6 +368,15 @@ export default function ClientDetailPage() {
           >
             <Plus size={16} />
             New Order
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRecordPayment}
+            className="flex items-center gap-2"
+          >
+            <DollarSign size={16} />
+            Record Payment
           </Button>
         </div>
       </div>
@@ -954,6 +979,14 @@ export default function ClientDetailPage() {
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create New Order
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={handleRecordPayment}
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Record Payment
               </Button>
               <Button
                 variant="outline"
