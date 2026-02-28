@@ -170,6 +170,13 @@ export default function ViewClientOrderPage() {
     totalDuration: order.totalDuration || order.items.reduce((sum, item) => sum + item.duration, 0)
   };
 
+  const totals = {
+    total: order.totalAmount || 0,
+    due: [PaymentStatus.PAID, PaymentStatus.REFUNDED].includes(order.paymentStatus)
+      ? 0
+      : (order.totalAmount || 0)
+  };
+
   const canProcessPayment = totals.due > 0 && order.status === OrderStatus.COMPLETED;
 
   const handleProcessPayment = () => {

@@ -158,7 +158,7 @@ export default function AppointmentsPage() {
     const query = searchQuery.toLowerCase();
     return appointments.filter(appointment => 
       appointment.subject?.toLowerCase().includes(query) ||
-      appointment.clientId?.toLowerCase().includes(query) ||
+      String(appointment.clientId ?? '').toLowerCase().includes(query) ||
       appointment.resourceName?.toLowerCase().includes(query) ||
       appointment.location?.toLowerCase().includes(query)
     );

@@ -30,7 +30,7 @@ const appointmentSchema = z.object({
   subject: z.string().min(2, { message: 'Subject must be at least 2 characters' }),
   clientId: z.string().min(1, { message: 'Client ID is required' }),
   resourceId: z.coerce.number().min(1, { message: 'Resource is required' }),
-  duration: z.coerce.number().min(5, { message: 'Duration must be at least 5 minutes' }).default(30),
+  duration: z.coerce.number().min(15, { message: 'Duration must be at least 15 minutes' }).default(30),
   type: z.coerce.number().int().min(0).default(0),
   status: z.coerce.number().int().min(0).default(0),
   label: z.coerce.number().int().min(0).default(0),
@@ -257,7 +257,7 @@ export default function NewAppointmentPage() {
                   name="duration"
                   label="Duration (minutes)"
                   type="number"
-                  min="5"
+                  min="15"
                   placeholder="Enter duration in minutes"
                   required
                 />

@@ -32,7 +32,14 @@ const clientSchema = z.object({
   
   // Contact Information - RETAINED FIELDS ONLY
   email: z.string().email({ message: "Please enter a valid email address" }).max(100, { message: "Email cannot exceed 100 characters" }),
-  cellPhone: z.string().min(10, { message: "Please enter a valid phone number" }).max(20, { message: "Phone number cannot exceed 20 characters" }),
+  cellPhone: z.string()
+    .min(1, { message: "Cell phone is required" })
+    .refine((value) => value.replace(/\D/g, '').length >= 10, {
+      message: "Please enter at least 10 digits"
+    })
+    .refine((value) => value.replace(/\D/g, '').length <= 15, {
+      message: "Phone number cannot exceed 15 digits"
+    }),
   homePhone: z.string().max(20, { message: "Phone number cannot exceed 20 characters" }).optional(),
   
   // Address Information

@@ -70,7 +70,8 @@ export function ClientsTableWrapper({
         params.delete('page');
       }
       
-      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+      const queryString = params.toString();
+      router.push(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
       router.refresh();
     }, 500); // 500ms debounce delay
   }, [router, pathname, searchParams]);

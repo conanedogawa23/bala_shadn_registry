@@ -35,7 +35,14 @@ const clientSchema = z.object({
   
   // Contact Information
   email: z.string().email({ message: "Please enter a valid email address" }),
-  cellPhone: z.string().min(10, { message: "Please enter a valid phone number" }),
+  cellPhone: z.string()
+    .min(1, { message: "Cell phone is required" })
+    .refine((value) => value.replace(/\D/g, '').length >= 10, {
+      message: "Please enter at least 10 digits"
+    })
+    .refine((value) => value.replace(/\D/g, '').length <= 15, {
+      message: "Phone number cannot exceed 15 digits"
+    }),
   homePhone: z.string().optional(),
   
   // Address Information

@@ -29,7 +29,8 @@ export function OrdersSearch({ initialSearch = '', totalOrders }: OrdersSearchPr
       params.delete('page');
     }
     
-    router.push(`${pathname}?${params.toString()}`);
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
   }, [router, pathname, searchParams]);
 
   useEffect(() => {
