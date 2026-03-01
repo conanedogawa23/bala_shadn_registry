@@ -1,7 +1,7 @@
 import { BaseApiService } from './baseApiService';
 
 interface Resource {
-  id: string;
+  id: string | number;
   resourceId: number;
   resourceName: string;
   type: 'practitioner' | 'service' | 'equipment' | 'room';
@@ -58,6 +58,7 @@ interface ResourceQueryOptions {
 }
 
 interface CreateResourceRequest {
+  resourceId?: number;
   resourceName: string;
   type: 'practitioner' | 'service' | 'equipment' | 'room';
   color?: string;
@@ -94,7 +95,7 @@ interface CreateResourceRequest {
   requiresApproval?: boolean;
 }
 
-interface UpdateResourceRequest extends Partial<CreateResourceRequest> {}
+type UpdateResourceRequest = Partial<CreateResourceRequest>;
 
 interface PaginatedResourceResponse {
   resources: Resource[];
@@ -221,9 +222,39 @@ interface ResourceStatsResponse {
   };
 }
 
+interface ApiResourcePayload extends Partial<Resource> {
+  id?: string | number;
+  resourceId?: number;
+  resourceName?: string;
+  name?: string;
+  fullName?: string;
+}
+
+interface ResourceConflictResponse {
+  hasConflict: boolean;
+  conflicts: Array<{
+    appointmentId: string;
+    startDate: string;
+    endDate: string;
+    clientName: string;
+    subject: string;
+  }>;
+}
+
 export class ResourceApiService extends BaseApiService {
   private static readonly ENDPOINT = '/resources';
   private static readonly CACHE_TTL = 300000; // 5 minutes
+
+  private static normalizeResource(resource: ApiResourcePayload): Resource {
+    const normalizedId = resource.id ?? resource.resourceId ?? '';
+    const parsedResourceId = Number(resource.resourceId ?? resource.id);
+    return {
+      ...(resource as Resource),
+      id: normalizedId,
+      resourceId: Number.isFinite(parsedResourceId) ? parsedResourceId : 0,
+      resourceName: resource.resourceName || resource.name || resource.fullName || ''
+    };
+  }
 
   /**
    * Get all resources with filtering and pagination
@@ -249,15 +280,12 @@ export class ResourceApiService extends BaseApiService {
       const queryString = query ? `?${query}` : '';
       const endpoint = `${this.ENDPOINT}${queryString}`;
       
-      const response = await this.request<any>(endpoint);
+      const response = await this.request<ApiResourcePayload[]>(endpoint);
       
       if (response.success && response.data) {
         // Handle actual API structure: response.data is direct array, not nested object
         const paginatedResponse: PaginatedResourceResponse = {
-          resources: Array.isArray(response.data) ? response.data.map((item: any) => ({
-            ...item,
-            resourceName: item.resourceName || item.name || item.fullName // Handle field name variations
-          })) : [],
+          resources: Array.isArray(response.data) ? response.data.map((item) => this.normalizeResource(item)) : [],
           pagination: response.pagination || {
             page: 1,
             limit: 50,
@@ -291,8 +319,9 @@ export class ResourceApiService extends BaseApiService {
       const response = await this.request<Resource>(endpoint);
       
       if (response.success && response.data) {
-        this.setCached(cacheKey, response.data, this.CACHE_TTL);
-        return response.data;
+        const normalizedResource = this.normalizeResource(response.data);
+        this.setCached(cacheKey, normalizedResource, this.CACHE_TTL);
+        return normalizedResource;
       }
       
       throw new Error('Resource not found');
@@ -317,7 +346,7 @@ export class ResourceApiService extends BaseApiService {
         this.clearCache('resources_');
         this.clearCache('practitioners_');
         this.clearCache('services_');
-        return response.data;
+        return this.normalizeResource(response.data);
       }
       
       throw new Error('Failed to create resource');
@@ -343,7 +372,7 @@ export class ResourceApiService extends BaseApiService {
         this.clearCache(`resource_${resourceId}`);
         this.clearCache('practitioners_');
         this.clearCache('services_');
-        return response.data;
+        return this.normalizeResource(response.data);
       }
       
       throw new Error('Failed to update resource');
@@ -614,7 +643,7 @@ export class ResourceApiService extends BaseApiService {
       });
 
       const endpoint = `${this.ENDPOINT}/${resourceId}/conflicts?${query}`;
-      const response = await this.request<any>(endpoint);
+      const response = await this.request<ResourceConflictResponse>(endpoint);
       
       if (response.success && response.data) {
         return response.data;
