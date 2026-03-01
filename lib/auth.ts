@@ -210,7 +210,12 @@ export const updateUserProfile = (userData: Partial<User>): boolean => {
 
 // Login the user (call this after successful authentication)
 // Tokens stored in localStorage + non-HttpOnly cookie for server-side reads
-export const login = (userData: User, token?: string, refreshToken?: string) => {
+export const login = (
+  userData: User,
+  token?: string,
+  refreshToken?: string,
+  accessTokenExpiresInSeconds: number = 3600
+) => {
   if (typeof window === "undefined") return;
   
   logger.debug('[Auth] Logging in user, storing tokens in localStorage');
@@ -222,7 +227,11 @@ export const login = (userData: User, token?: string, refreshToken?: string) => 
   if (token) {
     localStorage.setItem("authToken", token);
     // Also set non-HttpOnly cookie for Next.js Server Components
-    setServerReadableCookie("accessToken", token, 1/96); // 15 minutes
+    setServerReadableCookie(
+      "accessToken",
+      token,
+      Math.max(accessTokenExpiresInSeconds, 60) / 86400
+    );
     logger.debug('[Auth] Access token stored in localStorage + cookie for SSR');
   }
   

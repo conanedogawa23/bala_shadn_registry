@@ -37,6 +37,78 @@ export abstract class BaseApiService {
   }
   protected static readonly DEFAULT_TIMEOUT = 30000; // 30 seconds
   private static inFlightGetRequests = new Map<string, Promise<ApiResponse<unknown>>>();
+  private static refreshTokenPromise: Promise<string | null> | null = null;
+
+  private static setServerReadableCookie(name: string, value: string, days: number): void {
+    if (typeof document === 'undefined') return;
+
+    const expires = new Date();
+    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+  }
+
+  private static async refreshAccessToken(): Promise<string | null> {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    if (BaseApiService.refreshTokenPromise) {
+      return BaseApiService.refreshTokenPromise;
+    }
+
+    BaseApiService.refreshTokenPromise = (async () => {
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+          return null;
+        }
+
+        const refreshEndpoint = `${this.API_BASE_URL}/auth/refresh`;
+        const response = await fetch(refreshEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+          cache: 'no-store',
+          credentials: 'include',
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.success || !result?.data?.accessToken) {
+          logger.warn('[Auth] Token refresh failed', { status: response.status, result });
+          localStorage.removeItem('authToken');
+          return null;
+        }
+
+        const newAccessToken = result.data.accessToken as string;
+        localStorage.setItem('authToken', newAccessToken);
+
+        const newRefreshToken = result.data.refreshToken as string | undefined;
+        if (newRefreshToken) {
+          localStorage.setItem('refreshToken', newRefreshToken);
+          this.setServerReadableCookie('refreshToken', newRefreshToken, 7);
+        }
+
+        const expiresInSeconds = typeof result.data.expiresIn === 'number'
+          ? result.data.expiresIn
+          : 3600;
+        this.setServerReadableCookie('accessToken', newAccessToken, expiresInSeconds / 86400);
+
+        logger.debug('[Auth] Access token refreshed successfully');
+        return newAccessToken;
+      } catch (error) {
+        logger.error('[Auth] Refresh token request failed:', error);
+        return null;
+      } finally {
+        BaseApiService.refreshTokenPromise = null;
+      }
+    })();
+
+    return BaseApiService.refreshTokenPromise;
+  }
   
   /**
    * Optimized request handler with comprehensive error management
@@ -91,25 +163,48 @@ export abstract class BaseApiService {
       try {
         logger.api.request(method, requestUrl, data);
 
-        const response = await fetch(requestUrl, config);
-        clearTimeout(timeoutId);
+        const executeFetch = async (tokenOverride?: string): Promise<{ response: Response; result: any }> => {
+          const requestHeaders = {
+            ...(config.headers as Record<string, string>),
+            ...(tokenOverride ? { 'Authorization': `Bearer ${tokenOverride}` } : {}),
+          };
 
-        logger.api.response(response.status, endpoint);
+          const response = await fetch(requestUrl, { ...config, headers: requestHeaders });
+          logger.api.response(response.status, endpoint);
 
-        let result;
-        try {
-          result = await response.json();
-        } catch (parseError) {
-          logger.error(`[API] Failed to parse response:`, {
-            status: response.status,
-            statusText: response.statusText,
-            contentType: response.headers.get('content-type'),
-            error: parseError
-          });
-          throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
+          let result;
+          try {
+            result = await response.json();
+          } catch (parseError) {
+            logger.error(`[API] Failed to parse response:`, {
+              status: response.status,
+              statusText: response.statusText,
+              contentType: response.headers.get('content-type'),
+              error: parseError
+            });
+            throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
+          }
+
+          logger.debug(`[API] Response ${response.status}:`, result);
+          return { response, result };
+        };
+
+        let { response, result } = await executeFetch();
+
+        const authErrorCode = result?.error?.code;
+        const shouldAttemptRefresh =
+          response.status === 401 &&
+          endpoint !== '/auth/refresh' &&
+          typeof window !== 'undefined' &&
+          ['TOKEN_EXPIRED', 'INVALID_TOKEN', 'MISSING_ACCESS_TOKEN'].includes(authErrorCode);
+
+        if (shouldAttemptRefresh) {
+          const refreshedToken = await this.refreshAccessToken();
+          if (refreshedToken) {
+            logger.warn(`[API] Retrying ${method} ${endpoint} after token refresh`);
+            ({ response, result } = await executeFetch(refreshedToken));
+          }
         }
-
-        logger.debug(`[API] Response ${response.status}:`, result);
 
         if (!response.ok) {
           const errorMessage = result.error?.message || result.message || `HTTP ${response.status}: ${response.statusText}`;
@@ -125,6 +220,7 @@ export abstract class BaseApiService {
           throw new Error(errorMessage);
         }
 
+        clearTimeout(timeoutId);
         return result;
       } catch (error) {
         clearTimeout(timeoutId);

@@ -28,7 +28,7 @@ const appointmentSchema = z.object({
   startDate: z.string().min(1, { message: 'Start date is required' }),
   endDate: z.string().min(1, { message: 'End date is required' }),
   subject: z.string().min(2, { message: 'Subject must be at least 2 characters' }),
-  clientId: z.string().min(1, { message: 'Client ID is required' }),
+  clientId: z.coerce.string().min(1, { message: 'Client ID is required' }),
   resourceId: z.coerce.number().min(1, { message: 'Resource is required' }),
   duration: z.coerce.number().min(15, { message: 'Duration must be at least 15 minutes' }),
   type: z.coerce.number().int().min(0).default(0),
@@ -69,7 +69,7 @@ interface Appointment {
   label: number;
   resourceId: number;
   duration: number;
-  clientId: string;
+  clientId: string | number;
   clientInfo?: ClientInfo;
   readyToBill: boolean;
   clinicName: string;
@@ -150,7 +150,7 @@ export default function EditAppointmentPage() {
           startDate: formatDateTimeLocal(appointment.startDate),
           endDate: formatDateTimeLocal(appointment.endDate),
           subject: appointment.subject,
-          clientId: appointment.clientId,
+          clientId: String(appointment.clientId ?? ''),
           resourceId: appointment.resourceId,
           duration: appointment.duration,
           type: appointment.type,

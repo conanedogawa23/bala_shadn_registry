@@ -101,7 +101,7 @@ export default function LoginPage() {
       );
       
       if (response.success && response.data) {
-        const { user, accessToken, refreshToken } = response.data;
+        const { user, accessToken, refreshToken, expiresIn } = response.data;
         
         // Store refresh token separately
         localStorage.setItem("refreshToken", refreshToken);
@@ -204,7 +204,7 @@ export default function LoginPage() {
             loyaltyPoints: 0,
             referrals: 0
           }
-        }, accessToken, refreshToken);
+        }, accessToken, refreshToken, expiresIn);
         
         logger.debug('[Auth] Login successful, token stored');
         
