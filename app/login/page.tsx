@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,7 +46,6 @@ async function loginAPI(email: string, password: string, rememberMe: boolean) {
   const apiUrl = getApiUrl();
   const response = await fetch(`${apiUrl}/auth/login`, {
     method: 'POST',
-    credentials: 'include', // Important: allows HttpOnly cookies to be set
     headers: {
       'Content-Type': 'application/json',
     },
@@ -69,7 +67,6 @@ async function loginAPI(email: string, password: string, rememberMe: boolean) {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
   const [authError, setAuthError] = React.useState<string | null>(null);
@@ -220,9 +217,12 @@ export default function LoginPage() {
       } else {
         setAuthError(response.error?.message || "Login failed. Please try again.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login failed:", error);
-      setAuthError(error.message || "An unexpected error occurred. Please try again.");
+      const errorMessage = error instanceof Error
+        ? error.message
+        : "An unexpected error occurred. Please try again.";
+      setAuthError(errorMessage);
     } finally {
       setIsLoading(false);
     }

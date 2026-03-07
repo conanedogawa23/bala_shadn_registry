@@ -73,7 +73,6 @@ export abstract class BaseApiService {
             'Pragma': 'no-cache',
           },
           cache: 'no-store',
-          credentials: 'include',
           body: JSON.stringify({ refreshToken }),
         });
 
