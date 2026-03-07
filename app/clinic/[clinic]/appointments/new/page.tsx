@@ -1,14 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { z } from 'zod';
 import { 
   Card, 
   CardHeader, 
   CardTitle, 
-  CardDescription, 
-  CardContent 
+  CardDescription 
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FormWrapper } from '@/components/ui/form/FormWrapper';
@@ -16,8 +15,7 @@ import { FormInput } from '@/components/ui/form/FormInput';
 import { FormSelect } from '@/components/ui/form/FormSelect';
 import { FormClientSelect } from '@/components/ui/form/FormClientSelect';
 import { FormResourceSelect } from '@/components/ui/form/FormResourceSelect';
-import { FormDatePicker } from '@/components/ui/form/FormDatePicker';
-import { ArrowLeft, Save, Plus } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Save, Plus } from 'lucide-react';
 import { findClinicBySlug, generateLink } from '@/lib/route-utils';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { useClinic } from '@/lib/contexts/clinic-context';
@@ -44,6 +42,29 @@ const appointmentSchema = z.object({
 
 // Type definitions
 type AppointmentFormValues = z.infer<typeof appointmentSchema>;
+
+type DayKey =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
+type DayAvailability = {
+  start: string;
+  end: string;
+  available: boolean;
+};
+
+type WeeklyAvailability = Partial<Record<DayKey, DayAvailability>>;
+
+type SelectedResource = {
+  id: number;
+  name: string;
+  availability?: WeeklyAvailability;
+};
 
 const statusOptions = [
   { value: '0', label: 'Scheduled' },
@@ -76,6 +97,7 @@ export default function NewAppointmentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [prefilledClientId, setPrefilledClientId] = useState('');
   const [prefilledClientName, setPrefilledClientName] = useState('');
+  const [selectedResource, setSelectedResource] = useState<SelectedResource | null>(null);
 
   const { availableClinics } = useClinic();
   const clinicData = findClinicBySlug(availableClinics, clinicSlug);
@@ -93,6 +115,117 @@ export default function NewAppointmentPage() {
     clientId: prefilledClientId,
     autoFetch: !!prefilledClientId
   });
+
+  const handleResourceChange = useCallback((resource: {
+    id: string;
+    resourceId: number;
+    resourceName: string;
+    availability?: WeeklyAvailability;
+  } | null) => {
+    if (!resource) {
+      setSelectedResource(null);
+      return;
+    }
+
+    setSelectedResource({
+      id: Number(resource.resourceId || resource.id),
+      name: resource.resourceName,
+      availability: resource.availability
+    });
+  }, []);
+
+  const toMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map((part) => Number(part));
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+      return NaN;
+    }
+    return hours * 60 + minutes;
+  };
+
+  const toHHMM = (date: Date): string => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const getDayKey = (date: Date): DayKey => {
+    const dayKeys: DayKey[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    return dayKeys[date.getDay()];
+  };
+
+  const formatDayLabel = (day: string): string => `${day.charAt(0).toUpperCase()}${day.slice(1)}`;
+
+  const getResourceTimingFeedback = (startDateValue: string, endDateValue: string) => {
+    if (!selectedResource) {
+      return { hoursLabel: '', warning: '' };
+    }
+
+    if (!selectedResource.availability) {
+      return {
+        hoursLabel: '',
+        warning: `No operating-hours data is available for "${selectedResource.name}". Backend validation will enforce scheduling constraints.`
+      };
+    }
+
+    const startDate = new Date(startDateValue);
+    const endDate = new Date(endDateValue);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return { hoursLabel: '', warning: '' };
+    }
+
+    const dayKey = getDayKey(startDate);
+    const dayAvailability = selectedResource.availability[dayKey];
+    if (!dayAvailability) {
+      return {
+        hoursLabel: '',
+        warning: `No ${formatDayLabel(dayKey)} availability is configured for "${selectedResource.name}".`
+      };
+    }
+
+    const hoursLabel = dayAvailability.available
+      ? `${formatDayLabel(dayKey)} operating hours: ${dayAvailability.start} - ${dayAvailability.end}`
+      : `${formatDayLabel(dayKey)} operating hours: Unavailable`;
+
+    if (!dayAvailability.available) {
+      return {
+        hoursLabel,
+        warning: `"${selectedResource.name}" is not available on ${formatDayLabel(dayKey)}.`
+      };
+    }
+
+    if (startDate.toDateString() !== endDate.toDateString()) {
+      return {
+        hoursLabel,
+        warning: 'Start and end date must be on the same day to match resource operating hours.'
+      };
+    }
+
+    const appointmentStartMinutes = toMinutes(toHHMM(startDate));
+    const appointmentEndMinutes = toMinutes(toHHMM(endDate));
+    const availableStartMinutes = toMinutes(dayAvailability.start);
+    const availableEndMinutes = toMinutes(dayAvailability.end);
+
+    if (
+      Number.isNaN(appointmentStartMinutes) ||
+      Number.isNaN(appointmentEndMinutes) ||
+      Number.isNaN(availableStartMinutes) ||
+      Number.isNaN(availableEndMinutes)
+    ) {
+      return {
+        hoursLabel,
+        warning: 'Unable to validate selected time against resource operating hours.'
+      };
+    }
+
+    if (appointmentStartMinutes < availableStartMinutes || appointmentEndMinutes > availableEndMinutes) {
+      return {
+        hoursLabel,
+        warning: `Selected time (${toHHMM(startDate)}-${toHHMM(endDate)}) is outside "${selectedResource.name}" operating hours (${dayAvailability.start}-${dayAvailability.end}).`
+      };
+    }
+
+    return { hoursLabel, warning: '' };
+  };
 
   // If only clientId is provided, resolve a display name for FormClientSelect.
   useEffect(() => {
@@ -174,6 +307,10 @@ export default function NewAppointmentPage() {
 
   // Handle back navigation
   const handleBack = () => {
+    if (prefilledClientId) {
+      router.push(generateLink('clinic', `clients/${prefilledClientId}`, clinicSlug));
+      return;
+    }
     router.push(generateLink('clinic', 'appointments', clinicSlug));
   };
 
@@ -188,7 +325,7 @@ export default function NewAppointmentPage() {
             className="flex items-center gap-2"
           >
             <ArrowLeft size={16} />
-            Back
+            {prefilledClientId ? 'Back to Client' : 'Back'}
           </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">
@@ -218,9 +355,14 @@ export default function NewAppointmentPage() {
           defaultValues={defaultValues}
           onSubmit={handleSubmit}
         >
-          {(form) => (
-            <div className="p-6">
-              <div className="grid gap-6">
+          {(form) => {
+            const startDateValue = form.watch('startDate');
+            const endDateValue = form.watch('endDate');
+            const timingFeedback = getResourceTimingFeedback(startDateValue || '', endDateValue || '');
+
+            return (
+              <div className="p-6">
+                <div className="grid gap-6">
             {/* Basic Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Basic Information</h3>
@@ -249,7 +391,8 @@ export default function NewAppointmentPage() {
                   label="Resource"
                   placeholder="Select a practitioner..."
                   clinicName={clinicName}
-                  includeDoctors={false}
+                  includeDoctors={true}
+                  onResourceChange={handleResourceChange}
                   required
                 />
                 
@@ -287,6 +430,19 @@ export default function NewAppointmentPage() {
               <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-md">
                 <strong>Tip:</strong> The end date will be automatically calculated based on the start date and duration when you submit the form.
               </div>
+
+              {timingFeedback.hoursLabel && (
+                <div className="text-sm text-gray-700 bg-slate-50 p-3 rounded-md">
+                  <strong>Resource Hours:</strong> {timingFeedback.hoursLabel}
+                </div>
+              )}
+
+              {timingFeedback.warning && (
+                <div className="text-sm text-red-700 bg-red-50 p-3 rounded-md flex items-start gap-2">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                  <span>{timingFeedback.warning}</span>
+                </div>
+              )}
             </div>
 
             {/* Status and Type */}
@@ -366,9 +522,10 @@ export default function NewAppointmentPage() {
                 {isSubmitting ? 'Creating...' : 'Create Appointment'}
               </Button>
             </div>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          }}
         </FormWrapper>
       </Card>
     </div>

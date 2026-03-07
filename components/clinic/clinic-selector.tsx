@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Check, ChevronDown, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,16 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { Clinic } from '@/lib/types/clinic';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const getStatusColor = (status: Clinic['status']) => {
   switch (status) {
@@ -54,9 +64,19 @@ interface ClinicSelectorProps {
 export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => {
   const { selectedClinic, availableClinics, setSelectedClinic, loading, error } = useClinic();
   const [isSwitching, setIsSwitching] = useState(false);
+  const [pendingClinic, setPendingClinic] = useState<Clinic | null>(null);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
   const switchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleClinicSelect = useCallback((clinic: Clinic) => {
+  useEffect(() => {
+    return () => {
+      if (switchTimeoutRef.current) {
+        clearTimeout(switchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const switchClinic = useCallback((clinic: Clinic) => {
     // Prevent multiple rapid switches
     if (isSwitching) {
       console.log('Clinic switch already in progress, ignoring...');
@@ -96,6 +116,27 @@ export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => 
       setIsSwitching(false);
     }
   }, [selectedClinic, setSelectedClinic, isSwitching]);
+
+  const handleClinicSelect = useCallback((clinic: Clinic) => {
+    // Prevent opening confirmation for no-op switches
+    if (isSwitching || selectedClinic?.id === clinic.id) {
+      return;
+    }
+
+    setPendingClinic(clinic);
+    setConfirmationOpen(true);
+  }, [isSwitching, selectedClinic]);
+
+  const handleConfirmSwitch = useCallback(() => {
+    if (!pendingClinic) {
+      setConfirmationOpen(false);
+      return;
+    }
+
+    setConfirmationOpen(false);
+    switchClinic(pendingClinic);
+    setPendingClinic(null);
+  }, [pendingClinic, switchClinic]);
 
   // Group clinics by status
   const activeClinic = availableClinics.filter(c => c.status === 'active');
@@ -160,85 +201,112 @@ export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => 
   );
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className={cn(
-            "justify-between text-left font-normal px-3 py-2 h-auto min-w-0",
-            className
-          )}
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <Building2 className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <div className="font-medium text-sm truncate">
-                {selectedClinic.displayName}
-              </div>
-              <div className="text-xs text-muted-foreground truncate">
-                {selectedClinic.city && selectedClinic.province 
-                  ? `${selectedClinic.city}, ${selectedClinic.province}`
-                  : 'Location TBD'
-                }
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            className={cn(
+              "justify-between text-left font-normal px-3 py-2 h-auto min-w-0",
+              className
+            )}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Building2 className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm truncate">
+                  {selectedClinic.displayName}
+                </div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {selectedClinic.city && selectedClinic.province
+                    ? `${selectedClinic.city}, ${selectedClinic.province}`
+                    : 'Location TBD'
+                  }
+                </div>
               </div>
             </div>
-          </div>
-          <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0 ml-2" />
-        </Button>
-      </DropdownMenuTrigger>
-      
-      <DropdownMenuContent className="w-80" align="start">
-        {/* Active Clinic */}
-        {activeClinic.length > 0 && (
-          <>
-            <DropdownMenuLabel className="text-xs font-medium text-green-700">Active Clinic</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {activeClinic.map((clinic) => (
-                <ClinicMenuItem key={clinic.id} clinic={clinic} />
-              ))}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-          </>
-        )}
+            <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0 ml-2" />
+          </Button>
+        </DropdownMenuTrigger>
 
-        {/* Historical Clinics */}
-        {historicalClinics.length > 0 && (
-          <>
-            <DropdownMenuLabel className="text-xs font-medium text-orange-700">Recently Inactive</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {historicalClinics.map((clinic) => (
-                <ClinicMenuItem key={clinic.id} clinic={clinic} />
-              ))}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-          </>
-        )}
+        <DropdownMenuContent className="w-80" align="start">
+          {/* Active Clinic */}
+          {activeClinic.length > 0 && (
+            <>
+              <DropdownMenuLabel className="text-xs font-medium text-green-700">Active Clinic</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                {activeClinic.map((clinic) => (
+                  <ClinicMenuItem key={clinic.id} clinic={clinic} />
+                ))}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+            </>
+          )}
 
-        {/* Inactive Clinics */}
-        {inactiveClinics.length > 0 && (
-          <>
-            <DropdownMenuLabel className="text-xs font-medium text-gray-600">Inactive Clinics</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {inactiveClinics.map((clinic) => (
-                <ClinicMenuItem key={clinic.id} clinic={clinic} />
-              ))}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-          </>
-        )}
+          {/* Historical Clinics */}
+          {historicalClinics.length > 0 && (
+            <>
+              <DropdownMenuLabel className="text-xs font-medium text-orange-700">Recently Inactive</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                {historicalClinics.map((clinic) => (
+                  <ClinicMenuItem key={clinic.id} clinic={clinic} />
+                ))}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+            </>
+          )}
 
-        {/* Setup/No Data Clinics */}
-        {setupClinics.length > 0 && (
-          <>
-            <DropdownMenuLabel className="text-xs font-medium text-blue-700">In Development</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {setupClinics.map((clinic) => (
-                <ClinicMenuItem key={clinic.id} clinic={clinic} />
-              ))}
-            </DropdownMenuGroup>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {/* Inactive Clinics */}
+          {inactiveClinics.length > 0 && (
+            <>
+              <DropdownMenuLabel className="text-xs font-medium text-gray-600">Inactive Clinics</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                {inactiveClinics.map((clinic) => (
+                  <ClinicMenuItem key={clinic.id} clinic={clinic} />
+                ))}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+            </>
+          )}
+
+          {/* Setup/No Data Clinics */}
+          {setupClinics.length > 0 && (
+            <>
+              <DropdownMenuLabel className="text-xs font-medium text-blue-700">In Development</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                {setupClinics.map((clinic) => (
+                  <ClinicMenuItem key={clinic.id} clinic={clinic} />
+                ))}
+              </DropdownMenuGroup>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog
+        open={confirmationOpen}
+        onOpenChange={(isOpen) => {
+          setConfirmationOpen(isOpen);
+          if (!isOpen) {
+            setPendingClinic(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch Clinic?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to switch clinics? Unsaved changes may be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSwitch}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }; 

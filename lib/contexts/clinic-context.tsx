@@ -1,11 +1,11 @@
 'use client';
 
 import { logger } from '../utils/logger';
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Clinic, ClinicContextType, ClinicStats } from '@/lib/types/clinic';
 import { ClinicApiService, FullClinicData } from '@/lib/api/clinicService';
-import { generateLink, toUrlSlug, findClinicBySlug, normalizeClinicName } from '@/lib/route-utils';
+import { generateLink, toUrlSlug, findClinicBySlug } from '@/lib/route-utils';
 
 const ClinicContext = createContext<ClinicContextType | undefined>(undefined);
 
@@ -31,29 +31,23 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
   const pathname = usePathname();
 
   // Utility functions to work with clinic data
-  const clinicToSlug = (clinicDisplayName: string): string => {
+  const clinicToSlug = useCallback((clinicDisplayName: string): string => {
     // Find the clinic by displayName and return its slug field
     const clinic = availableClinics.find(c => c.displayName === clinicDisplayName);
     return clinic ? clinic.slug : toUrlSlug(clinicDisplayName);
-  };
+  }, [availableClinics]);
 
-  const slugToClinic = (slug: string): Clinic | undefined => {
+  const slugToClinic = useCallback((slug: string): Clinic | undefined => {
     return findClinicBySlug(availableClinics, slug);
-  };
+  }, [availableClinics]);
 
-  const getActiveClinic = (): Clinic | undefined => {
-    // Return the first active clinic, or undefined if none found
-    // Don't fallback to any clinic - let the UI handle the empty state
-    return availableClinics.find(clinic => clinic.status === 'active');
-  };
-
-  const getClinicByName = (name: string): Clinic | undefined => {
+  const getClinicByName = useCallback((name: string): Clinic | undefined => {
     return findClinicBySlug(availableClinics, name);
-  };
+  }, [availableClinics]);
 
-  const getClinicById = (id: number): Clinic | undefined => {
+  const getClinicById = useCallback((id: number): Clinic | undefined => {
     return availableClinics.find(clinic => clinic.id === id);
-  };
+  }, [availableClinics]);
 
   // Fetch clinics from API
   useEffect(() => {
@@ -205,7 +199,7 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
       setSelectedClinic(null);
       setLastInitializedPath(normalizedPathname);
     }
-  }, [pathname, router, loading, availableClinics, lastInitializedPath]);
+  }, [pathname, router, loading, availableClinics, lastInitializedPath, slugToClinic]);
 
   const handleSetSelectedClinic = (clinic: Clinic) => {
     try {
@@ -223,9 +217,8 @@ export const ClinicProvider: React.FC<ClinicProviderProps> = ({ children }) => {
       const pathSegments = pathname.split('/');
       
       if (pathSegments[1] === 'clinic') {
-        // Replace clinic in existing clinic URL
-        const remainingPath = pathSegments.slice(3).join('/');
-        const newPath = generateLink('clinic', remainingPath, clinicSlug);
+        // Always reset to clinic dashboard when switching to avoid stale page context
+        const newPath = generateLink('clinic', '', clinicSlug);
         
         // Clear any clinic-specific cached data
         if (typeof window !== 'undefined') {

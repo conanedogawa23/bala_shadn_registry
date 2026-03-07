@@ -12,7 +12,7 @@ import { themeColors } from "@/registry/new-york/theme-config/theme-config";
 import { findClinicBySlug, generateLink, getBackendClinicName } from "@/lib/route-utils";
 import { UserApiService, User } from "@/lib/api/userApiService";
 import Link from "next/link";
-import { Stethoscope, Building2, MapPin, Shield, ArrowRight, CalendarClock } from "lucide-react";
+import { Stethoscope, Building2, MapPin, Shield, ArrowRight, CalendarClock, Newspaper } from "lucide-react";
 import { useClinic } from "@/lib/contexts/clinic-context";
 
 export default function SettingsPage() {
@@ -555,6 +555,20 @@ export default function SettingsPage() {
                         <div>
                           <h3 className="font-semibold">Resources</h3>
                           <p className="text-sm text-muted-foreground">Manage appointment resources (practitioners, services, rooms)</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </Link>
+                <Link href={`/clinic/${safeClinicSlug}/settings/bulletin`}>
+                  <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+                    <CardContent className="flex items-center justify-between p-6">
+                      <div className="flex items-center gap-4">
+                        <Newspaper className="h-8 w-8 text-primary" />
+                        <div>
+                          <h3 className="font-semibold">Bulletin Board</h3>
+                          <p className="text-sm text-muted-foreground">Manage clinic announcements and approvals</p>
                         </div>
                       </div>
                       <ArrowRight className="h-5 w-5 text-muted-foreground" />

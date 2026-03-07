@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { 
   FormControl, 
@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, Search, Check, ChevronsUpDown, User, Wrench, Building } from 'lucide-react';
+import { AlertCircle, Loader2, Check, ChevronsUpDown, User, Wrench, Building } from 'lucide-react';
 import { ResourceApiService } from '@/lib/api/resourceService';
 import { baseApiService } from '@/lib/api/baseApiService';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,15 @@ interface Resource {
   resourceId: number;
   resourceName: string;
   type: 'practitioner' | 'service' | 'equipment' | 'room';
+  availability?: {
+    monday?: { start: string; end: string; available: boolean };
+    tuesday?: { start: string; end: string; available: boolean };
+    wednesday?: { start: string; end: string; available: boolean };
+    thursday?: { start: string; end: string; available: boolean };
+    friday?: { start: string; end: string; available: boolean };
+    saturday?: { start: string; end: string; available: boolean };
+    sunday?: { start: string; end: string; available: boolean };
+  };
   practitioner?: {
     firstName?: string;
     lastName?: string;
@@ -53,6 +62,17 @@ interface Resource {
   _source?: 'resource' | 'doctor';
 }
 
+interface ReferringDoctorRecord {
+  _id: string;
+  doctorId?: number;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  specialty?: string;
+  clinicName?: string;
+  isActive?: boolean;
+}
+
 interface FormResourceSelectProps {
   name: string;
   label?: string;
@@ -65,6 +85,7 @@ interface FormResourceSelectProps {
   type?: 'practitioner' | 'service' | 'equipment' | 'room';
   defaultResourceName?: string;
   includeDoctors?: boolean;
+  onResourceChange?: (resource: Resource | null) => void;
 }
 
 /**
@@ -82,9 +103,10 @@ export function FormResourceSelect({
   disabled = false,
   type,
   defaultResourceName,
-  includeDoctors = true
+  includeDoctors = true,
+  onResourceChange
 }: FormResourceSelectProps) {
-  const { control, getValues } = useFormContext();
+  const { control, getValues, watch } = useFormContext();
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
@@ -92,6 +114,7 @@ export function FormResourceSelect({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedResourceInfo, setSelectedResourceInfo] = useState<{ id: number; name: string } | null>(null);
+  const selectedValue = watch(name);
 
   // Debounce search term to avoid too many API calls
   useEffect(() => {
@@ -102,7 +125,7 @@ export function FormResourceSelect({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const fetchResources = async () => {
+  const fetchResources = useCallback(async () => {
     if (!clinicName) {
       setResources([]);
       return;
@@ -121,7 +144,7 @@ export function FormResourceSelect({
           limit: 100
         }),
         includeDoctors && (!type || type === 'practitioner')
-          ? baseApiService.get('/referring-doctors?limit=100').catch(() => null)
+          ? baseApiService.get<ReferringDoctorRecord[]>('/referring-doctors?limit=100').catch(() => null)
           : Promise.resolve(null)
       ]);
 
@@ -130,10 +153,10 @@ export function FormResourceSelect({
         _source: 'resource' as const
       }));
 
-      if (doctorResponse && (doctorResponse as any).data) {
-        const doctors: Resource[] = ((doctorResponse as any).data || [])
-          .filter((doc: any) => doc.isActive !== false)
-          .map((doc: any) => ({
+      if (doctorResponse?.data) {
+        const doctors: Resource[] = doctorResponse.data
+          .filter((doc) => doc.isActive !== false)
+          .map((doc) => ({
             id: doc._id,
             resourceId: (doc.doctorId || 0) + DOCTOR_ID_OFFSET,
             resourceName: `Dr. ${doc.fullName || `${doc.firstName || ''} ${doc.lastName || ''}`.trim()}`,
@@ -177,11 +200,33 @@ export function FormResourceSelect({
     } finally {
       setLoading(false);
     }
-  };
+  }, [clinicName, type, includeDoctors, debouncedSearchTerm]);
 
   useEffect(() => {
     fetchResources();
-  }, [clinicName, type, debouncedSearchTerm, includeDoctors]);
+  }, [fetchResources]);
+
+  useEffect(() => {
+    if (!onResourceChange) {
+      return;
+    }
+
+    if (selectedValue === undefined || selectedValue === null || selectedValue === '') {
+      onResourceChange(null);
+      return;
+    }
+
+    const selectedNumericValue = Number(selectedValue);
+    const matchedResource = Number.isNaN(selectedNumericValue)
+      ? resources.find(
+          (resource) => String(resource.resourceId || resource.id) === String(selectedValue)
+        )
+      : resources.find(
+          (resource) => Number(resource.resourceId || resource.id) === selectedNumericValue
+        );
+
+    onResourceChange(matchedResource || null);
+  }, [name, onResourceChange, resources, selectedValue]);
 
   // Set initial selected resource info from defaultResourceName
   useEffect(() => {
@@ -243,7 +288,7 @@ export function FormResourceSelect({
         resource
       };
     });
-  }, [resources, debouncedSearchTerm]);
+  }, [resources]);
 
   return (
     <FormField
@@ -251,7 +296,7 @@ export function FormResourceSelect({
       name={name}
       render={({ field, fieldState }) => {
         // Find selected resource for display - check resourceOptions first, then fallback to selectedResourceInfo
-        let selectedResource = resourceOptions.find(option => option.value === field.value?.toString());
+        const selectedResource = resourceOptions.find(option => option.value === field.value?.toString());
         
         // If not found in options but we have selectedResourceInfo, use that for display
         const displayLabel = selectedResource 
@@ -334,7 +379,7 @@ export function FormResourceSelect({
                           <div className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground">
                             <AlertCircle className="h-8 w-8 opacity-50" />
                             {debouncedSearchTerm ? (
-                              <p>No {type || 'resources'} found matching "{debouncedSearchTerm}"</p>
+                              <p>No {type || 'resources'} found matching &quot;{debouncedSearchTerm}&quot;</p>
                             ) : (
                               <p>No {type || 'resources'} available</p>
                             )}
@@ -350,6 +395,7 @@ export function FormResourceSelect({
                                 const selectedValue = parseInt(option.value, 10);
                                 field.onChange(selectedValue);
                                 setSelectedResourceInfo({ id: selectedValue, name: option.label });
+                                onResourceChange?.(option.resource);
                                 setOpen(false);
                               }}
                               className="cursor-pointer py-3"

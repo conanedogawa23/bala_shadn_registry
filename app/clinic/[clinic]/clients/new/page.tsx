@@ -181,13 +181,18 @@ export default function NewClientPage() {
         defaultClinic: clinic
       };
 
-      // Call real API
-      await ClientApiService.createClient(clientData);
+      // Call real API and use created client ID for profile redirect
+      const newClient = await ClientApiService.createClient(clientData);
+      const newClientId = newClient.clientId || newClient.id;
       
       logger.info("New client created successfully for clinic:", clinic);
       
-      // Navigate back to clients page
-      router.push(`/clinic/${clinic}/clients`);
+      if (newClientId) {
+        router.push(`/clinic/${clinic}/clients/${newClientId}`);
+      } else {
+        // Fallback for unexpected responses
+        router.push(`/clinic/${clinic}/clients`);
+      }
     } catch (error) {
       logger.error("Failed to create client:", error);
       alert(`Failed to create client: ${error instanceof Error ? error.message : 'Unknown error'}`);

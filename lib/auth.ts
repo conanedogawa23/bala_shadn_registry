@@ -118,6 +118,11 @@ const setServerReadableCookie = (name: string, value: string, days: number) => {
   document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
 };
 
+const clearServerReadableCookie = (name: string) => {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax`;
+};
+
 // Clear any session cookies (backup cleanup)
 const destroyAllCookies = () => {
   if (typeof document === "undefined") return;
@@ -169,6 +174,36 @@ export const isAuthenticated = (): boolean => {
   
   const isAuth = localStorage.getItem("isAuthenticated") === "true";
   return isAuth;
+};
+
+/**
+ * Clears local auth artifacts and optionally redirects to login.
+ * Used when token refresh fails or a session has expired.
+ */
+export const clearAuthState = (redirectTo: string | null = "/login"): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("isAuthenticated");
+    localStorage.removeItem("user");
+  } catch (error) {
+    logger.warn("[Auth] Failed to clear local auth storage:", error);
+  }
+
+  try {
+    BaseApiService.clearAllCache();
+  } catch (error) {
+    logger.warn("[Auth] Failed to clear API cache during session cleanup:", error);
+  }
+
+  clearServerReadableCookie("accessToken");
+  clearServerReadableCookie("refreshToken");
+
+  if (redirectTo && window.location.pathname !== redirectTo) {
+    window.location.href = redirectTo;
+  }
 };
 
 // Get logged in user with full profile data

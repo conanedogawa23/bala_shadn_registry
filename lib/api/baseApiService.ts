@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger';
+import { clearAuthState } from '@/lib/auth';
 
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -163,7 +164,9 @@ export abstract class BaseApiService {
       try {
         logger.api.request(method, requestUrl, data);
 
-        const executeFetch = async (tokenOverride?: string): Promise<{ response: Response; result: any }> => {
+        const executeFetch = async (
+          tokenOverride?: string
+        ): Promise<{ response: Response; result: ApiResponse<T> | null }> => {
           const requestHeaders = {
             ...(config.headers as Record<string, string>),
             ...(tokenOverride ? { 'Authorization': `Bearer ${tokenOverride}` } : {}),
@@ -172,9 +175,9 @@ export abstract class BaseApiService {
           const response = await fetch(requestUrl, { ...config, headers: requestHeaders });
           logger.api.response(response.status, endpoint);
 
-          let result;
+          let result: ApiResponse<T> | null;
           try {
-            result = await response.json();
+            result = await response.json() as ApiResponse<T>;
           } catch (parseError) {
             logger.error(`[API] Failed to parse response:`, {
               status: response.status,
@@ -191,7 +194,7 @@ export abstract class BaseApiService {
 
         let { response, result } = await executeFetch();
 
-        const authErrorCode = result?.error?.code;
+        let authErrorCode = result?.error?.code;
         const shouldAttemptRefresh =
           response.status === 401 &&
           endpoint !== '/auth/refresh' &&
@@ -203,7 +206,21 @@ export abstract class BaseApiService {
           if (refreshedToken) {
             logger.warn(`[API] Retrying ${method} ${endpoint} after token refresh`);
             ({ response, result } = await executeFetch(refreshedToken));
+            authErrorCode = result?.error?.code;
+          } else {
+            clearAuthState('/login');
+            throw new Error('Session expired. Please log in again.');
           }
+        }
+
+        const isTerminalAuthFailure =
+          response.status === 401 &&
+          endpoint !== '/auth/refresh' &&
+          ['TOKEN_EXPIRED', 'INVALID_TOKEN', 'MISSING_ACCESS_TOKEN'].includes(authErrorCode);
+
+        if (isTerminalAuthFailure) {
+          clearAuthState('/login');
+          throw new Error('Session expired. Please log in again.');
         }
 
         if (!response.ok) {

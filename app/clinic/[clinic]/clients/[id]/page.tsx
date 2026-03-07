@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/select';
 import { generateLink, findClinicBySlug } from '@/lib/route-utils';
 import { InsuranceSummaryCard } from '@/components/ui/client/InsuranceSection';
+import { EmailComposeDialog } from '@/components/ui/client/EmailComposeDialog';
 
 // Import real API hooks and utilities
 import { 
@@ -58,6 +59,7 @@ export default function ClientDetailPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const ordersPerPage = 10;
 
   // State for appointment pagination
@@ -79,8 +81,6 @@ export default function ClientDetailPage() {
     autoFetch: !!clientId
   });
 
-  // State to control when to load orders and appointments
-  const [shouldLoadOrders, setShouldLoadOrders] = useState(true);
   // Auto-load appointments on client detail page to show accurate statistics
   const [shouldLoadAppointments] = useState(true);
 
@@ -92,7 +92,7 @@ export default function ClientDetailPage() {
     refetch: refetchOrders
   } = useOrdersByClient({
     clientId: parseInt(clientId),
-    autoFetch: shouldLoadOrders && !!clientId && !isNaN(parseInt(clientId))
+    autoFetch: !!clientId && !isNaN(parseInt(clientId))
   });
 
   // Get real clinic name for API calls (maps slug to backend clinic name)
@@ -152,6 +152,10 @@ export default function ClientDetailPage() {
     }
 
     router.push(generateLink('clinic', `payments/new?${queryParams.toString()}`, clinic));
+  };
+
+  const handleOpenEmailDialog = () => {
+    setIsEmailDialogOpen(true);
   };
 
   const handleViewAppointment = (appointmentId: string | number) => {
@@ -354,15 +358,6 @@ export default function ClientDetailPage() {
           <Button
             variant="default"
             size="sm"
-            onClick={handleNewAppointment}
-            className="flex items-center gap-2"
-          >
-            <Calendar size={16} />
-            Schedule
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
             onClick={handleCreateOrder}
             className="flex items-center gap-2"
           >
@@ -377,6 +372,15 @@ export default function ClientDetailPage() {
           >
             <DollarSign size={16} />
             Record Payment
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleOpenEmailDialog}
+            className="flex items-center gap-2"
+          >
+            <Mail size={16} />
+            Send Email
           </Button>
         </div>
       </div>
@@ -637,57 +641,39 @@ export default function ClientDetailPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <CardTitle className="flex items-center gap-2">
                   <Package size={20} />
-                  Order History {shouldLoadOrders ? `(${filteredOrders.length})` : ''}
+                  Order History ({filteredOrders.length})
                 </CardTitle>
                 
-                {!shouldLoadOrders && (
-                  <Button 
-                    onClick={() => setShouldLoadOrders(true)}
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
-                    <RefreshCw size={16} />
-                    Load Order History
-                  </Button>
-                )}
-                
-                {shouldLoadOrders && (
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <div className="relative flex-1 sm:w-64">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        placeholder="Search orders..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        {Object.values(OrderStatus).map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {OrderUtils.getStatusLabel(status)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search orders..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
-                )}
+                  
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      {Object.values(OrderStatus).map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {OrderUtils.getStatusLabel(status)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {!shouldLoadOrders ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Package className="mx-auto h-12 w-12 text-gray-300" />
-                    <p className="mt-2">Click &quot;Load Order History&quot; to view client orders</p>
-                  </div>
-                ) : ordersLoading ? (
+                {ordersLoading ? (
                   <div className="text-center py-8">
                     <RefreshCw className="mx-auto h-8 w-8 animate-spin text-gray-400" />
                     <p className="mt-2 text-gray-500">Loading order history...</p>
@@ -943,9 +929,7 @@ export default function ClientDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {!shouldLoadOrders ? (
-                  <p className="text-sm text-gray-500">Load order history to see recent activity</p>
-                ) : ordersLoading ? (
+                {ordersLoading ? (
                   <p className="text-sm text-gray-500">Loading recent activity...</p>
                 ) : orders && orders.length > 0 ? (
                   orders.slice(0, 5).map((order) => (
@@ -1048,6 +1032,13 @@ export default function ClientDetailPage() {
           </Card>
         </div>
       </div>
+
+      <EmailComposeDialog
+        open={isEmailDialogOpen}
+        onOpenChange={setIsEmailDialogOpen}
+        clientEmail={client.email}
+        clientName={`${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Client'}
+      />
     </div>
   );
 }
