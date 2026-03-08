@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Check, ChevronDown, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -63,69 +63,31 @@ interface ClinicSelectorProps {
 
 export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => {
   const { selectedClinic, availableClinics, setSelectedClinic, loading, error } = useClinic();
-  const [isSwitching, setIsSwitching] = useState(false);
   const [pendingClinic, setPendingClinic] = useState<Clinic | null>(null);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
-  const switchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (switchTimeoutRef.current) {
-        clearTimeout(switchTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const switchClinic = useCallback((clinic: Clinic) => {
-    // Prevent multiple rapid switches
-    if (isSwitching) {
-      console.log('Clinic switch already in progress, ignoring...');
-      return;
-    }
-
     // Don't switch if already selected
     if (selectedClinic?.id === clinic.id) {
-      console.log('Clinic already selected, skipping switch');
       return;
     }
 
     try {
-      setIsSwitching(true);
-
-      // Clear any existing timeout
-      if (switchTimeoutRef.current) {
-        clearTimeout(switchTimeoutRef.current);
-      }
-
-      // Debounce the actual switch by 300ms
-      switchTimeoutRef.current = setTimeout(() => {
-        try {
-          setSelectedClinic(clinic);
-          console.log('Successfully switched to clinic:', clinic.displayName);
-        } catch (error) {
-          console.error('Error during clinic switch:', error);
-        } finally {
-          // Reset switching state after a delay
-          setTimeout(() => {
-            setIsSwitching(false);
-          }, 1000);
-        }
-      }, 300);
+      setSelectedClinic(clinic);
     } catch (error) {
       console.error('Error initiating clinic switch:', error);
-      setIsSwitching(false);
     }
-  }, [selectedClinic, setSelectedClinic, isSwitching]);
+  }, [selectedClinic, setSelectedClinic]);
 
   const handleClinicSelect = useCallback((clinic: Clinic) => {
     // Prevent opening confirmation for no-op switches
-    if (isSwitching || selectedClinic?.id === clinic.id) {
+    if (selectedClinic?.id === clinic.id) {
       return;
     }
 
     setPendingClinic(clinic);
     setConfirmationOpen(true);
-  }, [isSwitching, selectedClinic]);
+  }, [selectedClinic]);
 
   const handleConfirmSwitch = useCallback(() => {
     if (!pendingClinic) {
@@ -178,7 +140,7 @@ export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => 
     <DropdownMenuItem
       onClick={() => handleClinicSelect(clinic)}
       className="flex items-center justify-between p-2"
-      disabled={isSwitching || selectedClinic?.id === clinic.id}
+      disabled={selectedClinic?.id === clinic.id}
     >
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <Check

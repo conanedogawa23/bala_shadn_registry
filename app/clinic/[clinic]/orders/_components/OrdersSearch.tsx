@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ export function OrdersSearch({ initialSearch = '', totalOrders }: OrdersSearchPr
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const previousSearchRef = useRef(initialSearch);
 
   const handleSearchChange = useCallback((value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -34,12 +35,25 @@ export function OrdersSearch({ initialSearch = '', totalOrders }: OrdersSearchPr
   }, [router, pathname, searchParams]);
 
   useEffect(() => {
+    const currentSearchParam = searchParams.get('search') || '';
+
+    if (currentSearchParam !== previousSearchRef.current) {
+      previousSearchRef.current = currentSearchParam;
+      setSearchQuery(currentSearchParam);
+      return;
+    }
+
+    if (searchQuery === previousSearchRef.current) {
+      return;
+    }
+
     const timer = setTimeout(() => {
+      previousSearchRef.current = searchQuery;
       handleSearchChange(searchQuery);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, handleSearchChange]);
+  }, [searchQuery, searchParams, handleSearchChange]);
 
   return (
     <Card className="shadow-sm border border-gray-200 mb-8">
