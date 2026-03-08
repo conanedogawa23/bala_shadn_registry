@@ -63,8 +63,20 @@ interface ClinicSelectorProps {
 
 export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => {
   const { selectedClinic, availableClinics, setSelectedClinic, loading, error } = useClinic();
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pendingClinic, setPendingClinic] = useState<Clinic | null>(null);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
+
+  const runAfterLayerCleanup = useCallback((callback: () => void) => {
+    if (typeof window === 'undefined') {
+      callback();
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      callback();
+    });
+  }, []);
 
   const switchClinic = useCallback((clinic: Clinic) => {
     // Don't switch if already selected
@@ -86,8 +98,11 @@ export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => 
     }
 
     setPendingClinic(clinic);
-    setConfirmationOpen(true);
-  }, [selectedClinic]);
+    setMenuOpen(false);
+    runAfterLayerCleanup(() => {
+      setConfirmationOpen(true);
+    });
+  }, [runAfterLayerCleanup, selectedClinic]);
 
   const handleConfirmSwitch = useCallback(() => {
     if (!pendingClinic) {
@@ -95,10 +110,13 @@ export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => 
       return;
     }
 
+    const clinicToSwitch = pendingClinic;
     setConfirmationOpen(false);
-    switchClinic(pendingClinic);
     setPendingClinic(null);
-  }, [pendingClinic, switchClinic]);
+    runAfterLayerCleanup(() => {
+      switchClinic(clinicToSwitch);
+    });
+  }, [pendingClinic, runAfterLayerCleanup, switchClinic]);
 
   // Group clinics by status
   const activeClinic = availableClinics.filter(c => c.status === 'active');
@@ -138,7 +156,10 @@ export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => 
 
   const ClinicMenuItem: React.FC<{ clinic: Clinic }> = ({ clinic }) => (
     <DropdownMenuItem
-      onClick={() => handleClinicSelect(clinic)}
+      onSelect={(event) => {
+        event.preventDefault();
+        handleClinicSelect(clinic);
+      }}
       className="flex items-center justify-between p-2"
       disabled={selectedClinic?.id === clinic.id}
     >
@@ -164,7 +185,7 @@ export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => 
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen} modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
@@ -254,7 +275,11 @@ export const ClinicSelector: React.FC<ClinicSelectorProps> = ({ className }) => 
           }
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Switch Clinic?</AlertDialogTitle>
             <AlertDialogDescription>
