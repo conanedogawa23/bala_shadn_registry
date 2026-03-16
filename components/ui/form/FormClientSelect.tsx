@@ -129,7 +129,7 @@ export function FormClientSelect({
       name={name}
       render={({ field, fieldState }) => {
         // Find selected client for display - check clientOptions first, then fallback to selectedClientInfo
-        let selectedClient = clientOptions.find(option => option.value === field.value);
+        const selectedClient = clientOptions.find(option => option.value === field.value);
         
         // If not found in options but we have selectedClientInfo, use that for display
         const displayLabel = selectedClient 

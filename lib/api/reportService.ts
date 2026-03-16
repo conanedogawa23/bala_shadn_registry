@@ -206,6 +206,112 @@ export interface ReportQueryOptions {
   variant?: string;
 }
 
+type ReportRow = Record<string, unknown>;
+
+interface ReportData {
+  clinicName?: string;
+  dateRange?: {
+    startDate?: string;
+    endDate?: string;
+  };
+  summary?: Record<string, unknown>;
+  topServices?: Array<{
+    productKey?: string | number;
+    productName?: string;
+    quantity?: number;
+    revenue?: number;
+  }>;
+  revenueBreakdown?: Array<{
+    date?: string;
+    revenue?: number;
+    orderCount?: number;
+  }>;
+  paymentMethods?: Array<{
+    method?: string;
+    count?: number;
+    amount?: number;
+    percentage?: number;
+  }>;
+  dailyPayments?: Array<{
+    date?: string;
+    amount?: number;
+    count?: number;
+  }>;
+  practitioners?: Array<{
+    resourceId?: number;
+    resourceName?: string;
+    totalHours?: number;
+    totalAppointments?: number;
+    completedAppointments?: number;
+    cancelledAppointments?: number;
+    averageAppointmentDuration?: number;
+    revenue?: number;
+    utilization?: number;
+  }>;
+  userActivity?: Array<{
+    userId?: string;
+    username?: string;
+    fullName?: string;
+    role?: string;
+    lastLogin?: string | null;
+    lastActivity?: string | null;
+    totalSessions?: number;
+    activeSessions?: number;
+    sessions?: Array<{
+      deviceId?: string;
+      ipAddress?: string;
+      userAgent?: string;
+      lastActivity?: string;
+      isActive?: boolean;
+    }>;
+  }>;
+  statusBreakdown?: Array<{
+    status?: string;
+    count?: number;
+    percentage?: number;
+    totalValue?: number;
+  }>;
+  recentOrders?: Array<{
+    orderId?: string;
+    orderNumber?: string;
+    clientName?: string;
+    status?: string;
+    totalAmount?: number;
+    createdAt?: string;
+  }>;
+  coPayBreakdown?: Array<{
+    insuranceType?: string;
+    count?: number;
+    amount?: number;
+    percentage?: number;
+  }>;
+  monthlyTrends?: Array<{
+    month?: string;
+    amount?: number;
+    count?: number;
+  }>;
+  campaigns?: Array<{
+    campaignName?: string;
+    spent?: number;
+    revenue?: number;
+    roi?: number;
+    conversions?: number;
+  }>;
+  channels?: Array<{
+    channel?: string;
+    spent?: number;
+    clients?: number;
+    revenue?: number;
+    roi?: number;
+  }>;
+  [key: string]: unknown;
+}
+
+interface ReportApiResponse {
+  data?: ReportData;
+  [key: string]: unknown;
+}
+
 export class ReportApiService extends BaseApiService {
   private static readonly ENDPOINT = '/reports';
   private static readonly CACHE_TTL = 300000; // 5 minutes cache for reports
@@ -529,7 +635,7 @@ export class ReportApiService extends BaseApiService {
     reportType: string, 
     clinicName: string, 
     options: ReportQueryOptions
-  ): Promise<any> {
+  ): Promise<ReportApiResponse> {
     const baseUrl = `${this.ENDPOINT}/${encodeURIComponent(clinicName)}`;
     const queryParams = this.buildQueryParams(options);
     
@@ -554,14 +660,14 @@ export class ReportApiService extends BaseApiService {
   /**
    * Enhanced CSV export with detailed data flattening
    */
-  private static exportToCSV(reportData: any, filename: string): void {
+  private static exportToCSV(reportData: ReportApiResponse, filename: string): void {
     const flattenedData = this.flattenReportData(reportData);
     if (!flattenedData.length) {
       logger.warn('No data available for export');
       return;
     }
 
-    const headers = Object.keys(flattenedData[0]);
+    const headers = this.collectHeaders(flattenedData);
     const csvRows = [headers.join(',')];
     
     // Optimized row generation without forEach
@@ -580,7 +686,7 @@ export class ReportApiService extends BaseApiService {
   /**
    * Export to JSON format
    */
-  private static exportToJSON(reportData: any, filename: string): void {
+  private static exportToJSON(reportData: ReportApiResponse, filename: string): void {
     const jsonContent = JSON.stringify(reportData, null, 2);
     this.downloadFile(jsonContent, `${filename}.json`, 'application/json');
   }
@@ -588,7 +694,7 @@ export class ReportApiService extends BaseApiService {
   /**
    * Export to PDF format (simplified implementation)
    */
-  private static async exportToPDF(reportData: any, filename: string, reportType: string): Promise<void> {
+  private static async exportToPDF(reportData: ReportApiResponse, filename: string, reportType: string): Promise<void> {
     // For now, create a formatted HTML content for PDF printing
     const htmlContent = this.generateReportHTML(reportData, reportType);
     const printWindow = window.open('', '_blank');
@@ -604,7 +710,7 @@ export class ReportApiService extends BaseApiService {
   /**
    * Generate comprehensive filename
    */
-  private static generateFilename(reportType: string, clinicName: string, format: string): string {
+  private static generateFilename(reportType: string, clinicName: string, _format: string): string {
     const timestamp = new Date().toISOString().split('T')[0];
     const sanitizedClinic = clinicName.replace(/[^a-zA-Z0-9]/g, '_');
     return `${reportType}_${sanitizedClinic}_${timestamp}`;
@@ -633,11 +739,14 @@ export class ReportApiService extends BaseApiService {
    * Flatten complex report data for CSV export
    * Handles nested objects and arrays efficiently
    */
-  private static flattenReportData(reportData: any): any[] {
-    if (!reportData?.data) return [];
-    
-    const { data } = reportData;
-    const flatData: any[] = [];
+  private static flattenReportData(reportData: ReportApiResponse): ReportRow[] {
+    const data = reportData.data;
+    if (!data) return [];
+
+    const flatData: ReportRow[] = [];
+    const dateRange = data.dateRange
+      ? `${data.dateRange.startDate} to ${data.dateRange.endDate}`
+      : 'All Time';
     
     // Handle different report structures
     if (data.summary && data.topServices) {
@@ -645,14 +754,8 @@ export class ReportApiService extends BaseApiService {
       flatData.push({
         report_type: 'Summary',
         clinic_name: data.clinicName,
-        date_range: `${data.dateRange.startDate} to ${data.dateRange.endDate}`,
-        total_revenue: data.summary.totalRevenue,
-        total_orders: data.summary.totalOrders,
-        total_clients: data.summary.totalClients,
-        average_order_value: data.summary.averageOrderValue,
-        completed_orders: data.summary.completedOrders,
-        pending_orders: data.summary.pendingOrders,
-        cancelled_orders: data.summary.cancelledOrders
+        date_range: dateRange,
+        ...this.prefixKeys(data.summary, 'summary')
       });
       
       // Add top services data
@@ -667,13 +770,71 @@ export class ReportApiService extends BaseApiService {
           revenue: service.revenue
         });
       }
+
+      if (Array.isArray(data.revenueBreakdown)) {
+        for (let i = 0; i < data.revenueBreakdown.length; i++) {
+          const revenue = data.revenueBreakdown[i];
+          flatData.push({
+            report_type: 'Revenue Breakdown',
+            clinic_name: data.clinicName,
+            date_range: dateRange,
+            date: revenue.date,
+            revenue: revenue.revenue,
+            order_count: revenue.orderCount
+          });
+        }
+      }
+    } else if (data.summary && data.paymentMethods) {
+      flatData.push({
+        report_type: 'Summary',
+        clinic_name: data.clinicName,
+        date_range: dateRange,
+        ...this.prefixKeys(data.summary, 'summary')
+      });
+
+      for (let i = 0; i < data.paymentMethods.length; i++) {
+        const method = data.paymentMethods[i];
+        flatData.push({
+          report_type: 'Payment Method',
+          clinic_name: data.clinicName,
+          date_range: dateRange,
+          method: method.method,
+          count: method.count,
+          amount: method.amount,
+          percentage: method.percentage
+        });
+      }
+
+      if (Array.isArray(data.dailyPayments)) {
+        for (let i = 0; i < data.dailyPayments.length; i++) {
+          const payment = data.dailyPayments[i];
+          flatData.push({
+            report_type: 'Daily Payment',
+            clinic_name: data.clinicName,
+            date_range: dateRange,
+            date: payment.date,
+            amount: payment.amount,
+            count: payment.count
+          });
+        }
+      }
     } else if (data.practitioners) {
+      if (data.summary) {
+        flatData.push({
+          report_type: 'Summary',
+          clinic_name: data.clinicName,
+          date_range: dateRange,
+          ...this.prefixKeys(data.summary, 'summary')
+        });
+      }
+
       // Timesheet Report - Practitioners
       for (let i = 0; i < data.practitioners.length; i++) {
         const practitioner = data.practitioners[i];
         flatData.push({
           report_type: 'Practitioner Hours',
           clinic_name: data.clinicName,
+          date_range: dateRange,
           practitioner_name: practitioner.resourceName,
           practitioner_id: practitioner.resourceId,
           total_hours: practitioner.totalHours,
@@ -693,6 +854,7 @@ export class ReportApiService extends BaseApiService {
           flatData.push({
             report_type: 'User Login Activity',
             clinic_name: data.clinicName,
+            date_range: dateRange,
             user_id: user.userId,
             username: user.username,
             full_name: user.fullName,
@@ -710,6 +872,7 @@ export class ReportApiService extends BaseApiService {
               flatData.push({
                 report_type: 'User Session Detail',
                 clinic_name: data.clinicName,
+                date_range: dateRange,
                 username: user.username,
                 full_name: user.fullName,
                 session_device: session.deviceId,
@@ -722,9 +885,120 @@ export class ReportApiService extends BaseApiService {
           }
         }
       }
+    } else if (data.summary && data.statusBreakdown) {
+      flatData.push({
+        report_type: 'Summary',
+        clinic_name: data.clinicName,
+        ...this.prefixKeys(data.summary, 'summary')
+      });
+
+      for (let i = 0; i < data.statusBreakdown.length; i++) {
+        const status = data.statusBreakdown[i];
+        flatData.push({
+          report_type: 'Status Breakdown',
+          clinic_name: data.clinicName,
+          status: status.status,
+          count: status.count,
+          percentage: status.percentage,
+          total_value: status.totalValue
+        });
+      }
+
+      if (Array.isArray(data.recentOrders)) {
+        for (let i = 0; i < data.recentOrders.length; i++) {
+          const order = data.recentOrders[i];
+          flatData.push({
+            report_type: 'Recent Order',
+            clinic_name: data.clinicName,
+            order_id: order.orderId,
+            order_number: order.orderNumber,
+            client_name: order.clientName,
+            status: order.status,
+            total_amount: order.totalAmount,
+            created_at: order.createdAt
+          });
+        }
+      }
+    } else if (data.summary && data.coPayBreakdown) {
+      flatData.push({
+        report_type: 'Summary',
+        clinic_name: data.clinicName,
+        date_range: dateRange,
+        ...this.prefixKeys(data.summary, 'summary')
+      });
+
+      for (let i = 0; i < data.coPayBreakdown.length; i++) {
+        const coPay = data.coPayBreakdown[i];
+        flatData.push({
+          report_type: 'Co-Pay Breakdown',
+          clinic_name: data.clinicName,
+          date_range: dateRange,
+          insurance_type: coPay.insuranceType,
+          count: coPay.count,
+          amount: coPay.amount,
+          percentage: coPay.percentage
+        });
+      }
+
+      if (Array.isArray(data.monthlyTrends)) {
+        for (let i = 0; i < data.monthlyTrends.length; i++) {
+          const trend = data.monthlyTrends[i];
+          flatData.push({
+            report_type: 'Monthly Trend',
+            clinic_name: data.clinicName,
+            date_range: dateRange,
+            month: trend.month,
+            amount: trend.amount,
+            count: trend.count
+          });
+        }
+      }
+    } else if (data.summary && data.campaigns) {
+      flatData.push({
+        report_type: 'Summary',
+        clinic_name: data.clinicName,
+        date_range: dateRange,
+        ...this.prefixKeys(data.summary, 'summary')
+      });
+
+      for (let i = 0; i < data.campaigns.length; i++) {
+        const campaign = data.campaigns[i];
+        flatData.push({
+          report_type: 'Campaign',
+          clinic_name: data.clinicName,
+          date_range: dateRange,
+          campaign_name: campaign.campaignName,
+          spent: campaign.spent,
+          revenue: campaign.revenue,
+          roi: campaign.roi,
+          conversions: campaign.conversions
+        });
+      }
+
+      if (Array.isArray(data.channels)) {
+        for (let i = 0; i < data.channels.length; i++) {
+          const channel = data.channels[i];
+          flatData.push({
+            report_type: 'Channel',
+            clinic_name: data.clinicName,
+            date_range: dateRange,
+            channel: channel.channel,
+            spent: channel.spent,
+            clients: channel.clients,
+            revenue: channel.revenue,
+            roi: channel.roi
+          });
+        }
+      }
     } else if (Array.isArray(data)) {
       // Handle array-based reports
-      return data.map((item, index) => ({ ...item, row_index: index + 1 }));
+      return data.map((item, index) => {
+        if (item && typeof item === 'object' && !Array.isArray(item)) {
+          return { ...(item as ReportRow), row_index: index + 1 };
+        }
+
+        return { value: item, row_index: index + 1 };
+      });
     } else {
       // Generic object flattening
       flatData.push(this.flattenObject(data));
@@ -736,17 +1010,25 @@ export class ReportApiService extends BaseApiService {
   /**
    * Flatten nested objects recursively
    */
-  private static flattenObject(obj: any, prefix = ''): any {
-    const flattened: any = {};
+  private static flattenObject(obj: Record<string, unknown>, prefix = ''): ReportRow {
+    const flattened: ReportRow = {};
     
     Object.keys(obj).forEach(key => {
       const value = obj[key];
       const newKey = prefix ? `${prefix}_${key}` : key;
       
       if (value && typeof value === 'object' && !Array.isArray(value)) {
-        Object.assign(flattened, this.flattenObject(value, newKey));
+        Object.assign(flattened, this.flattenObject(value as Record<string, unknown>, newKey));
       } else if (Array.isArray(value)) {
-        flattened[newKey] = value.join('; ');
+        flattened[newKey] = value
+          .map(item => {
+            if (item && typeof item === 'object') {
+              return JSON.stringify(this.flattenObject(item as Record<string, unknown>));
+            }
+
+            return String(item);
+          })
+          .join('; ');
       } else {
         flattened[newKey] = value;
       }
@@ -758,7 +1040,7 @@ export class ReportApiService extends BaseApiService {
   /**
    * Escape CSV values properly
    */
-  private static escapeCsvValue(value: any): string {
+  private static escapeCsvValue(value: unknown): string {
     if (value == null) return '';
     
     const stringValue = String(value);
@@ -771,9 +1053,36 @@ export class ReportApiService extends BaseApiService {
   /**
    * Generate HTML content for PDF export
    */
-  private static generateReportHTML(reportData: any, reportType: string): string {
-    const { data } = reportData;
-    const title = `${reportType.replace('-', ' ').toUpperCase()} REPORT`;
+  private static generateReportHTML(reportData: ReportApiResponse, reportType: string): string {
+    const data = reportData.data;
+    if (!data) {
+      return '';
+    }
+    const title = `${this.formatReportLabel(reportType)} Report`;
+    const sections: string[] = [];
+
+    if (data.summary && typeof data.summary === 'object') {
+      sections.push(this.renderObjectTable('Summary', data.summary));
+    }
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (['clinicName', 'dateRange', 'summary'].includes(key) || value == null) {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        sections.push(this.renderArrayTable(this.formatReportLabel(key), value));
+        return;
+      }
+
+      if (typeof value === 'object') {
+        sections.push(this.renderObjectTable(this.formatReportLabel(key), value as Record<string, unknown>));
+      }
+    });
+
+    if (!sections.length) {
+      sections.push(this.renderObjectTable('Report Data', this.flattenObject(data)));
+    }
     
     return `
       <!DOCTYPE html>
@@ -781,27 +1090,232 @@ export class ReportApiService extends BaseApiService {
       <head>
         <title>${title}</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { color: #2563eb; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
-          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
-          th { background-color: #f3f4f6; font-weight: bold; }
-          .summary { background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; }
+          body {
+            font-family: Arial, sans-serif;
+            color: #111827;
+            margin: 24px;
+          }
+          h1 {
+            color: #1d4ed8;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+          }
+          h2 {
+            color: #111827;
+            font-size: 18px;
+            margin: 0 0 12px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 24px;
+          }
+          th, td {
+            border: 1px solid #d1d5db;
+            font-size: 12px;
+            padding: 8px 10px;
+            text-align: left;
+            vertical-align: top;
+          }
+          th {
+            background-color: #f8fafc;
+            font-weight: 700;
+          }
+          .meta-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            margin: 20px 0 24px;
+          }
+          .meta-card {
+            background-color: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+          }
+          .meta-label {
+            color: #6b7280;
+            font-size: 12px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+          }
+          .meta-value {
+            font-size: 14px;
+            font-weight: 600;
+          }
+          .section {
+            break-inside: avoid;
+          }
+          @media print {
+            body {
+              margin: 12px;
+            }
+          }
         </style>
       </head>
       <body>
-        <h1>${title}</h1>
-        <div class="summary">
-          <h3>Report Details</h3>
-          <p><strong>Clinic:</strong> ${data.clinicName || 'N/A'}</p>
-          <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
-          <p><strong>Date Range:</strong> ${data.dateRange ? `${data.dateRange.startDate} to ${data.dateRange.endDate}` : 'All Time'}</p>
+        <h1>${this.escapeHtml(title)}</h1>
+        <div class="meta-grid">
+          <div class="meta-card">
+            <div class="meta-label">Clinic</div>
+            <div class="meta-value">${this.escapeHtml(data.clinicName || 'N/A')}</div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">Generated</div>
+            <div class="meta-value">${this.escapeHtml(new Date().toLocaleString())}</div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">Date Range</div>
+            <div class="meta-value">${this.escapeHtml(data.dateRange ? `${data.dateRange.startDate} to ${data.dateRange.endDate}` : 'All Time')}</div>
+          </div>
         </div>
         <div id="report-content">
-          <pre>${JSON.stringify(data, null, 2)}</pre>
+          ${sections.join('')}
         </div>
       </body>
       </html>
+    `;
+  }
+
+  private static collectHeaders(rows: Array<Record<string, unknown>>): string[] {
+    const headerSet = new Set<string>();
+
+    rows.forEach(row => {
+      Object.keys(row).forEach(key => headerSet.add(key));
+    });
+
+    return Array.from(headerSet);
+  }
+
+  private static prefixKeys(obj: Record<string, unknown>, prefix: string): Record<string, unknown> {
+    return Object.entries(obj).reduce<Record<string, unknown>>((accumulator, [key, value]) => {
+      accumulator[`${prefix}_${key}`] = value;
+      return accumulator;
+    }, {});
+  }
+
+  private static formatReportLabel(value: string): string {
+    return value
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b\w/g, char => char.toUpperCase());
+  }
+
+  private static escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  private static formatHtmlValue(value: unknown): string {
+    if (value == null || value === '') {
+      return 'N/A';
+    }
+
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+
+    if (Array.isArray(value)) {
+      return this.escapeHtml(
+        value.map(item => this.stringifyDisplayValue(item)).join(', ')
+      );
+    }
+
+    if (typeof value === 'object') {
+      const flattened = this.flattenObject(value);
+      const pairs = Object.entries(flattened).map(([key, item]) => {
+        return `${this.formatReportLabel(key)}: ${item}`;
+      });
+
+      return this.escapeHtml(pairs.join(' | '));
+    }
+
+    return this.escapeHtml(String(value));
+  }
+
+  private static stringifyDisplayValue(value: unknown): string {
+    if (value == null) {
+      return 'N/A';
+    }
+
+    if (typeof value === 'object') {
+      const flattened = this.flattenObject(value);
+      return Object.entries(flattened)
+        .map(([key, item]) => `${this.formatReportLabel(key)}: ${item}`)
+        .join(' | ');
+    }
+
+    return String(value);
+  }
+
+  private static renderObjectTable(title: string, data: Record<string, unknown>): string {
+    const rows = Object.entries(data)
+      .map(([key, value]) => `
+        <tr>
+          <th scope="row">${this.escapeHtml(this.formatReportLabel(key))}</th>
+          <td>${this.formatHtmlValue(value)}</td>
+        </tr>
+      `)
+      .join('');
+
+    if (!rows) {
+      return '';
+    }
+
+    return `
+      <section class="section">
+        <h2>${this.escapeHtml(title)}</h2>
+        <table>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </section>
+    `;
+  }
+
+  private static renderArrayTable(title: string, rows: unknown[]): string {
+    if (!rows.length) {
+      return '';
+    }
+
+    const normalizedRows = rows.map(row => {
+      if (row && typeof row === 'object' && !Array.isArray(row)) {
+        return row as Record<string, unknown>;
+      }
+
+      return { value: row };
+    });
+
+    const headers = this.collectHeaders(normalizedRows);
+    const headMarkup = headers
+      .map(header => `<th scope="col">${this.escapeHtml(this.formatReportLabel(header))}</th>`)
+      .join('');
+    const bodyMarkup = normalizedRows
+      .map(row => `
+        <tr>
+          ${headers.map(header => `<td>${this.formatHtmlValue(row[header])}</td>`).join('')}
+        </tr>
+      `)
+      .join('');
+
+    return `
+      <section class="section">
+        <h2>${this.escapeHtml(title)}</h2>
+        <table>
+          <thead>
+            <tr>${headMarkup}</tr>
+          </thead>
+          <tbody>
+            ${bodyMarkup}
+          </tbody>
+        </table>
+      </section>
     `;
   }
 

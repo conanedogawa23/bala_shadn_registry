@@ -36,7 +36,9 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { generateLink, findClinicBySlug } from '@/lib/route-utils';
+import { OrderService } from '@/lib/api/orderService';
 import { InsuranceSummaryCard } from '@/components/ui/client/InsuranceSection';
 import { EmailComposeDialog } from '@/components/ui/client/EmailComposeDialog';
 
@@ -49,6 +51,70 @@ import {
   OrderStatus,
 } from "@/lib/hooks";
 
+type CsvRow = Record<string, string | number>;
+type ExportHistoryRow = CsvRow & { sortDate: string };
+
+function escapeCsvCell(value: unknown): string {
+  if (value == null) {
+    return '';
+  }
+
+  const stringValue = String(value);
+  if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+
+  return stringValue;
+}
+
+function downloadCsvFile(filename: string, rows: CsvRow[]): void {
+  const headerSet = new Set<string>();
+
+  rows.forEach((row) => {
+    Object.keys(row).forEach((key) => headerSet.add(key));
+  });
+
+  const headers = Array.from(headerSet);
+  const csvContent = [
+    headers.map((header) => escapeCsvCell(header)).join(','),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(','))
+  ].join('\n');
+
+  const blob = new Blob(['\uFEFF', csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function getAppointmentStatusLabel(status: number): string {
+  switch (status) {
+    case 0:
+      return 'Scheduled';
+    case 1:
+      return 'Completed';
+    case 2:
+      return 'Cancelled';
+    default:
+      return 'Unknown';
+  }
+}
+
+function sanitizeFileNameSegment(value: string): string {
+  return value
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+}
+
 export default function ClientDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -60,6 +126,7 @@ export default function ClientDetailPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [isExportingHistory, setIsExportingHistory] = useState(false);
   const ordersPerPage = 10;
 
   // State for appointment pagination
@@ -166,6 +233,132 @@ export default function ClientDetailPage() {
     router.push(generateLink('clinic', `appointments/${appointmentId}/edit`, clinic));
   };
 
+  const clientDisplayName = `${client?.firstName || ''} ${client?.lastName || ''}`.trim();
+  const clientOrderSearchTerm = useMemo(() => {
+    const orderClientName = orders?.find(order => order.clientName?.trim())?.clientName?.trim();
+    if (orderClientName) {
+      return orderClientName;
+    }
+
+    const lastName = client?.lastName?.trim();
+    const firstName = client?.firstName?.trim();
+    return [lastName, firstName].filter(Boolean).join(', ');
+  }, [client?.firstName, client?.lastName, orders]);
+
+  const handleViewAllOrders = () => {
+    const queryParams = new URLSearchParams();
+    if (clientOrderSearchTerm) {
+      queryParams.set('search', clientOrderSearchTerm);
+    }
+
+    const ordersPath = generateLink('clinic', 'orders', clinic);
+    router.push(queryParams.toString() ? `${ordersPath}?${queryParams.toString()}` : ordersPath);
+  };
+
+  const handleExportHistory = async () => {
+    if (!clientId || !clinicName || isExportingHistory) {
+      return;
+    }
+
+    setIsExportingHistory(true);
+
+    try {
+      const numericClientId = Number(clientId);
+      const [ordersResponse, firstAppointmentsPage] = await Promise.all([
+        OrderService.getOrdersByClient(numericClientId, 5000),
+        AppointmentApiService.getAppointmentsByClinic(clinicName, {
+          clientId,
+          page: 1,
+          limit: 100
+        })
+      ]);
+
+      const allAppointments = [...firstAppointmentsPage.appointments];
+      const totalAppointmentPages = firstAppointmentsPage.pagination?.pages || 1;
+
+      if (totalAppointmentPages > 1) {
+        const remainingPages = Array.from({ length: totalAppointmentPages - 1 }, (_, index) => index + 2);
+        const appointmentResponses = await Promise.all(
+          remainingPages.map((page) =>
+            AppointmentApiService.getAppointmentsByClinic(clinicName, {
+              clientId,
+              page,
+              limit: 100
+            })
+          )
+        );
+
+        appointmentResponses.forEach((response) => {
+          allAppointments.push(...response.appointments);
+        });
+      }
+
+      const orderRows: ExportHistoryRow[] = ordersResponse.data.map((order) => ({
+        sortDate: order.serviceDate || order.orderDate,
+        'Client Name': clientDisplayName || order.clientName,
+        'Clinic Name': clinicData?.displayName || clinicData?.name || clinic,
+        'History Type': 'Order',
+        'Reference': `Order #${order.orderNumber}`,
+        'Date': OrderUtils.formatDate(order.serviceDate),
+        'Time': '',
+        'Status': OrderUtils.getStatusLabel(order.status),
+        'Payment Status': OrderUtils.getPaymentStatusLabel(order.paymentStatus),
+        'Amount': OrderUtils.formatCurrency(order.totalAmount),
+        'Duration (min)': order.totalDuration || order.items.reduce((sum, item) => sum + item.duration, 0),
+        'Location': order.location || '',
+        'Summary': order.items.map((item) => `${item.productName} x${item.quantity}`).join('; '),
+        'Notes': order.description || '',
+        'Created On': OrderUtils.formatDate(order.orderDate)
+      }));
+
+      const appointmentRows: ExportHistoryRow[] = allAppointments.map((appointment) => {
+        const startDate = new Date(appointment.startDate);
+        const endDate = new Date(appointment.endDate);
+
+        return {
+          sortDate: appointment.startDate,
+          'Client Name': clientDisplayName || clientOrderSearchTerm || `Client ${clientId}`,
+          'Clinic Name': clinicData?.displayName || clinicData?.name || clinic,
+          'History Type': 'Appointment',
+          'Reference': appointment.appointmentId ? `Appointment #${appointment.appointmentId}` : 'Appointment',
+          'Date': startDate.toLocaleDateString(),
+          'Time': `${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+          'Status': getAppointmentStatusLabel(appointment.status),
+          'Payment Status': appointment.readyToBill ? 'Ready to Bill' : '',
+          'Amount': '',
+          'Duration (min)': appointment.duration || '',
+          'Location': appointment.location || '',
+          'Summary': [appointment.subject, appointment.resourceName].filter(Boolean).join(' - ') || 'Appointment',
+          'Notes': appointment.description || '',
+          'Created On': new Date(appointment.dateCreated).toLocaleDateString()
+        };
+      });
+
+      const historyRows = [...orderRows, ...appointmentRows]
+        .sort((left, right) => new Date(right.sortDate).getTime() - new Date(left.sortDate).getTime())
+        .map(({ sortDate, ...row }) => row);
+
+      if (!historyRows.length) {
+        window.alert('No order or appointment history is available to export for this client.');
+        return;
+      }
+
+      const filenameParts = [
+        sanitizeFileNameSegment(clientDisplayName || clientOrderSearchTerm || `client-${clientId}`),
+        'history'
+      ].filter(Boolean);
+
+      downloadCsvFile(`${filenameParts.join('_')}.csv`, historyRows);
+    } catch (error) {
+      console.error('Failed to export client history:', error);
+      window.alert(
+        `Unable to export client history: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    } finally {
+      setIsExportingHistory(false);
+    }
+  };
+
   // Filter orders based on search and status
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
@@ -241,6 +434,9 @@ export default function ClientDetailPage() {
   const getAppointmentId = (appointment: any): string | number => {
     return appointment.appointmentId || appointment._id || appointment.id;
   };
+
+  const statsValueClassName = 'text-lg font-bold leading-tight text-gray-900 xl:text-xl 2xl:text-2xl';
+  const statsLabelClassName = 'text-[11px] text-gray-600 sm:text-xs';
 
   // Get status icon and color
   const getStatusIcon = (status: OrderStatus) => {
@@ -389,15 +585,15 @@ export default function ClientDetailPage() {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Client Statistics */}
-          <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {/* Order Stats */}
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <Package className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{clientStats.totalOrders}</p>
-                    <p className="text-xs text-gray-600">Total Orders</p>
+                  <div className="min-w-0">
+                    <p className={statsValueClassName}>{clientStats.totalOrders}</p>
+                    <p className={statsLabelClassName}>Total Orders</p>
                   </div>
                 </div>
               </CardContent>
@@ -405,11 +601,11 @@ export default function ClientDetailPage() {
             
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <CheckCircle className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{clientStats.completedOrders}</p>
-                    <p className="text-xs text-gray-600">Completed Orders</p>
+                  <div className="min-w-0">
+                    <p className={statsValueClassName}>{clientStats.completedOrders}</p>
+                    <p className={statsLabelClassName}>Completed Orders</p>
                   </div>
                 </div>
               </CardContent>
@@ -418,11 +614,11 @@ export default function ClientDetailPage() {
             {/* Appointment Stats */}
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <Calendar className="h-5 w-5 text-purple-600" />
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{appointmentStats.totalAppointments}</p>
-                    <p className="text-xs text-gray-600">Total Appointments</p>
+                  <div className="min-w-0">
+                    <p className={statsValueClassName}>{appointmentStats.totalAppointments}</p>
+                    <p className={statsLabelClassName}>Total Appointments</p>
                   </div>
                 </div>
               </CardContent>
@@ -430,11 +626,11 @@ export default function ClientDetailPage() {
 
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <Clock className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{appointmentStats.upcomingAppointments}</p>
-                    <p className="text-xs text-gray-600">Upcoming</p>
+                  <div className="min-w-0">
+                    <p className={statsValueClassName}>{appointmentStats.upcomingAppointments}</p>
+                    <p className={statsLabelClassName}>Upcoming</p>
                   </div>
                 </div>
               </CardContent>
@@ -442,13 +638,13 @@ export default function ClientDetailPage() {
             
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <DollarSign className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <div className="min-w-0">
+                    <p className={statsValueClassName}>
                       {OrderUtils.formatCurrency(clientStats.totalSpent)}
                     </p>
-                    <p className="text-xs text-gray-600">Total Spent</p>
+                    <p className={statsLabelClassName}>Total Spent</p>
                   </div>
                 </div>
               </CardContent>
@@ -456,13 +652,13 @@ export default function ClientDetailPage() {
             
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <DollarSign className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <div className="min-w-0">
+                    <p className={statsValueClassName}>
                       {OrderUtils.formatCurrency(clientStats.avgOrderValue)}
                     </p>
-                    <p className="text-xs text-gray-600">Avg Order</p>
+                    <p className={statsLabelClassName}>Avg Order</p>
                   </div>
                 </div>
               </CardContent>
@@ -644,7 +840,15 @@ export default function ClientDetailPage() {
                   Order History ({filteredOrders.length})
                 </CardTitle>
                 
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleViewAllOrders}
+                    className="w-full sm:w-auto"
+                  >
+                    View All Orders
+                  </Button>
                   <div className="relative flex-1 sm:w-64">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
@@ -991,10 +1195,15 @@ export default function ClientDetailPage() {
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => {/* TODO: Implement export */}}
+                onClick={handleExportHistory}
+                disabled={isExportingHistory}
               >
-                <Download className="h-4 w-4 mr-2" />
-                Export History
+                {isExportingHistory ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {isExportingHistory ? 'Exporting History...' : 'Export History'}
               </Button>
             </CardContent>
           </Card>

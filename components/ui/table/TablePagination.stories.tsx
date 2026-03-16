@@ -52,9 +52,9 @@ export const Default: Story = {
  */
 export const Interactive = {
   render: () => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
+     
     const [currentPage, setCurrentPage] = useState(1);
-    // eslint-disable-next-line react-hooks/rules-of-hooks
+     
     const [pageSize, setPageSize] = useState(10);
     
     return (

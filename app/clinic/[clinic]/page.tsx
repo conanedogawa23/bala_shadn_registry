@@ -180,7 +180,7 @@ export default function ClinicPage() {
       {clinic.status === 'active' && (
         <div className="grid gap-6 md:grid-cols-2">
           <TodaysAppointments clinicName={backendClinicName} />
-          <BulletinFeed />
+          <BulletinFeed clinicName={backendClinicName} clinicSlug={clinicSlug} />
         </div>
       )}
 
