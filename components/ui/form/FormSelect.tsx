@@ -33,6 +33,7 @@ export interface FormSelectProps {
   className?: string;
   onValueChange?: (value: string) => void;
   disabled?: boolean;
+  required?: boolean;
 }
 
 /**
@@ -42,7 +43,7 @@ export interface FormSelectProps {
  */
 export const FormSelect = forwardRef<HTMLButtonElement, FormSelectProps>(
   function FormSelect(
-    { options, name, label, description, placeholder, className, onValueChange, ...props }, 
+    { options, name, label, description, placeholder, className, onValueChange, required = false, ...props }, 
     ref
   ) {
     const { control } = useFormContext();
@@ -53,7 +54,12 @@ export const FormSelect = forwardRef<HTMLButtonElement, FormSelectProps>(
         name={name}
         render={({ field, fieldState }) => (
           <FormItem className={cn("w-full", className)}>
-            {label && <FormLabel>{label}</FormLabel>}
+            {label && (
+              <FormLabel>
+                {label}
+                {required && <span className="ml-1 text-red-500">*</span>}
+              </FormLabel>
+            )}
             <Select
               onValueChange={(value) => {
                 field.onChange(value);

@@ -25,15 +25,12 @@ import {
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2, Check, ChevronsUpDown, User, Wrench, Building } from 'lucide-react';
+import { AlertCircle, Loader2, Check, ChevronsUpDown, User, Wrench, Building, X } from 'lucide-react';
 import { ResourceApiService } from '@/lib/api/resourceService';
-import { baseApiService } from '@/lib/api/baseApiService';
 import { cn } from '@/lib/utils';
 
-const DOCTOR_ID_OFFSET = 100000;
-
 interface Resource {
-  id: string;
+  id: string | number;
   resourceId: number;
   resourceName: string;
   type: 'practitioner' | 'service' | 'equipment' | 'room';
@@ -59,18 +56,6 @@ interface Resource {
   clinics: string[];
   isActive: boolean;
   isBookable: boolean;
-  _source?: 'resource' | 'doctor';
-}
-
-interface ReferringDoctorRecord {
-  _id: string;
-  doctorId?: number;
-  fullName?: string;
-  firstName?: string;
-  lastName?: string;
-  specialty?: string;
-  clinicName?: string;
-  isActive?: boolean;
 }
 
 interface FormResourceSelectProps {
@@ -84,7 +69,6 @@ interface FormResourceSelectProps {
   disabled?: boolean;
   type?: 'practitioner' | 'service' | 'equipment' | 'room';
   defaultResourceName?: string;
-  includeDoctors?: boolean;
   onResourceChange?: (resource: Resource | null) => void;
 }
 
@@ -103,7 +87,6 @@ export function FormResourceSelect({
   disabled = false,
   type,
   defaultResourceName,
-  includeDoctors = true,
   onResourceChange
 }: FormResourceSelectProps) {
   const { control, getValues, watch } = useFormContext();
@@ -135,45 +118,15 @@ export function FormResourceSelect({
     setError(null);
 
     try {
-      const [resourceResponse, doctorResponse] = await Promise.all([
-        ResourceApiService.getAllResources({
-          clinicName,
-          type,
-          isActive: true,
-          isBookable: true,
-          limit: 100
-        }),
-        includeDoctors && (!type || type === 'practitioner')
-          ? baseApiService.get<ReferringDoctorRecord[]>('/referring-doctors?limit=100').catch(() => null)
-          : Promise.resolve(null)
-      ]);
+      const resourceResponse = await ResourceApiService.getAllResources({
+        clinicName,
+        type,
+        isActive: true,
+        isBookable: true,
+        limit: 100
+      });
 
-      let allResources: Resource[] = (resourceResponse.resources || []).map(r => ({
-        ...r,
-        _source: 'resource' as const
-      }));
-
-      if (doctorResponse?.data) {
-        const doctors: Resource[] = doctorResponse.data
-          .filter((doc) => doc.isActive !== false)
-          .map((doc) => ({
-            id: doc._id,
-            resourceId: (doc.doctorId || 0) + DOCTOR_ID_OFFSET,
-            resourceName: `Dr. ${doc.fullName || `${doc.firstName || ''} ${doc.lastName || ''}`.trim()}`,
-            type: 'practitioner' as const,
-            practitioner: {
-              firstName: doc.firstName,
-              lastName: doc.lastName,
-              credentials: 'MD',
-              specialties: doc.specialty ? [doc.specialty] : []
-            },
-            clinics: doc.clinicName ? [doc.clinicName] : [],
-            isActive: true,
-            isBookable: true,
-            _source: 'doctor' as const
-          }));
-        allResources = [...allResources, ...doctors];
-      }
+      let allResources: Resource[] = resourceResponse.resources || [];
 
       if (debouncedSearchTerm) {
         const searchLower = debouncedSearchTerm.toLowerCase();
@@ -200,7 +153,7 @@ export function FormResourceSelect({
     } finally {
       setLoading(false);
     }
-  }, [clinicName, type, includeDoctors, debouncedSearchTerm]);
+  }, [clinicName, type, debouncedSearchTerm]);
 
   useEffect(() => {
     fetchResources();
@@ -274,7 +227,6 @@ export function FormResourceSelect({
         if (credentials) displayName += `, ${credentials}`;
         const parts: string[] = [];
         if (specialties?.length) parts.push(specialties.join(', '));
-        if (resource._source === 'doctor') parts.push('Referring Doctor');
         subtitle = parts.join(' - ');
       } else if (resource.type === 'service' && resource.service) {
         subtitle = `${resource.service.category} • ${resource.service.duration} min`;
@@ -387,10 +339,26 @@ export function FormResourceSelect({
                         </CommandEmpty>
                       ) : (
                         <CommandGroup>
+                          {!required && (
+                            <CommandItem
+                              key="clear-selection"
+                              value="clear selection no resource"
+                              onSelect={() => {
+                                field.onChange(undefined);
+                                setSelectedResourceInfo(null);
+                                onResourceChange?.(null);
+                                setOpen(false);
+                              }}
+                              className="cursor-pointer py-3 text-muted-foreground"
+                            >
+                              <X className="mr-2 h-4 w-4 shrink-0" />
+                              <span>Clear selection</span>
+                            </CommandItem>
+                          )}
                           {resourceOptions.map((option) => (
                             <CommandItem
                               key={option.value}
-                              value={option.resource.resourceName || ''}
+                              value={`${option.label} ${option.subtitle}`.trim()}
                               onSelect={() => {
                                 const selectedValue = parseInt(option.value, 10);
                                 field.onChange(selectedValue);

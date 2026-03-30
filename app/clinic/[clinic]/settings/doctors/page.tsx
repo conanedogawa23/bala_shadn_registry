@@ -11,8 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { generateLink } from '@/lib/route-utils';
-import { baseApiService } from '@/lib/api/baseApiService';
+import { findClinicBySlug, generateLink, getBackendClinicName } from '@/lib/route-utils';
+import { useClinic } from '@/lib/contexts/clinic-context';
+import { ReferringDoctorApiService } from '@/lib/api/referringDoctorService';
 
 interface ReferringDoctor {
   _id: string;
@@ -30,6 +31,9 @@ interface ReferringDoctor {
 export default function DoctorsPage() {
   const params = useParams();
   const clinicSlug = Array.isArray(params.clinic) ? params.clinic[0] : params.clinic as string;
+  const { availableClinics } = useClinic();
+  const clinic = findClinicBySlug(availableClinics, clinicSlug);
+  const clinicName = getBackendClinicName(clinic, clinicSlug);
 
   const [doctors, setDoctors] = useState<ReferringDoctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,14 +47,17 @@ export default function DoctorsPage() {
   const fetchDoctors = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await baseApiService.get(`/referring-doctors?search=${search}`);
-      setDoctors((response as any).data || []);
+      const response = await ReferringDoctorApiService.getAll({
+        clinicName,
+        search: search || undefined
+      });
+      setDoctors(response.doctors);
     } catch {
       setDoctors([]);
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [clinicName, search]);
 
   useEffect(() => {
     fetchDoctors();
@@ -81,9 +88,15 @@ export default function DoctorsPage() {
     setError(null);
     try {
       if (editing) {
-        await baseApiService.put(`/referring-doctors/${editing._id}`, form);
+        await ReferringDoctorApiService.update(editing._id, {
+          ...form,
+          clinicName
+        });
       } else {
-        await baseApiService.post('/referring-doctors', form);
+        await ReferringDoctorApiService.create({
+          ...form,
+          clinicName
+        });
       }
       setDialogOpen(false);
       fetchDoctors();
@@ -97,7 +110,7 @@ export default function DoctorsPage() {
   const handleDelete = async (id: string) => {
     setError(null);
     try {
-      await baseApiService.delete(`/referring-doctors/${id}`);
+      await ReferringDoctorApiService.deactivate(id);
       fetchDoctors();
     } catch (e: any) {
       setError(e?.message || 'Failed to delete doctor');

@@ -16,6 +16,7 @@ import {
   Clock,
   User,
   MapPin,
+  Stethoscope,
   Eye,
   Edit,
   CheckCircle,
@@ -24,7 +25,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { findClinicBySlug, generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink, getBackendClinicName } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { useAppointments, useAppointmentStats } from '@/lib/hooks';
 
@@ -116,7 +117,7 @@ export default function AppointmentsPage() {
   
   // Find clinic from dynamic data
   const clinic = findClinicBySlug(availableClinics, clinicSlug);
-  const clinicName = clinic?.backendName || clinic?.displayName || clinicSlug;
+  const clinicName = getBackendClinicName(clinic, clinicSlug);
 
   // State for filtering and pagination
   const [searchQuery, setSearchQuery] = useState('');
@@ -160,6 +161,7 @@ export default function AppointmentsPage() {
       appointment.subject?.toLowerCase().includes(query) ||
       String(appointment.clientId ?? '').toLowerCase().includes(query) ||
       appointment.resourceName?.toLowerCase().includes(query) ||
+      appointment.referringDoctorName?.toLowerCase().includes(query) ||
       appointment.location?.toLowerCase().includes(query)
     );
   }, [appointments, searchQuery]);
@@ -404,6 +406,12 @@ export default function AppointmentsPage() {
                             <div className="flex items-center gap-1">
                               <User className="h-4 w-4" />
                               {appointment.resourceName}
+                            </div>
+                          )}
+                          {appointment.referringDoctorName && (
+                            <div className="flex items-center gap-1">
+                              <Stethoscope className="h-4 w-4" />
+                              {appointment.referringDoctorName}
                             </div>
                           )}
                           {appointment.location && (

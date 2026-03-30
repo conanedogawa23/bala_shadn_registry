@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger';
 import { BaseApiService } from './baseApiService';
+import { ClinicApiService, type FullClinicData } from './clinicService';
 
 // Report data interfaces
 export interface AccountSummaryData {
@@ -312,6 +313,16 @@ interface ReportApiResponse {
   [key: string]: unknown;
 }
 
+interface ClinicBranding {
+  clinic?: FullClinicData;
+  logo?: FullClinicData['logo'];
+}
+
+interface ReportDetailSection {
+  rows: Array<Record<string, unknown>>;
+  title: string;
+}
+
 export class ReportApiService extends BaseApiService {
   private static readonly ENDPOINT = '/reports';
   private static readonly CACHE_TTL = 300000; // 5 minutes cache for reports
@@ -606,13 +617,17 @@ export class ReportApiService extends BaseApiService {
   static async exportReport(
     reportType: string, 
     clinicName: string, 
-    format: 'csv' | 'json' | 'pdf' = 'csv',
+    format: 'xlsx' | 'csv' | 'json' | 'pdf' = 'xlsx',
     options: ReportQueryOptions = {}
   ): Promise<void> {
     const reportData = await this.getDetailedReportData(reportType, clinicName, options);
     const filename = this.generateFilename(reportType, clinicName, format);
+    const clinicBranding = await this.getClinicBranding(clinicName);
     
     switch (format) {
+      case 'xlsx':
+        await this.exportToExcel(reportData, filename, reportType, clinicBranding);
+        break;
       case 'csv':
         this.exportToCSV(reportData, filename);
         break;
@@ -620,7 +635,7 @@ export class ReportApiService extends BaseApiService {
         this.exportToJSON(reportData, filename);
         break;
       case 'pdf':
-        await this.exportToPDF(reportData, filename, reportType);
+        await this.exportToPDF(reportData, filename, reportType, clinicBranding);
         break;
       default:
         throw new Error(`Unsupported export format: ${format}`);
@@ -641,17 +656,17 @@ export class ReportApiService extends BaseApiService {
     
     switch (reportType) {
       case 'account-summary':
-        return this.request(`${baseUrl}/account-summary${queryParams}`);
+        return this.request<ReportData>(`${baseUrl}/account-summary${queryParams}`) as unknown as Promise<ReportApiResponse>;
       case 'payment-summary':
-        return this.request(`${baseUrl}/payment-summary${queryParams}`);
+        return this.request<ReportData>(`${baseUrl}/payment-summary${queryParams}`) as unknown as Promise<ReportApiResponse>;
       case 'timesheet':
-        return this.request(`${baseUrl}/timesheet${queryParams}`);
+        return this.request<ReportData>(`${baseUrl}/timesheet${queryParams}`) as unknown as Promise<ReportApiResponse>;
       case 'order-status':
-        return this.request(`${baseUrl}/order-status${queryParams}`);
+        return this.request<ReportData>(`${baseUrl}/order-status${queryParams}`) as unknown as Promise<ReportApiResponse>;
       case 'copay-summary':
-        return this.request(`${baseUrl}/copay-summary${queryParams}`);
+        return this.request<ReportData>(`${baseUrl}/copay-summary${queryParams}`) as unknown as Promise<ReportApiResponse>;
       case 'marketing-budget':
-        return this.request(`${baseUrl}/marketing-budget${queryParams}`);
+        return this.request<ReportData>(`${baseUrl}/marketing-budget${queryParams}`) as unknown as Promise<ReportApiResponse>;
       default:
         throw new Error(`Unknown report type: ${reportType}`);
     }
@@ -660,6 +675,99 @@ export class ReportApiService extends BaseApiService {
   /**
    * Enhanced CSV export with detailed data flattening
    */
+  private static async exportToExcel(
+    reportData: ReportApiResponse,
+    filename: string,
+    reportType: string,
+    clinicBranding: ClinicBranding
+  ): Promise<void> {
+    const excelJsModule = await import('exceljs');
+    const ExcelJS = excelJsModule.default ?? excelJsModule;
+    const workbook = new ExcelJS.Workbook();
+    const summarySheet = workbook.addWorksheet('Summary', {
+      views: [{ state: 'frozen', ySplit: 6 }]
+    });
+    const detailSheet = workbook.addWorksheet('Detail', {
+      views: [{ state: 'frozen', ySplit: 1 }]
+    });
+    const reportPayload = reportData.data;
+
+    workbook.creator = 'Visio Reports';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+    workbook.lastPrinted = new Date();
+
+    let summaryStartRow = 1;
+    if (clinicBranding.logo) {
+      const imageExtension = this.getImageExtension(clinicBranding.logo.contentType);
+      if (imageExtension) {
+        const imageId = workbook.addImage({
+          base64: `data:${clinicBranding.logo.contentType};base64,${clinicBranding.logo.data}`,
+          extension: imageExtension
+        });
+        summarySheet.addImage(imageId, {
+          tl: { col: 0, row: 0 },
+          ext: { width: 180, height: 60 }
+        });
+        summaryStartRow = 5;
+      }
+    }
+
+    summarySheet.getCell(`A${summaryStartRow}`).value = `${this.formatReportLabel(reportType)} Report`;
+    summarySheet.getCell(`A${summaryStartRow}`).font = { bold: true, size: 18 };
+    summarySheet.getCell(`A${summaryStartRow + 1}`).value = `Clinic: ${clinicBranding.clinic?.displayName || reportPayload?.clinicName || filename}`;
+    summarySheet.getCell(`A${summaryStartRow + 2}`).value = `Generated: ${new Date().toLocaleString('en-CA')}`;
+    summarySheet.getCell(`A${summaryStartRow + 3}`).value = `Date Range: ${this.formatDateRange(reportPayload?.dateRange)}`;
+
+    let summaryRowIndex = summaryStartRow + 5;
+    summaryRowIndex = this.writeSummarySection(summarySheet, summaryRowIndex, 'Summary', reportPayload?.summary);
+
+    Object.entries(reportPayload || {}).forEach(([key, value]) => {
+      if (['clinicName', 'dateRange', 'summary'].includes(key) || value == null) {
+        return;
+      }
+
+      if (!Array.isArray(value) && typeof value === 'object') {
+        summaryRowIndex = this.writeSummarySection(
+          summarySheet,
+          summaryRowIndex,
+          this.formatReportLabel(key),
+          value as Record<string, unknown>
+        );
+      }
+    });
+
+    if (summaryRowIndex === summaryStartRow + 5) {
+      summaryRowIndex = this.writeSummarySection(
+        summarySheet,
+        summaryRowIndex,
+        'Report Data',
+        this.flattenObject(reportPayload || {})
+      );
+    }
+
+    const detailSections = this.extractDetailSections(reportPayload);
+    let detailRowIndex = 1;
+    detailSections.forEach((section) => {
+      detailRowIndex = this.writeDetailSection(detailSheet, detailRowIndex, section.title, section.rows);
+    });
+
+    if (detailRowIndex === 1) {
+      this.writeDetailSection(detailSheet, detailRowIndex, 'Detail', this.flattenReportData(reportData));
+    }
+
+    this.autoFitWorksheetColumns(summarySheet);
+    this.autoFitWorksheetColumns(detailSheet);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    this.downloadBlob(
+      new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }),
+      `${filename}.xlsx`
+    );
+  }
+
   private static exportToCSV(reportData: ReportApiResponse, filename: string): void {
     const flattenedData = this.flattenReportData(reportData);
     if (!flattenedData.length) {
@@ -694,9 +802,14 @@ export class ReportApiService extends BaseApiService {
   /**
    * Export to PDF format (simplified implementation)
    */
-  private static async exportToPDF(reportData: ReportApiResponse, filename: string, reportType: string): Promise<void> {
+  private static async exportToPDF(
+    reportData: ReportApiResponse,
+    filename: string,
+    reportType: string,
+    clinicBranding: ClinicBranding
+  ): Promise<void> {
     // For now, create a formatted HTML content for PDF printing
-    const htmlContent = this.generateReportHTML(reportData, reportType);
+    const htmlContent = this.generateReportHTML(reportData, reportType, clinicBranding);
     const printWindow = window.open('', '_blank');
     
     if (printWindow) {
@@ -733,6 +846,229 @@ export class ReportApiService extends BaseApiService {
     }
     
     return params.toString() ? `?${params.toString()}` : '';
+  }
+
+  private static async getClinicBranding(clinicName: string): Promise<ClinicBranding> {
+    try {
+      const { clinics } = await ClinicApiService.getFullClinics();
+      const normalizedClinicName = clinicName.toLowerCase();
+      const clinic = clinics.find((candidate) => {
+        return [candidate.backendName, candidate.displayName, candidate.name]
+          .filter(Boolean)
+          .some((value) => value.toLowerCase() === normalizedClinicName);
+      });
+
+      return {
+        clinic,
+        logo: clinic?.logo || null
+      };
+    } catch (error) {
+      logger.warn('Unable to load clinic branding for report export', error);
+      return {};
+    }
+  }
+
+  private static getImageExtension(contentType?: string): 'png' | 'jpeg' | null {
+    if (!contentType) {
+      return null;
+    }
+
+    if (contentType.includes('png')) {
+      return 'png';
+    }
+
+    if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+      return 'jpeg';
+    }
+
+    return null;
+  }
+
+  private static formatDateRange(dateRange?: { startDate?: string; endDate?: string }): string {
+    if (!dateRange?.startDate && !dateRange?.endDate) {
+      return 'All Time';
+    }
+
+    if (dateRange?.startDate && dateRange?.endDate) {
+      return `${dateRange.startDate} to ${dateRange.endDate}`;
+    }
+
+    return dateRange?.startDate || dateRange?.endDate || 'All Time';
+  }
+
+  private static extractDetailSections(data?: ReportData): ReportDetailSection[] {
+    if (!data) {
+      return [];
+    }
+
+    const sections: ReportDetailSection[] = [];
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (['clinicName', 'dateRange', 'summary'].includes(key) || value == null) {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        const rows = value.map((item, index) => {
+          if (item && typeof item === 'object' && !Array.isArray(item)) {
+            return item as Record<string, unknown>;
+          }
+
+          return {
+            rowIndex: index + 1,
+            value: item
+          };
+        });
+
+        if (rows.length > 0) {
+          sections.push({
+            title: this.formatReportLabel(key),
+            rows
+          });
+        }
+        return;
+      }
+
+      if (typeof value === 'object') {
+        sections.push({
+          title: this.formatReportLabel(key),
+          rows: [this.flattenObject(value as Record<string, unknown>)]
+        });
+      }
+    });
+
+    return sections;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static writeSummarySection(worksheet: any, startRow: number, title: string, data?: Record<string, unknown>): number {
+    if (!data || Object.keys(data).length === 0) {
+      return startRow;
+    }
+
+    const titleCell = worksheet.getCell(startRow, 1);
+    titleCell.value = title;
+    titleCell.font = { bold: true, size: 14, color: { argb: 'FF1D4ED8' } };
+
+    let rowIndex = startRow + 1;
+    Object.entries(data).forEach(([key, value]) => {
+      worksheet.getCell(rowIndex, 1).value = this.formatReportLabel(key);
+      worksheet.getCell(rowIndex, 1).font = { bold: true };
+      this.setWorksheetCellValue(worksheet.getCell(rowIndex, 2), key, value);
+      rowIndex += 1;
+    });
+
+    return rowIndex + 1;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static writeDetailSection(worksheet: any, startRow: number, title: string, rows: Array<Record<string, unknown>>): number {
+    if (!rows.length) {
+      return startRow;
+    }
+
+    const headers = this.collectHeaders(rows);
+    const titleCell = worksheet.getCell(startRow, 1);
+    titleCell.value = title;
+    titleCell.font = { bold: true, size: 14, color: { argb: 'FF1D4ED8' } };
+
+    const headerRowNumber = startRow + 1;
+    headers.forEach((header, index) => {
+      const cell = worksheet.getCell(headerRowNumber, index + 1);
+      cell.value = this.formatReportLabel(header);
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1F2937' }
+      };
+    });
+
+    let rowIndex = headerRowNumber + 1;
+    rows.forEach((row) => {
+      headers.forEach((header, index) => {
+        this.setWorksheetCellValue(worksheet.getCell(rowIndex, index + 1), header, row[header]);
+      });
+      rowIndex += 1;
+    });
+
+    return rowIndex + 1;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static setWorksheetCellValue(cell: any, key: string, value: unknown): void {
+    if (value == null || value === '') {
+      cell.value = '';
+      return;
+    }
+
+    if (typeof value === 'number') {
+      cell.value = this.getRoundedNumber(key, value);
+      cell.numFmt = this.isWholeNumberMetricKey(key) || this.isIdentifierKey(key) ? '0' : '0.000';
+      return;
+    }
+
+    if ((value instanceof Date || typeof value === 'string') && this.isDateLikeKey(key)) {
+      const dateValue = value instanceof Date ? value : new Date(value);
+      if (!Number.isNaN(dateValue.getTime())) {
+        cell.value = dateValue;
+        cell.numFmt = this.hasNonMidnightTime(dateValue) ? 'yyyy-mm-dd hh:mm' : 'yyyy-mm-dd';
+        return;
+      }
+    }
+
+    if (Array.isArray(value)) {
+      cell.value = value.map((item) => this.stringifyDisplayValue(item)).join(', ');
+      return;
+    }
+
+    if (typeof value === 'object') {
+      cell.value = this.stringifyDisplayValue(value);
+      return;
+    }
+
+    cell.value = String(value);
+  }
+
+  private static getRoundedNumber(key: string, value: number): number {
+    if (this.isIdentifierKey(key) || this.isWholeNumberMetricKey(key)) {
+      return Math.round(value);
+    }
+
+    return Number(value.toFixed(3));
+  }
+
+  private static isIdentifierKey(key: string): boolean {
+    return /(^|_)(id|key)$/.test(key.toLowerCase());
+  }
+
+  private static isWholeNumberMetricKey(key: string): boolean {
+    return /(count|orders|clients|appointments|sessions|users|quantity|completed|pending|cancelled|active)/i.test(key);
+  }
+
+  private static isDateLikeKey(key: string): boolean {
+    return /(date|month|created|generated|last_login|lastlogin|last_activity|lastactivity)/i.test(key);
+  }
+
+  private static hasNonMidnightTime(date: Date): boolean {
+    return date.getHours() !== 0 || date.getMinutes() !== 0 || date.getSeconds() !== 0;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static autoFitWorksheetColumns(worksheet: any): void {
+    worksheet.columns.forEach((column: any) => {
+      let maxLength = 12;
+      column.eachCell({ includeEmpty: true }, (cell: any) => {
+        const rawValue = cell.value;
+        const cellText = rawValue == null
+          ? ''
+          : rawValue instanceof Date
+            ? this.formatDateTimeValue(rawValue)
+            : String(rawValue);
+        maxLength = Math.max(maxLength, cellText.length + 2);
+      });
+      column.width = Math.min(maxLength, 40);
+    });
   }
 
   /**
@@ -1053,31 +1389,28 @@ export class ReportApiService extends BaseApiService {
   /**
    * Generate HTML content for PDF export
    */
-  private static generateReportHTML(reportData: ReportApiResponse, reportType: string): string {
+  private static generateReportHTML(
+    reportData: ReportApiResponse,
+    reportType: string,
+    clinicBranding: ClinicBranding
+  ): string {
     const data = reportData.data;
     if (!data) {
       return '';
     }
     const title = `${this.formatReportLabel(reportType)} Report`;
     const sections: string[] = [];
+    const detailSections = this.extractDetailSections(data);
+    const logoMarkup = clinicBranding.logo
+      ? `<img src="data:${clinicBranding.logo.contentType};base64,${clinicBranding.logo.data}" alt="Clinic logo" class="report-logo" />`
+      : '';
 
     if (data.summary && typeof data.summary === 'object') {
       sections.push(this.renderObjectTable('Summary', data.summary));
     }
 
-    Object.entries(data).forEach(([key, value]) => {
-      if (['clinicName', 'dateRange', 'summary'].includes(key) || value == null) {
-        return;
-      }
-
-      if (Array.isArray(value)) {
-        sections.push(this.renderArrayTable(this.formatReportLabel(key), value));
-        return;
-      }
-
-      if (typeof value === 'object') {
-        sections.push(this.renderObjectTable(this.formatReportLabel(key), value as Record<string, unknown>));
-      }
+    detailSections.forEach((section) => {
+      sections.push(this.renderArrayTable(section.title, section.rows));
     });
 
     if (!sections.length) {
@@ -1095,10 +1428,21 @@ export class ReportApiService extends BaseApiService {
             color: #111827;
             margin: 24px;
           }
+          .report-header {
+            align-items: center;
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+          }
+          .report-logo {
+            height: 60px;
+            max-width: 180px;
+            object-fit: contain;
+          }
           h1 {
             color: #1d4ed8;
             border-bottom: 2px solid #e5e7eb;
-            margin-bottom: 16px;
+            margin: 0 0 16px;
             padding-bottom: 10px;
           }
           h2 {
@@ -1155,19 +1499,24 @@ export class ReportApiService extends BaseApiService {
         </style>
       </head>
       <body>
-        <h1>${this.escapeHtml(title)}</h1>
+        <div class="report-header">
+          ${logoMarkup}
+          <div>
+            <h1>${this.escapeHtml(title)}</h1>
+          </div>
+        </div>
         <div class="meta-grid">
           <div class="meta-card">
             <div class="meta-label">Clinic</div>
-            <div class="meta-value">${this.escapeHtml(data.clinicName || 'N/A')}</div>
+            <div class="meta-value">${this.escapeHtml(clinicBranding.clinic?.displayName || data.clinicName || 'N/A')}</div>
           </div>
           <div class="meta-card">
             <div class="meta-label">Generated</div>
-            <div class="meta-value">${this.escapeHtml(new Date().toLocaleString())}</div>
+            <div class="meta-value">${this.escapeHtml(this.formatDateTimeValue(new Date()))}</div>
           </div>
           <div class="meta-card">
             <div class="meta-label">Date Range</div>
-            <div class="meta-value">${this.escapeHtml(data.dateRange ? `${data.dateRange.startDate} to ${data.dateRange.endDate}` : 'All Time')}</div>
+            <div class="meta-value">${this.escapeHtml(this.formatDateRange(data.dateRange))}</div>
           </div>
         </div>
         <div id="report-content">
@@ -1211,13 +1560,28 @@ export class ReportApiService extends BaseApiService {
       .replace(/'/g, '&#39;');
   }
 
-  private static formatHtmlValue(value: unknown): string {
+  private static formatHtmlValue(key: string, value: unknown): string {
     if (value == null || value === '') {
       return 'N/A';
     }
 
     if (typeof value === 'boolean') {
       return value ? 'Yes' : 'No';
+    }
+
+    if (typeof value === 'number') {
+      return this.escapeHtml(
+        this.isWholeNumberMetricKey(key) || this.isIdentifierKey(key)
+          ? String(Math.round(value))
+          : value.toFixed(3)
+      );
+    }
+
+    if ((value instanceof Date || typeof value === 'string') && this.isDateLikeKey(key)) {
+      const dateValue = value instanceof Date ? value : new Date(value);
+      if (!Number.isNaN(dateValue.getTime())) {
+        return this.escapeHtml(this.formatDateTimeValue(dateValue));
+      }
     }
 
     if (Array.isArray(value)) {
@@ -1227,9 +1591,9 @@ export class ReportApiService extends BaseApiService {
     }
 
     if (typeof value === 'object') {
-      const flattened = this.flattenObject(value);
+      const flattened = this.flattenObject(value as Record<string, unknown>);
       const pairs = Object.entries(flattened).map(([key, item]) => {
-        return `${this.formatReportLabel(key)}: ${item}`;
+        return `${this.formatReportLabel(key)}: ${this.stringifyDisplayValue(item, key)}`;
       });
 
       return this.escapeHtml(pairs.join(' | '));
@@ -1238,15 +1602,28 @@ export class ReportApiService extends BaseApiService {
     return this.escapeHtml(String(value));
   }
 
-  private static stringifyDisplayValue(value: unknown): string {
+  private static stringifyDisplayValue(value: unknown, key = ''): string {
     if (value == null) {
       return 'N/A';
     }
 
+    if (typeof value === 'number') {
+      return this.isWholeNumberMetricKey(key) || this.isIdentifierKey(key)
+        ? String(Math.round(value))
+        : value.toFixed(3);
+    }
+
+    if ((value instanceof Date || typeof value === 'string') && this.isDateLikeKey(key)) {
+      const dateValue = value instanceof Date ? value : new Date(value);
+      if (!Number.isNaN(dateValue.getTime())) {
+        return this.formatDateTimeValue(dateValue);
+      }
+    }
+
     if (typeof value === 'object') {
-      const flattened = this.flattenObject(value);
+      const flattened = this.flattenObject(value as Record<string, unknown>);
       return Object.entries(flattened)
-        .map(([key, item]) => `${this.formatReportLabel(key)}: ${item}`)
+        .map(([nestedKey, item]) => `${this.formatReportLabel(nestedKey)}: ${this.stringifyDisplayValue(item, nestedKey)}`)
         .join(' | ');
     }
 
@@ -1258,7 +1635,7 @@ export class ReportApiService extends BaseApiService {
       .map(([key, value]) => `
         <tr>
           <th scope="row">${this.escapeHtml(this.formatReportLabel(key))}</th>
-          <td>${this.formatHtmlValue(value)}</td>
+          <td>${this.formatHtmlValue(key, value)}</td>
         </tr>
       `)
       .join('');
@@ -1299,7 +1676,7 @@ export class ReportApiService extends BaseApiService {
     const bodyMarkup = normalizedRows
       .map(row => `
         <tr>
-          ${headers.map(header => `<td>${this.formatHtmlValue(row[header])}</td>`).join('')}
+          ${headers.map(header => `<td>${this.formatHtmlValue(header, row[header])}</td>`).join('')}
         </tr>
       `)
       .join('');
@@ -1322,8 +1699,22 @@ export class ReportApiService extends BaseApiService {
   /**
    * Download file helper
    */
-  private static downloadFile(content: string, filename: string, mimeType: string): void {
-    const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
+  private static formatDateTimeValue(date: string | Date): string {
+    const dateValue = typeof date === 'string' ? new Date(date) : date;
+    if (Number.isNaN(dateValue.getTime())) {
+      return String(date);
+    }
+
+    return dateValue.toLocaleString('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  private static downloadBlob(blob: Blob, filename: string): void {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     
@@ -1336,6 +1727,13 @@ export class ReportApiService extends BaseApiService {
     document.body.removeChild(link);
     
     URL.revokeObjectURL(url);
+  }
+
+  private static downloadFile(content: string, filename: string, mimeType: string): void {
+    this.downloadBlob(
+      new Blob([content], { type: `${mimeType};charset=utf-8;` }),
+      filename
+    );
   }
 
   /**

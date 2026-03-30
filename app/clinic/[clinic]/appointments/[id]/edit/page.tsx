@@ -15,13 +15,33 @@ import { FormWrapper } from '@/components/ui/form/FormWrapper';
 import { FormInput } from '@/components/ui/form/FormInput';
 import { FormSelect } from '@/components/ui/form/FormSelect';
 import { FormClientSelect } from '@/components/ui/form/FormClientSelect';
+import { FormReferringDoctorSelect } from '@/components/ui/form/FormReferringDoctorSelect';
 import { FormResourceSelect } from '@/components/ui/form/FormResourceSelect';
 import { FormDatePicker } from '@/components/ui/form/FormDatePicker';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Save, Edit3, AlertCircle } from 'lucide-react';
-import { findClinicBySlug, generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink, getBackendClinicName } from '@/lib/route-utils';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { useClinic } from '@/lib/contexts/clinic-context';
+
+const optionalResourceSchema = z.preprocess(
+  (value) => {
+    if (value === '' || value === undefined) {
+      return undefined;
+    }
+
+    if (value === null) {
+      return null;
+    }
+
+    return Number(value);
+  },
+  z.number()
+    .int()
+    .min(1, { message: 'Resource must be a positive integer' })
+    .nullable()
+    .optional()
+);
 
 // Define the appointment schema using zod for validation
 const appointmentSchema = z.object({
@@ -29,7 +49,8 @@ const appointmentSchema = z.object({
   endDate: z.string().min(1, { message: 'End date is required' }),
   subject: z.string().min(2, { message: 'Subject must be at least 2 characters' }),
   clientId: z.coerce.string().min(1, { message: 'Client ID is required' }),
-  resourceId: z.coerce.number().min(1, { message: 'Resource is required' }),
+  resourceId: optionalResourceSchema,
+  referringDoctorId: z.string().trim().nullable().optional(),
   duration: z.coerce.number().min(15, { message: 'Duration must be at least 15 minutes' }),
   type: z.coerce.number().int().min(0).default(0),
   status: z.coerce.number().int().min(0).default(0),
@@ -67,13 +88,15 @@ interface Appointment {
   description?: string;
   status: number;
   label: number;
-  resourceId: number;
+  resourceId?: number | null;
   duration: number;
   clientId: string | number;
   clientInfo?: ClientInfo;
   readyToBill: boolean;
   clinicName: string;
   resourceName?: string;
+  referringDoctorId?: string;
+  referringDoctorName?: string;
   isActive: boolean;
   reminderInfo?: string;
   dateCreated: string;
@@ -114,10 +137,11 @@ export default function EditAppointmentPage() {
   const [error, setError] = useState<string | null>(null);
   const [clientName, setClientName] = useState<string>('');
   const [resourceName, setResourceName] = useState<string>('');
+  const [referringDoctorName, setReferringDoctorName] = useState<string>('');
 
   const { availableClinics } = useClinic();
   const clinicData = findClinicBySlug(availableClinics, clinicSlug);
-  const clinicName = clinicData?.backendName || clinicData?.displayName || clinicSlug;
+  const clinicName = getBackendClinicName(clinicData, clinicSlug);
 
   // Fetch appointment data from API
   useEffect(() => {
@@ -136,8 +160,16 @@ export default function EditAppointmentPage() {
         };
 
         // Store resource name if available
-        if (appointment.resourceName) {
+        if (appointment.resourceId && appointment.resourceName) {
           setResourceName(appointment.resourceName);
+        } else {
+          setResourceName('');
+        }
+
+        if (appointment.referringDoctorName) {
+          setReferringDoctorName(appointment.referringDoctorName);
+        } else {
+          setReferringDoctorName('');
         }
 
         if (appointment.clientInfo?.name) {
@@ -151,7 +183,8 @@ export default function EditAppointmentPage() {
           endDate: formatDateTimeLocal(appointment.endDate),
           subject: appointment.subject,
           clientId: String(appointment.clientId ?? ''),
-          resourceId: appointment.resourceId,
+          resourceId: appointment.resourceId ?? undefined,
+          referringDoctorId: appointment.referringDoctorId ?? undefined,
           duration: appointment.duration,
           type: appointment.type,
           status: appointment.status,
@@ -184,7 +217,8 @@ export default function EditAppointmentPage() {
         endDate: new Date(formData.endDate),
         subject: formData.subject,
         clientId: formData.clientId,
-        resourceId: formData.resourceId,
+        resourceId: formData.resourceId ?? null,
+        referringDoctorId: formData.referringDoctorId || null,
         duration: formData.duration,
         type: formData.type,
         status: formData.status,
@@ -323,17 +357,24 @@ export default function EditAppointmentPage() {
                 />
               </div>
               
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <FormResourceSelect
                   name="resourceId"
                   label="Resource"
-                  placeholder="Select a practitioner or resource"
+                  placeholder="Select a practitioner"
                   clinicName={clinicName}
-                  includeDoctors={false}
-                  required
+                  required={false}
                   defaultResourceName={resourceName}
                 />
-                
+
+                <FormReferringDoctorSelect
+                  name="referringDoctorId"
+                  label="Referring Doctor"
+                  placeholder="Select a referring doctor"
+                  clinicName={clinicName}
+                  defaultDoctorName={referringDoctorName}
+                />
+
                 <FormInput
                   name="duration"
                   label="Duration (minutes)"

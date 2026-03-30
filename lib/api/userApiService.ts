@@ -17,6 +17,22 @@ export interface UserProfile {
   };
 }
 
+export interface UserPermissions {
+  canManageUsers?: boolean;
+  canManageClinic?: boolean;
+  canViewReports?: boolean;
+  canManageAppointments?: boolean;
+  canManageOrders?: boolean;
+  canManagePayments?: boolean;
+  canViewPayments?: boolean;
+  canCreatePayments?: boolean;
+  canEditPayments?: boolean;
+  canDeletePayments?: boolean;
+  canProcessRefunds?: boolean;
+  canAccessAllClinics?: boolean;
+  allowedClinics: string[];
+}
+
 export interface User {
   _id: string;
   username: string;
@@ -24,21 +40,7 @@ export interface User {
   profile: UserProfile;
   role: string;
   status: string;
-  permissions: {
-    canManageUsers?: boolean;
-    canManageClinic?: boolean;
-    canViewReports?: boolean;
-    canManageAppointments?: boolean;
-    canManageOrders?: boolean;
-    canManagePayments?: boolean;
-    canViewPayments?: boolean;
-    canCreatePayments?: boolean;
-    canEditPayments?: boolean;
-    canDeletePayments?: boolean;
-    canProcessRefunds?: boolean;
-    canAccessAllClinics?: boolean;
-    allowedClinics: string[];
-  };
+  permissions: UserPermissions;
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -62,6 +64,29 @@ export interface UpdateUserProfileRequest {
       country?: string;
     };
   };
+}
+
+export interface CreateUserRequest {
+  username: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  role: string;
+  status?: string;
+  clinics?: string[];
+  permissions?: Partial<UserPermissions>;
+}
+
+export interface UpdateUserRequest {
+  username?: string;
+  email?: string;
+  role?: string;
+  status?: string;
+  clinics?: string[];
+  permissions?: Partial<UserPermissions>;
+  profile?: UpdateUserProfileRequest['profile'];
 }
 
 export interface UserQueryOptions {
@@ -179,18 +204,7 @@ export class UserApiService extends BaseApiService {
   /**
    * Create a new user (Admin only)
    */
-  static async createUser(userData: {
-    username: string;
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    phone?: string;
-    role: string;
-    status?: string;
-    clinics?: string[];
-    permissions?: any;
-  }): Promise<User> {
+  static async createUser(userData: CreateUserRequest): Promise<User> {
     const endpoint = this.BASE_PATH;
     
     const response = await this.request<{ user: User }>(
@@ -201,6 +215,28 @@ export class UserApiService extends BaseApiService {
 
     if (!response.success || !response.data) {
       throw new Error(response.error?.message || '[createUser] Failed to create user');
+    }
+
+    return response.data.user;
+  }
+
+  /**
+   * Update a user with role, clinics, and permissions (Admin/User Manager)
+   */
+  static async updateUser(
+    userId: string,
+    updateData: UpdateUserRequest
+  ): Promise<User> {
+    const endpoint = `${this.BASE_PATH}/${userId}`;
+
+    const response = await this.request<{ user: User }>(
+      endpoint,
+      'PUT',
+      updateData
+    );
+
+    if (!response.success || !response.data) {
+      throw new Error(response.error?.message || '[updateUser] Failed to update user');
     }
 
     return response.data.user;

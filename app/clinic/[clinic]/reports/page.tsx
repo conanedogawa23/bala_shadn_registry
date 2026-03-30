@@ -147,7 +147,7 @@ export default function ReportsPage() {
 
   const [selectedPeriod, setSelectedPeriod] = useState('last6months');
   const [isExporting, setIsExporting] = useState(false);
-  const [selectedExportFormat, setSelectedExportFormat] = useState<'csv' | 'json' | 'pdf'>('csv');
+  const [selectedExportFormat, setSelectedExportFormat] = useState<'xlsx' | 'csv' | 'json' | 'pdf'>('xlsx');
   
   // Custom date range state
   const [useCustomRange, setUseCustomRange] = useState(false);
@@ -342,6 +342,19 @@ export default function ReportsPage() {
       revenueGrowthRate
     };
   }, [revenueAnalytics, orders, ordersPagination, clientStats, totalRevenue, avgOrderValue, analyticsOrderCount]);
+
+  const exportFormatLabel = useMemo(() => {
+    switch (selectedExportFormat) {
+      case 'xlsx':
+        return 'Excel (.xlsx)';
+      case 'csv':
+        return 'CSV';
+      case 'json':
+        return 'JSON';
+      case 'pdf':
+        return 'PDF';
+    }
+  }, [selectedExportFormat]);
 
   // Transform analytics data for charts
   const revenueChartData = useMemo((): RevenueDataPoint[] => {
@@ -617,12 +630,13 @@ export default function ReportsPage() {
               <div className="flex items-center gap-2">
                 <Select 
                   value={selectedExportFormat} 
-                  onValueChange={(value: 'csv' | 'json' | 'pdf') => setSelectedExportFormat(value)}
+                  onValueChange={(value: 'xlsx' | 'csv' | 'json' | 'pdf') => setSelectedExportFormat(value)}
                 >
-                  <SelectTrigger className="w-24">
+                  <SelectTrigger className="w-36">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="xlsx">Excel (.xlsx)</SelectItem>
                     <SelectItem value="csv">CSV</SelectItem>
                     <SelectItem value="json">JSON</SelectItem>
                     <SelectItem value="pdf">PDF</SelectItem>
@@ -964,7 +978,7 @@ export default function ReportsPage() {
                           className="w-full"
                         >
                           <Download size={12} className="mr-2" />
-                          Export {selectedExportFormat.toUpperCase()}
+                          Export {exportFormatLabel}
                         </Button>
                       </CardContent>
                     </Card>
@@ -977,7 +991,8 @@ export default function ReportsPage() {
                     <div>
                       <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Export Information</h4>
                       <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                        <p><strong>CSV:</strong> Spreadsheet format for Excel/Google Sheets</p>
+                        <p><strong>Excel (.xlsx):</strong> Native workbook export with logo, dates, and separate Summary and Detail sheets</p>
+                        <p><strong>CSV:</strong> Flat spreadsheet export for quick imports</p>
                         <p><strong>JSON:</strong> Structured data for API integration</p>
                         <p><strong>PDF:</strong> Formatted reports for presentation</p>
                       </div>
@@ -986,7 +1001,7 @@ export default function ReportsPage() {
                           Period: {selectedPeriod.replace(/([a-z])([A-Z0-9])/g, '$1 $2')}
                         </Badge>
                         <Badge variant="outline" className="text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700">
-                          Format: {selectedExportFormat.toUpperCase()}
+                          Format: {exportFormatLabel}
                         </Badge>
                       </div>
                     </div>

@@ -16,14 +16,15 @@ import {
   XCircle,
   FileText,
   DollarSign,
-  Building
+  Building,
+  Stethoscope
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { findClinicBySlug, generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink, getBackendClinicName } from '@/lib/route-utils';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { formatDate, formatTime } from '@/lib/utils';
@@ -50,7 +51,7 @@ interface Appointment {
   description?: string;
   status: number;
   label: number;
-  resourceId: number;
+  resourceId?: number | null;
   duration: number;
   clientId: string;
   clientKey?: number;
@@ -58,6 +59,8 @@ interface Appointment {
   readyToBill: boolean;
   clinicName: string;
   resourceName?: string;
+  referringDoctorId?: string;
+  referringDoctorName?: string;
   isActive: boolean;
   dateCreated: string;
   dateModified: string;
@@ -93,7 +96,7 @@ export default function AppointmentDetailPage() {
   const { availableClinics } = useClinic();
   const clinicData = useMemo(() => findClinicBySlug(availableClinics, clinicSlug), [availableClinics, clinicSlug]);
   const clinicName = useMemo(() => {
-    return clinicData?.backendName || clinicData?.displayName || clinicSlug;
+    return getBackendClinicName(clinicData, clinicSlug);
   }, [clinicData, clinicSlug]);
 
   useEffect(() => {
@@ -237,9 +240,19 @@ export default function AppointmentDetailPage() {
                     <Building className="h-4 w-4 text-gray-500" />
                     <div>
                       <p className="text-sm text-gray-500">Resource</p>
-                      <p className="font-medium">{appointment.resourceName || `Resource ${appointment.resourceId}`}</p>
+                      <p className="font-medium">{appointment.resourceName || 'Not assigned'}</p>
                     </div>
                   </div>
+
+                  {appointment.referringDoctorName && (
+                    <div className="flex items-center gap-3">
+                      <Stethoscope className="h-4 w-4 text-gray-500" />
+                      <div>
+                        <p className="text-sm text-gray-500">Referring Doctor</p>
+                        <p className="font-medium">{appointment.referringDoctorName}</p>
+                      </div>
+                    </div>
+                  )}
                   
                   {appointment.location && (
                     <div className="flex items-center gap-3">

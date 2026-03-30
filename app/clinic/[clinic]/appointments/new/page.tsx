@@ -14,12 +14,27 @@ import { FormWrapper } from '@/components/ui/form/FormWrapper';
 import { FormInput } from '@/components/ui/form/FormInput';
 import { FormSelect } from '@/components/ui/form/FormSelect';
 import { FormClientSelect } from '@/components/ui/form/FormClientSelect';
+import { FormReferringDoctorSelect } from '@/components/ui/form/FormReferringDoctorSelect';
 import { FormResourceSelect } from '@/components/ui/form/FormResourceSelect';
 import { AlertTriangle, ArrowLeft, Save, Plus } from 'lucide-react';
-import { findClinicBySlug, generateLink } from '@/lib/route-utils';
+import { findClinicBySlug, generateLink, getBackendClinicName } from '@/lib/route-utils';
 import { AppointmentApiService } from '@/lib/api/appointmentService';
 import { useClinic } from '@/lib/contexts/clinic-context';
 import { useClient } from '@/lib/hooks';
+
+const requiredResourceSchema = z.preprocess(
+  (value) => {
+    if (value === '' || value === undefined || value === null) {
+      return undefined;
+    }
+
+    return Number(value);
+  },
+  z.number({
+    required_error: 'Resource is required',
+    invalid_type_error: 'Resource is required'
+  }).int().min(1, { message: 'Resource is required' })
+);
 
 // Define the appointment schema using zod for validation
 const appointmentSchema = z.object({
@@ -27,7 +42,8 @@ const appointmentSchema = z.object({
   endDate: z.string().min(1, { message: 'End date is required' }),
   subject: z.string().min(2, { message: 'Subject must be at least 2 characters' }),
   clientId: z.string().min(1, { message: 'Client ID is required' }),
-  resourceId: z.coerce.number().min(1, { message: 'Resource is required' }),
+  resourceId: requiredResourceSchema,
+  referringDoctorId: z.string().trim().nullable().optional(),
   duration: z.coerce.number().min(15, { message: 'Duration must be at least 15 minutes' }).default(30),
   type: z.coerce.number().int().min(0).default(0),
   status: z.coerce.number().int().min(0).default(0),
@@ -101,7 +117,7 @@ export default function NewAppointmentPage() {
 
   const { availableClinics } = useClinic();
   const clinicData = findClinicBySlug(availableClinics, clinicSlug);
-  const clinicName = clinicData?.backendName || clinicData?.displayName || clinicSlug;
+  const clinicName = getBackendClinicName(clinicData, clinicSlug);
 
   // Read pre-filled client details from URL params.
   useEffect(() => {
@@ -117,7 +133,7 @@ export default function NewAppointmentPage() {
   });
 
   const handleResourceChange = useCallback((resource: {
-    id: string;
+    id: string | number;
     resourceId: number;
     resourceName: string;
     availability?: WeeklyAvailability;
@@ -255,7 +271,7 @@ export default function NewAppointmentPage() {
   const currentDate = new Date();
   const defaultEndDate = calculateEndDate(currentDate, 30);
   
-  const defaultValues: Partial<AppointmentFormValues> = {
+  const defaultValues = {
     startDate: formatDateTimeLocal(currentDate),
     endDate: formatDateTimeLocal(defaultEndDate),
     duration: 30,
@@ -264,11 +280,11 @@ export default function NewAppointmentPage() {
     label: 0,
     subject: '',
     clientId: prefilledClientId,
-    resourceId: 1,
+    referringDoctorId: undefined,
     location: '',
     description: '',
     reminderInfo: ''
-  };
+  } satisfies Partial<AppointmentFormValues>;
 
   // Handle form submission
   const handleSubmit = async (formData: AppointmentFormValues) => {
@@ -282,6 +298,7 @@ export default function NewAppointmentPage() {
         subject: formData.subject,
         clientId: formData.clientId,
         resourceId: formData.resourceId,
+        referringDoctorId: formData.referringDoctorId || undefined,
         clinicName: clinicName,
         duration: formData.duration,
         type: formData.type,
@@ -352,7 +369,7 @@ export default function NewAppointmentPage() {
         <FormWrapper
           key={`appointment-form-${prefilledClientId || 'new'}`}
           schema={appointmentSchema}
-          defaultValues={defaultValues}
+          defaultValues={defaultValues as AppointmentFormValues}
           onSubmit={handleSubmit}
         >
           {(form) => {
@@ -385,17 +402,23 @@ export default function NewAppointmentPage() {
                 />
               </div>
               
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <FormResourceSelect
                   name="resourceId"
                   label="Resource"
                   placeholder="Select a practitioner..."
                   clinicName={clinicName}
-                  includeDoctors={true}
                   onResourceChange={handleResourceChange}
                   required
                 />
-                
+
+                <FormReferringDoctorSelect
+                  name="referringDoctorId"
+                  label="Referring Doctor"
+                  placeholder="Select a referring doctor"
+                  clinicName={clinicName}
+                />
+
                 <FormInput
                   name="duration"
                   label="Duration (minutes)"

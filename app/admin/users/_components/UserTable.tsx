@@ -33,7 +33,7 @@ export function UserTable({ users, onEdit, onDelete, onUnlock, onUpdateStatus }:
       manager: "bg-blue-100 text-blue-800 border-blue-200",
       staff: "bg-cyan-100 text-cyan-800 border-cyan-200",
       practitioner: "bg-indigo-100 text-indigo-800 border-indigo-200",
-      receptionist: "bg-pink-100 text-pink-800 border-pink-200"
+      client: "bg-amber-100 text-amber-800 border-amber-200"
     };
     return styles[role as keyof typeof styles] || styles.staff;
   };
@@ -75,9 +75,18 @@ export function UserTable({ users, onEdit, onDelete, onUnlock, onUpdateStatus }:
               </TableCell>
               <TableCell>{user.email}</TableCell>
               <TableCell>
-                <Badge variant="outline" className={`capitalize ${getRoleBadge(user.role)}`}>
-                  {user.role}
-                </Badge>
+                <div className="space-y-1">
+                  <Badge variant="outline" className={`capitalize ${getRoleBadge(user.role)}`}>
+                    {user.role}
+                  </Badge>
+                  <div className="text-xs text-gray-500">
+                    {user.permissions?.canAccessAllClinics
+                      ? 'All clinics'
+                      : user.permissions?.allowedClinics?.length
+                        ? user.permissions.allowedClinics.join(', ')
+                        : 'No clinic access'}
+                  </div>
+                </div>
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className={`capitalize ${getStatusBadge(user.status)}`}>

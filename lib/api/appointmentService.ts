@@ -22,7 +22,9 @@ interface Appointment {
   description?: string;
   status: number; // 0=scheduled, 1=completed, 2=cancelled, 3=no-show, 4=rescheduled
   label: number;
-  resourceId: number;
+  resourceId?: number | null;
+  referringDoctorId?: string;
+  referringDoctorName?: string;
   duration: number;
   clientId: string;
   clientKey?: number;
@@ -108,6 +110,7 @@ interface CreateAppointmentRequest {
   subject: string;
   clientId: string;
   resourceId: number;
+  referringDoctorId?: string;
   clinicName: string;
   duration?: number;
   type?: number;
@@ -119,9 +122,11 @@ interface CreateAppointmentRequest {
   recurrenceInfo?: string;
 }
 
-interface UpdateAppointmentRequest extends Partial<CreateAppointmentRequest> {
+type UpdateAppointmentRequest = Omit<Partial<CreateAppointmentRequest>, 'resourceId' | 'referringDoctorId'> & {
   isActive?: boolean;
-}
+  referringDoctorId?: string | null;
+  resourceId?: number | null;
+};
 
 interface PaginatedAppointmentResponse {
   appointments: Appointment[];

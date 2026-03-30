@@ -48,17 +48,15 @@ export default function UserManagementPage() {
 
     try {
       const userData = JSON.parse(userJson);
-      // Check role property first, fallback to membershipDetails.membershipType for backward compatibility
-      const userRole = userData.role || userData.membershipDetails?.membershipType;
-      
-      // Only allow admin and manager roles
-      if (userRole !== 'admin' && userRole !== 'manager') {
-        console.log('Access denied. User role:', userRole, '(requires admin or manager)');
+      const canManageUsers = userData.permissions?.canManageUsers === true;
+
+      if (!canManageUsers) {
+        console.log('Access denied. Missing canManageUsers permission.');
         router.push('/');
         return;
       }
-      
-      console.log('Admin access granted. User role:', userRole);
+
+      console.log('User management access granted.');
     } catch (error) {
       console.error('Failed to parse user data:', error);
       router.push('/login');
@@ -149,7 +147,7 @@ export default function UserManagementPage() {
       if (dialogMode === "create") {
         await UserApiService.createUser(userData);
       } else if (dialogMode === "edit" && selectedUser) {
-        await UserApiService.updateUserProfile(selectedUser._id, userData);
+        await UserApiService.updateUser(selectedUser._id, userData);
       }
       
       await fetchUsers();
@@ -252,7 +250,7 @@ export default function UserManagementPage() {
             <SelectItem value="manager">Manager</SelectItem>
             <SelectItem value="staff">Staff</SelectItem>
             <SelectItem value="practitioner">Practitioner</SelectItem>
-            <SelectItem value="receptionist">Receptionist</SelectItem>
+            <SelectItem value="client">Client</SelectItem>
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>

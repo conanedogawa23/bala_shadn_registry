@@ -13,7 +13,9 @@ interface Appointment {
   description?: string;
   status: number;
   label: number;
-  resourceId: number;
+  resourceId?: number | null;
+  referringDoctorId?: string;
+  referringDoctorName?: string;
   duration: number;
   clientId: string;
   clientKey?: number;
