@@ -13,6 +13,7 @@ import { findClinicBySlug, generateLink, getBackendClinicName } from "@/lib/rout
 import { UserApiService, User } from "@/lib/api/userApiService";
 import Link from "next/link";
 import { Stethoscope, Building2, MapPin, Shield, ArrowRight, CalendarClock, Newspaper } from "lucide-react";
+import { canManageSystemUsers } from "@/lib/auth";
 import { useClinic } from "@/lib/contexts/clinic-context";
 
 export default function SettingsPage() {
@@ -48,10 +49,14 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [staffMembers, setStaffMembers] = useState<User[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
+  const [showUserManagement, setShowUserManagement] = useState(false);
 
   // Set mounted state to true after hydration
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== "undefined") {
+      setShowUserManagement(canManageSystemUsers());
+    }
   }, []);
 
   // Fetch staff members for this clinic
@@ -429,13 +434,15 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium">Staff Members ({staffMembers.length})</h3>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => router.push('/admin/users')}
-                  >
-                    Manage All Users
-                  </Button>
+                  {showUserManagement ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => router.push('/admin/users')}
+                    >
+                      Manage All Users
+                    </Button>
+                  ) : null}
                 </div>
                 
                 {isLoadingStaff ? (
@@ -445,12 +452,14 @@ export default function SettingsPage() {
                 ) : staffMembers.length === 0 ? (
                   <div className="text-center py-8 border rounded-lg bg-gray-50">
                     <p className="text-gray-500 mb-4">No staff members assigned to this clinic</p>
-                    <Button 
-                      variant="outline"
-                      onClick={() => router.push('/admin/users')}
-                    >
-                      Add Staff Member
-                    </Button>
+                    {showUserManagement ? (
+                      <Button 
+                        variant="outline"
+                        onClick={() => router.push('/admin/users')}
+                      >
+                        Add Staff Member
+                      </Button>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -484,25 +493,29 @@ export default function SettingsPage() {
                             </div>
                           )}
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => router.push('/admin/users')}
-                        >
-                          Edit
-                        </Button>
+                        {showUserManagement ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => router.push('/admin/users')}
+                          >
+                            Edit
+                          </Button>
+                        ) : null}
                       </div>
                     ))}
                   </div>
                 )}
                 
-                <div className="pt-4 border-t">
-                  <Link href="/admin/users">
-                    <Button variant="outline" className="w-full">
-                      View All Staff & Add New Members
-                    </Button>
-                  </Link>
-                </div>
+                {showUserManagement ? (
+                  <div className="pt-4 border-t">
+                    <Link href="/admin/users">
+                      <Button variant="outline" className="w-full">
+                        View All Staff & Add New Members
+                      </Button>
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">

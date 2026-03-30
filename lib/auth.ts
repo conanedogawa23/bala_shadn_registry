@@ -4,6 +4,7 @@ import { logger } from './utils/logger';
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BaseApiService } from "@/lib/api/baseApiService";
+import type { UserPermissions } from "@/lib/api/userApiService";
 
 // Enhanced User interface with comprehensive profile information
 export interface User {
@@ -14,6 +15,8 @@ export interface User {
   dob: string;
   gender: string;
   role?: string; // User role for authorization (admin, manager, staff, etc.)
+  /** Persisted from API on login; required for /admin/users and permission-gated UI */
+  permissions?: UserPermissions;
   address: {
     street: string;
     city: string;
@@ -205,6 +208,23 @@ export const clearAuthState = (redirectTo: string | null = "/login"): void => {
     window.location.href = redirectTo;
   }
 };
+
+/** True if the signed-in user may open system user management (matches API user routes). */
+export function canManageSystemUsers(): boolean {
+  if (typeof window === "undefined") return false;
+  const userJson = localStorage.getItem("user");
+  if (!userJson) return false;
+  try {
+    const userData = JSON.parse(userJson) as {
+      permissions?: { canManageUsers?: boolean };
+      role?: string;
+    };
+    if (userData.permissions?.canManageUsers === true) return true;
+    return userData.role === "admin";
+  } catch {
+    return false;
+  }
+}
 
 // Get logged in user with full profile data
 export const getUser = (): User | null => {

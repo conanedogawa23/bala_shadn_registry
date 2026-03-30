@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { canManageSystemUsers } from "@/lib/auth";
 import { useClinic } from "@/lib/contexts/clinic-context";
 import { generateLink } from "@/lib/route-utils";
 import { clinicToSlug } from "@/lib/data/clinics";
@@ -21,23 +22,13 @@ export default function SettingsPage() {
   const router = useRouter();
   const { selectedClinic } = useClinic();
   const [mounted, setMounted] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [showUserManagement, setShowUserManagement] = useState(false);
 
   // Set mounted state to true after hydration
   useEffect(() => {
     setMounted(true);
-    
-    // Get user role from localStorage
     if (typeof window !== 'undefined') {
-      const userJson = localStorage.getItem('user');
-      if (userJson) {
-        try {
-          const userData = JSON.parse(userJson);
-          setUserRole(userData.role);
-        } catch (error) {
-          console.error('Failed to parse user data:', error);
-        }
-      }
+      setShowUserManagement(canManageSystemUsers());
     }
   }, []);
 
@@ -89,7 +80,7 @@ export default function SettingsPage() {
     }
   ] : [];
 
-  const adminSettings = (userRole === 'admin' || userRole === 'manager') ? [
+  const adminSettings = showUserManagement ? [
     {
       title: "User Management",
       description: "Manage system users, roles, and permissions",

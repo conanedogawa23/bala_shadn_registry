@@ -119,6 +119,12 @@ export default function LoginPage() {
           dob: user.profile?.dateOfBirth || '',
           gender: user.profile?.gender || 'Other',
           role: user.role || 'user', // Add role as top-level property
+          permissions: user.permissions
+            ? {
+                ...user.permissions,
+                allowedClinics: user.permissions.allowedClinics ?? [],
+              }
+            : undefined,
           address: {
             street: user.profile?.address?.street || '',
             city: user.profile?.address?.city || '',

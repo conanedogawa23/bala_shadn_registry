@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus, Search, RefreshCw } from "lucide-react";
+import { canManageSystemUsers } from "@/lib/auth";
 import { UserApiService, User, UserQueryOptions } from "@/lib/api/userApiService";
 import { UserStats } from "./_components/UserStats";
 import { UserTable } from "./_components/UserTable";
@@ -47,16 +48,11 @@ export default function UserManagementPage() {
     }
 
     try {
-      const userData = JSON.parse(userJson);
-      const canManageUsers = userData.permissions?.canManageUsers === true;
-
-      if (!canManageUsers) {
-        console.log('Access denied. Missing canManageUsers permission.');
+      JSON.parse(userJson);
+      if (!canManageSystemUsers()) {
         router.push('/');
         return;
       }
-
-      console.log('User management access granted.');
     } catch (error) {
       console.error('Failed to parse user data:', error);
       router.push('/login');
